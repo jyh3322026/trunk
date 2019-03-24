@@ -33,12 +33,12 @@
 #define CC_LOCAL_SURF_DENSITY_FIELD_NAME "Surface density"
 #define CC_LOCAL_VOL_DENSITY_FIELD_NAME "Volume density"
 #define CC_ROUGHNESS_FIELD_NAME "Roughness"
+#define CC_MOMENT_ORDER1_FIELD_NAME "1st order moment"
 #define CC_CURVATURE_GAUSSIAN_FIELD_NAME "Gaussian curvature"
 #define CC_CURVATURE_MEAN_FIELD_NAME "Mean curvature"
 #define CC_CURVATURE_NORM_CHANGE_RATE_FIELD_NAME "Normal change rate"
 #define CC_GRADIENT_NORMS_FIELD_NAME "Gradient norms"
 #define CC_GEODESIC_DISTANCES_FIELD_NAME "Geodesic distances"
-#define CC_HEIGHT_GRID_FIELD_NAME "Height grid values"
 #define CC_DEFAULT_RAD_SCATTERING_ANGLES_SF_NAME "Scattering angles (rad)"
 #define CC_DEFAULT_DEG_SCATTERING_ANGLES_SF_NAME "Scattering angles (deg)"
 #define CC_DEFAULT_RANGES_SF_NAME "Ranges"
@@ -47,17 +47,6 @@
 #define CC_DEFAULT_DIP_DIR_SF_NAME "Dip direction (degrees)"
 #define CC_DEFAULT_MESH_VERT_FLAGS_SF_NAME "Vertex type"
 #define CC_DEFAULT_ID_SF_NAME "Id"
-
-//Qt
-#include <QString>
-
-//! Common parameters and other stuff
-class ccCommon
-{
-public:
-
-	//! Returns current software version
-	static QString GetCCVersion(bool full = true);
-};
+#define CC_ORIGINAL_CLOUD_INDEX_SF_NAME "Original cloud index"
 
 #endif

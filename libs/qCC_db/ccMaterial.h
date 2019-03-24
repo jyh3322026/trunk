@@ -19,14 +19,14 @@
 #define CC_MATERIAL_HEADER
 
 //Local
-#include "ccSerializableObject.h"
 #include "ccColorTypes.h"
+#include "ccSerializableObject.h"
 
 //Qt
-#include <QImage>
-#include <QStringList>
 #include <QSharedPointer>
+#include <QtGui/qopengl.h>
 
+class QImage;
 class QOpenGLContext;
 
 //! Mesh (triangle) material
@@ -34,12 +34,12 @@ class QCC_DB_LIB_API ccMaterial : public ccSerializableObject
 {
 public:
 	//! Const + Shared type
-	typedef QSharedPointer<const ccMaterial> CShared;
+	using CShared = QSharedPointer<const ccMaterial>;
 	//! Shared type
-	typedef QSharedPointer<ccMaterial> Shared;
+	using Shared = QSharedPointer<ccMaterial>;
 
 	//! Default constructor
-	ccMaterial(QString name = QString("default"));
+	ccMaterial(const QString& name = QString("default"));
 
 	//! Copy constructor
 	ccMaterial(const ccMaterial& mtl);
@@ -49,7 +49,7 @@ public:
 	//! Returns the texture filename (if any)
 	inline const QString& getTextureFilename() const { return m_textureFilename; }
 	//! Sets the material name
-	inline void setName(QString name) { m_name = name; }
+	inline void setName(const QString& name) { m_name = name; }
 
 	//! Sets diffuse color (both front and back)
 	void setDiffuse(const ccColor::Rgbaf& color);
@@ -106,7 +106,7 @@ public:
 	/** If the filename is not already in DB, the corresponding file will be loaded.
 		\return whether the file could be loaded (or is already in DB) or not
 	**/
-	bool loadAndSetTexture(QString absoluteFilename);
+	bool loadAndSetTexture(const QString& absoluteFilename);
 
 	//! Returns the texture (if any)
 	const QImage getTexture() const;
@@ -120,10 +120,10 @@ public:
 	static void MakeLightsNeutral(const QOpenGLContext* context);
 
 	//! Returns the texture image associated to a given name
-	static QImage GetTexture(QString absoluteFilename);
+	static QImage GetTexture(const QString& absoluteFilename);
 
 	//! Adds a texture to the global texture DB
-	static void AddTexture(QImage image, QString absoluteFilename);
+	static void AddTexture(QImage image, const QString& absoluteFilename);
 
 	//! Release all texture objects
 	/** Should be called BEFORE the global shared context is destroyed.
@@ -141,11 +141,11 @@ public:
 	bool compare(const ccMaterial& mtl) const;
 
 	//inherited from ccSerializableObject
-	virtual bool isSerializable() const { return true; }
+	bool isSerializable() const override { return true; }
 	/** \warning Doesn't save the texture image!
 	**/
-	virtual bool toFile(QFile& out) const;
-	virtual bool fromFile(QFile& in, short dataVersion, int flags);
+	bool toFile(QFile& out) const override;
+	bool fromFile(QFile& in, short dataVersion, int flags) override;
 
 	//! Returns unique identifier (UUID)
 	inline QString getUniqueIdentifier() const { return m_uniqueID; }
@@ -162,12 +162,6 @@ protected:
 	ccColor::Rgbaf m_emission;
 	float m_shininessFront;
 	float m_shininessBack;
-
-	//float m_reflect;
-	//float m_refract;
-	//float m_trans;
-	//float m_glossy;
-	//float m_refract_index;
 };
 
 #endif //CC_MATERIAL_HEADER

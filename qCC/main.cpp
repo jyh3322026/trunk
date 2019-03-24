@@ -18,148 +18,55 @@
 #include <ccIncludeGL.h>
 
 //Qt
-#include <QApplication>
-#include <QSplashScreen>
-#include <QPixmap>
+#include <QDir>
 #include <QMessageBox>
-#include <QLocale>
-#include <QTime>
-#include <QTranslator>
+#include <QPixmap>
 #include <QSettings>
-#include <QGLFormat>
-
-#ifdef Q_OS_MAC
-#include <QFileOpenEvent>
-#endif
+#include <QSplashScreen>
+#include <QTime>
+#include <QTimer>
+#include <QTranslator>
 
 //qCC_db
+#include <ccColorScalesManager.h>
 #include <ccLog.h>
 #include <ccNormalVectors.h>
-#include <ccColorScalesManager.h>
-#include <ccMaterial.h>
 
 //qCC_io
 #include <FileIOFilter.h>
 #include <ccGlobalShiftManager.h>
 
 //local
-#include "mainwindow.h"
-#include "ccGuiParameters.h"
+#include "ccApplication.h"
 #include "ccCommandLineParser.h"
+#include "ccGuiParameters.h"
 #include "ccPersistentSettings.h"
+#include "mainwindow.h"
 
 //plugins
-#include <ccPluginInfo.h>
+#include "ccPluginInterface.h"
+#include "ccPluginManager.h"
 
 #ifdef USE_VLD
 //VLD
 #include <vld.h>
 #endif
 
-//! QApplication wrapper
-class qccApplication : public QApplication
-{
-public:
-	qccApplication( int &argc, char **argv )
-		: QApplication( argc, argv )
-	{
-		setOrganizationName("CCCorp");
-		setApplicationName("CloudCompare");
-		//setAttribute( Qt::AA_ShareOpenGLContexts ); //DGM: too late
 #ifdef Q_OS_MAC
-		// Mac OS X apps don't show icons in menus
-		setAttribute( Qt::AA_DontShowIconsInMenus );
+#include <unistd.h>
 #endif
-		connect(this, &qccApplication::aboutToQuit, [=](){ ccMaterial::ReleaseTextures(); });
-	}
-
-#ifdef Q_OS_MAC
-protected:
-	bool event( QEvent *inEvent )
-	{
-		switch ( inEvent->type() )
-		{
-		case QEvent::FileOpen:
-			{
-				MainWindow* mainWindow = MainWindow::TheInstance();
-				if ( mainWindow == NULL )
-					return false;
-
-				mainWindow->addToDB( QStringList(static_cast<QFileOpenEvent *>(inEvent)->file()) );
-				return true;
-			}
-
-		default:
-			return QApplication::event( inEvent );
-		}
-	}
-#endif
-};
 
 int main(int argc, char **argv)
 {
-	//See http://doc.qt.io/qt-5/qopenglwidget.html#opengl-function-calls-headers-and-qopenglfunctions
-	/** Calling QSurfaceFormat::setDefaultFormat() before constructing the QApplication instance is mandatory
-		on some platforms (for example, OS X) when an OpenGL core profile context is requested. This is to
-		ensure that resource sharing between contexts stays functional as all internal contexts are created
-		using the correct version and profile.
-	**/
-	{
-		QSurfaceFormat format = QSurfaceFormat::defaultFormat();
-		format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
-		format.setStencilBufferSize(0);
-#ifdef CC_GL_WINDOW_USE_QWINDOW
-		format.setStereo(true);
-#endif
 #ifdef Q_OS_MAC
-		format.setStereo(false);
-		format.setVersion( 2, 1 );
-		format.setProfile( QSurfaceFormat::CoreProfile );
+	bool commandLine = isatty( fileno( stdin ) );
+#else
+	bool commandLine = (argc > 1) && (argv[1][0] == '-');
 #endif
-#ifdef QT_DEBUG
-		format.setOption(QSurfaceFormat::DebugContext, true);
-#endif
-		QSurfaceFormat::setDefaultFormat(format);
-	}
-
-	//The 'AA_ShareOpenGLContexts' attribute must be defined BEFORE the creation of the Q(Gui)Application
-	//DGM: this is mandatory to enable exclusive full screen for ccGLWidget (at least on Windows)
-	QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
-
-	//QT initialiation
-	qccApplication app(argc, argv);
-
-	//Locale management
-	{
-		//Force 'english' locale so as to get a consistent behavior everywhere
-		QLocale locale = QLocale(QLocale::English);
-		locale.setNumberOptions(QLocale::c().numberOptions());
-		QLocale::setDefault(locale);
-
-#ifdef Q_OS_UNIX
-		//We reset the numeric locale for POSIX functions
-		//See http://qt-project.org/doc/qt-5/qcoreapplication.html#locale-settings
-		setlocale(LC_NUMERIC, "C");
-#endif
-	}
-
-#ifdef USE_VLD
-	VLDEnable();
-#endif
-
-#ifdef Q_OS_MAC	
-	// This makes sure that our "working directory" is not within the application bundle
-	QDir  appDir = QCoreApplication::applicationDirPath();
+   
+	ccApplication::init(commandLine);
 	
-	if ( appDir.dirName() == "MacOS" )
-	{
-		appDir.cdUp();
-		appDir.cdUp();
-		appDir.cdUp();
-		
-		QDir::setCurrent( appDir.absolutePath() );
-	}
-#endif
+	ccApplication app(argc, argv);
 
 	//store the log message until a valid logging instance is registered
 	ccLog::EnableMessageBackup(true);
@@ -178,9 +85,6 @@ int main(int argc, char **argv)
 		ccGlobalShiftManager::SetMaxBoundgBoxDiagonal(maxAbsDiag);
 	}
 
-	//Command line mode?
-	bool commandLine = (argc > 1 && argv[1][0] == '-');
-	
 	//specific commands
 	int lastArgumentIndex = 1;
 	QTranslator translator;
@@ -206,8 +110,8 @@ int main(int argc, char **argv)
 	}
 
 	//splash screen
-	QSplashScreen* splash = 0;
-	QTime splashStartTime;
+	QScopedPointer<QSplashScreen> splash(nullptr);
+	QTimer splashTimer;
 
 	//standard mode
 	if (!commandLine)
@@ -219,9 +123,8 @@ int main(int argc, char **argv)
 		}
 
 		//splash screen
-		splashStartTime.start();
 		QPixmap pixmap(QString::fromUtf8(":/CC/images/imLogoV2Qt.png"));
-		splash = new QSplashScreen(pixmap, Qt::WindowStaysOnTopHint);
+		splash.reset(new QSplashScreen(pixmap, Qt::WindowStaysOnTopHint));
 		splash->show();
 		QApplication::processEvents();
 	}
@@ -232,63 +135,7 @@ int main(int argc, char **argv)
 	ccColorScalesManager::GetUniqueInstance(); //force pre-computed color tables initialization
 
 	//load the plugins
-	tPluginInfoList plugins;
-	QStringList dirFilters;
-	QStringList pluginPaths;
-	{
-		QString appPath = QCoreApplication::applicationDirPath();
-
-#if defined(Q_OS_MAC)
-		dirFilters << "*.dylib";
-
-		// plugins are in the bundle
-		appPath.remove("MacOS");
-
-		pluginPaths += (appPath + "Plugins/ccPlugins");
-#if defined(CC_MAC_DEV_PATHS)
-		// used for development only - this is the path where the plugins are built
-		// this avoids having to install into the application bundle when developing
-		pluginPaths += (appPath + "../../../ccPlugins");
-#endif
-#elif defined(Q_OS_WIN)
-		dirFilters << "*.dll";
-
-		//plugins are in bin/plugins
-		pluginPaths << (appPath + "/plugins");
-#elif defined(Q_OS_LINUX)
-		dirFilters << "*.so";
-
-		// Plugins are relative to the bin directory where the executable is found
-		QDir  binDir(appPath);
-
-		if (binDir.dirName() == "bin")
-		{
-			binDir.cdUp();
-
-			pluginPaths << (binDir.absolutePath() + "/lib/cloudcompare/plugins");
-		}
-		else
-		{
-			// Choose a reasonable default to look in
-			pluginPaths << "/usr/lib/cloudcompare/plugins";
-		}
-#else
-		#warning Need to specify the plugin path for this OS.
-#endif
-
-#ifdef Q_OS_MAC
-		// Add any app data paths
-		// Plugins in these directories take precendence over the included ones
-		QStringList appDataPaths = QStandardPaths::standardLocations(QStandardPaths::AppDataLocation);
-
-		for (const QString &appDataPath : appDataPaths)
-		{
-			pluginPaths << (appDataPath + "/plugins");
-		}
-#endif
-	}
-
-	ccPlugins::LoadPlugins(plugins, pluginPaths, dirFilters);
+	ccPluginManager::loadPlugins();
 	
 	int result = 0;
 
@@ -296,7 +143,7 @@ int main(int argc, char **argv)
 	if (commandLine)
 	{
 		//command line processing (no GUI)
-		result = ccCommandLineParser::Parse(argc, argv);
+		result = ccCommandLineParser::Parse(argc, argv, ccPluginManager::pluginList());
 	}
 	else
 	{
@@ -307,7 +154,7 @@ int main(int argc, char **argv)
 			QMessageBox::critical(0, "Error", "Failed to initialize the main application window?!");
 			return EXIT_FAILURE;
 		}
-		mainWindow->dispatchPlugins(plugins, pluginPaths);
+		mainWindow->initPlugins();
 		mainWindow->show();
 		QApplication::processEvents();
 
@@ -321,7 +168,9 @@ int main(int argc, char **argv)
 		if (argc > lastArgumentIndex)
 		{
 			if (splash)
+			{
 				splash->close();
+			}
 
 			//any additional argument is assumed to be a filename --> we try to load it/them
 			QStringList filenames;
@@ -335,15 +184,15 @@ int main(int argc, char **argv)
 					QString pluginNameUpper = pluginName.toUpper();
 					//look for this plugin
 					bool found = false;
-					for (const tPluginInfo &plugin : plugins)
+					for ( ccPluginInterface *plugin : ccPluginManager::pluginList() )
 					{
-						if (plugin.object->getName().replace(' ', '_').toUpper() == pluginNameUpper)
+						if (plugin->getName().replace(' ', '_').toUpper() == pluginNameUpper)
 						{
 							found = true;
-							bool success = plugin.object->start();
+							bool success = plugin->start();
 							if (!success)
 							{
-								ccLog::Error(QString("Failed to start the plugin '%1'").arg(plugin.object->getName()));
+								ccLog::Error(QString("Failed to start the plugin '%1'").arg(plugin->getName()));
 							}
 							break;
 						}
@@ -356,33 +205,43 @@ int main(int argc, char **argv)
 				}
 				else
 				{
-					filenames << arg;
+					filenames << QString::fromLocal8Bit(argv[i]);
 				}
 			}
 
 			mainWindow->addToDB(filenames);
 		}
-		
-		if (splash)
+		else if (splash)
 		{
-			//we want the splash screen to be visible a minimum amount of time (1000 ms.)
-			while (splashStartTime.elapsed() < 1000)
-			{
-				splash->raise();
-				QApplication::processEvents(); //to let the system breath!
-			}
-
-			splash->close();
-			QApplication::processEvents();
-
-			delete splash;
-			splash = 0;
+			//count-down to hide the timer (only effective once the application will have actually started!)
+			QObject::connect(&splashTimer, &QTimer::timeout, [&]() { if (splash) splash->close(); QCoreApplication::processEvents(); splash.reset(); });
+			splashTimer.setInterval(1000);
+			splashTimer.start();
 		}
+
+		//change the default path to the application one (do this AFTER processing the command line)
+		QDir  workingDir = QCoreApplication::applicationDirPath();
+		
+	#ifdef Q_OS_MAC
+		// This makes sure that our "working directory" is not within the application bundle	
+		if ( workingDir.dirName() == "MacOS" )
+		{
+			workingDir.cdUp();
+			workingDir.cdUp();
+			workingDir.cdUp();
+		}
+	#endif
+
+		QDir::setCurrent(workingDir.absolutePath());
 
 		//let's rock!
 		try
 		{
 			result = app.exec();
+		}
+		catch (const std::exception& e)
+		{
+			QMessageBox::warning(0, "CC crashed!", QString("Hum, it seems that CC has crashed... Sorry about that :)\n") + e.what());
 		}
 		catch (...)
 		{
@@ -390,17 +249,10 @@ int main(int argc, char **argv)
 		}
 
 		//release the plugins
-		for (tPluginInfo &plugin : plugins)
+		for ( ccPluginInterface *plugin : ccPluginManager::pluginList() )
 		{
-			plugin.object->stop(); //just in case
-			if (!plugin.qObject->parent())
-			{
-				delete plugin.object;
-				plugin.object = 0;
-				plugin.qObject = 0;
-			}
+			plugin->stop(); //just in case
 		}
-
 	}
 
 	//release global structures

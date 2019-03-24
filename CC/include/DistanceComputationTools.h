@@ -32,7 +32,7 @@ class GenericIndexedMesh;
 class GenericCloud;
 class GenericIndexedCloudPersist;
 class ReferenceCloud;
-class ChunkedPointCloud;
+class PointCloud;
 class GenericProgressCallback;
 struct OctreeAndMeshIntersection;
 class ScalarField;
@@ -69,18 +69,18 @@ public: //distance to clouds or meshes
 		**/
 		CC_LOCAL_MODEL_TYPES localModel;
 
-		//! Whether to use a fixed number of neighbors or a (sphere) radius for nearest neighbours seach
+		//! Whether to use a fixed number of neighbors or a (sphere) radius for nearest neighbours search
 		/** For local models only (i.e. ignored if localModel = NO_MODEL).
 		**/
 		bool useSphericalSearchForLocalModel;
 
-		//! Number of neighbours for nearest neighbours seach (local model)
+		//! Number of neighbours for nearest neighbours search (local model)
 		/** For local models only (i.e. ignored if localModel = NO_MODEL).
 			Ignored if useSphericalSearchForLocalModel is true.
 		**/
 		unsigned kNNForLocalModel;
 
-		//! Radius for nearest neighbours seach (local model)
+		//! Radius for nearest neighbours search (local model)
 		/** For local models only (i.e. ignored if localModel = NO_MODEL).
 			Ignored if useSphericalSearchForLocalModel is true.
 		**/
@@ -118,10 +118,10 @@ public: //distance to clouds or meshes
 			, kNNForLocalModel(0)
 			, radiusForLocalModel(0)
 			, reuseExistingLocalModels(false)
-			, CPSet(0)
+			, CPSet(nullptr)
 			, resetFormerDistances(true)
 		{
-			splitDistances[0] = splitDistances[1] = splitDistances[2] = 0;
+			splitDistances[0] = splitDistances[1] = splitDistances[2] = nullptr;
 		}
 	};
 
@@ -130,7 +130,7 @@ public: //distance to clouds or meshes
 		Daniel Girardeau-Montaut's PhD manuscript (Chapter 2, section 2.3). It is the standard way to compare
 		directly two dense (and globally close) point clouds.
 		\warning The current scalar field of the compared cloud should be enabled. By default it will be reset to
-		NAN_VALUE but one can avoid this by definining the Cloud2CloudDistanceComputationParams::resetFormerDistances
+		NAN_VALUE but one can avoid this by defining the Cloud2CloudDistanceComputationParams::resetFormerDistances
 		parameters to false. But even in this case, only values above Cloud2CloudDistanceComputationParams::maxSearchDist
 		will remain untouched.
 		\warning Max search distance (Cloud2CloudDistanceComputationParams::maxSearchDist > 0) is not compatible with the
@@ -146,9 +146,9 @@ public: //distance to clouds or meshes
 	static int computeCloud2CloudDistance(	GenericIndexedCloudPersist* comparedCloud,
 											GenericIndexedCloudPersist* referenceCloud,
 											Cloud2CloudDistanceComputationParams& params,
-											GenericProgressCallback* progressCb = 0,
-											DgmOctree* compOctree = 0,
-											DgmOctree* refOctree = 0);
+											GenericProgressCallback* progressCb = nullptr,
+											DgmOctree* compOctree = nullptr,
+											DgmOctree* refOctree = nullptr);
 
 	//! Cloud-to-mes distances computation parameters
 	struct Cloud2MeshDistanceComputationParams
@@ -186,7 +186,7 @@ public: //distance to clouds or meshes
 		/** The cloud should be initialized but empty on input. It will have the same size as the compared cloud on output.
 			\warning Not compatible with maxSearchDist > 0.
 		**/
-		ChunkedPointCloud* CPSet;
+		PointCloud* CPSet;
 
 		//! Default constructor
 		Cloud2MeshDistanceComputationParams()
@@ -197,7 +197,7 @@ public: //distance to clouds or meshes
 			, flipNormals(false)
 			, multiThread(true)
 			, maxThreadCount(0)
-			, CPSet(0)
+			, CPSet(nullptr)
 		{}
 	};
 
@@ -215,8 +215,8 @@ public: //distance to clouds or meshes
 	static int computeCloud2MeshDistance(	GenericIndexedCloudPersist* pointCloud,
 											GenericIndexedMesh* mesh,
 											Cloud2MeshDistanceComputationParams& params,
-											GenericProgressCallback* progressCb = 0,
-											DgmOctree* cloudOctree = 0);
+											GenericProgressCallback* progressCb = nullptr,
+											DgmOctree* cloudOctree = nullptr);
 
 public: //approximate distances to clouds or meshes
 
@@ -237,9 +237,9 @@ public: //approximate distances to clouds or meshes
 												GenericIndexedCloudPersist* referenceCloud,
 												unsigned char octreeLevel,
 												PointCoordinateType maxSearchDist = 0,
-												GenericProgressCallback* progressCb = 0,
-												DgmOctree* compOctree = 0,
-												DgmOctree* refOctree = 0);
+												GenericProgressCallback* progressCb = nullptr,
+												DgmOctree* compOctree = nullptr,
+												DgmOctree* refOctree = nullptr);
 
 public: //distance to simple entities (triangles, planes, etc.)
 
@@ -254,7 +254,7 @@ public: //distance to simple entities (triangles, planes, etc.)
 	static ScalarType computePoint2TriangleDistance(const CCVector3* P,
 													const GenericTriangle* theTriangle,
 													bool signedDist,
-													CCVector3* nearestP = 0);
+													CCVector3* nearestP = nullptr);
 
 	//! Computes the (signed) distance between a point and a plane
 	/** \param P a 3D point
@@ -341,7 +341,7 @@ public: //other methods
 	static bool computeGeodesicDistances(	GenericIndexedCloudPersist* cloud,
 											unsigned seedPointIndex,
 											unsigned char octreeLevel,
-											GenericProgressCallback* progressCb = 0);
+											GenericProgressCallback* progressCb = nullptr);
 
 	//! Computes the differences between two scalar fields associated to equivalent point clouds
 	/** The compared cloud should be smaller or equal to the reference cloud. Its points should be
@@ -356,7 +356,7 @@ public: //other methods
 	**/
 	static int diff(GenericIndexedCloudPersist* comparedCloud,
 					GenericIndexedCloudPersist* referenceCloud,
-					GenericProgressCallback* progressCb = 0);
+					GenericProgressCallback* progressCb = nullptr);
 
 	//! Return codes for DistanceComputationTools::synchronizeOctrees
 	enum SOReturnCode { EMPTY_CLOUD, SYNCHRONIZED, DISJOINT, OUT_OF_MEMORY };
@@ -378,7 +378,7 @@ public: //other methods
 											DgmOctree* &comparedOctree,
 											DgmOctree* &referenceOctree,
 											PointCoordinateType maxSearchDist = 0,
-											GenericProgressCallback* progressCb = 0);
+											GenericProgressCallback* progressCb = nullptr);
 
 	//! Returns whether multi-threading (parallel) computation is supported or not
 	static bool MultiThreadSupport();
@@ -393,7 +393,7 @@ protected:
 	**/
 	static int intersectMeshWithOctree(	OctreeAndMeshIntersection* theIntersection,
 										unsigned char octreeLevel,
-										GenericProgressCallback* progressCb = 0);
+										GenericProgressCallback* progressCb = nullptr);
 
 	//! Computes the distances between a point cloud and a mesh projected into a grid structure
 	/** This method is used by computeCloud2MeshDistance, after intersectMeshWithOctree has been called.
@@ -404,7 +404,7 @@ protected:
 	**/
 	static int computeCloud2MeshDistanceWithOctree(	OctreeAndMeshIntersection* theIntersection,
 													Cloud2MeshDistanceComputationParams& params,
-													GenericProgressCallback* progressCb = 0);
+													GenericProgressCallback* progressCb = nullptr);
 
 	//! Computes the "nearest neighbour distance" without local modeling for all points of an octree cell
 	/** This method has the generic syntax of a "cellular function" (see DgmOctree::localFunctionPtr).
@@ -419,7 +419,7 @@ protected:
 	**/
 	static bool computeCellHausdorffDistance(	const DgmOctree::octreeCell& cell,
 												void** additionalParameters,
-												NormalizedProgress* nProgress = 0);
+												NormalizedProgress* nProgress = nullptr);
 
 	//! Computes the "nearest neighbour distance" with local modeling for all points of an octree cell
 	/** This method has the generic syntax of a "cellular function" (see DgmOctree::localFunctionPtr).
@@ -435,7 +435,7 @@ protected:
 	**/
 	static bool computeCellHausdorffDistanceWithLocalModel(	const DgmOctree::octreeCell& cell,
 															void** additionalParameters,
-															NormalizedProgress* nProgress = 0);
+															NormalizedProgress* nProgress = nullptr);
 };
 
 }

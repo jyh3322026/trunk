@@ -21,10 +21,10 @@
 
 //Local
 #include "CCToolbox.h"
-#include "GenericChunkedArray.h"
 
 //system
 #include <map>
+#include <vector>
 
 namespace CCLib
 {
@@ -32,7 +32,7 @@ namespace CCLib
 class GenericProgressCallback;
 class GenericMesh;
 class GenericIndexedMesh;
-class SimpleCloud;
+class PointCloud;
 class ScalarField;
 
 //! Mesh sampling algorithms
@@ -99,7 +99,7 @@ public:
 		\param[out] stats output statistics (optional)
 		\return false if an error occurred (invalid input or not enough memory)
 	**/
-	static bool flagMeshVerticesByType(GenericIndexedMesh* mesh, ScalarField* flags, EdgeConnectivityStats* stats = 0);
+	static bool flagMeshVerticesByType(GenericIndexedMesh* mesh, ScalarField* flags, EdgeConnectivityStats* stats = nullptr);
 
 	//! Samples points on a mesh
 	/** The points are sampled on each triangle randomly, by generating
@@ -119,10 +119,10 @@ public:
 		\param[out] triIndices triangle index for each samples point (output only - optional)
 		\return the sampled points
 	**/
-	static SimpleCloud* samplePointsOnMesh(	GenericMesh* mesh,
+	static PointCloud* samplePointsOnMesh(	GenericMesh* mesh,
 											double samplingDensity,
-											GenericProgressCallback* progressCb = 0,
-											GenericChunkedArray<1,unsigned>* triIndices = 0);
+											GenericProgressCallback* progressCb = nullptr,
+											std::vector<unsigned>* triIndices = nullptr);
 
 	//! Samples points on a mesh
 	/** See the other version of this method. Instead of specifying a
@@ -134,10 +134,10 @@ public:
 		\param[out] triIndices triangle index for each samples point (output only - optional)
 		\return the sampled points
 	**/
-	static SimpleCloud* samplePointsOnMesh(	GenericMesh* mesh,
+	static PointCloud* samplePointsOnMesh(	GenericMesh* mesh,
 											unsigned numberOfPoints,
-											GenericProgressCallback* progressCb = 0,
-											GenericChunkedArray<1,unsigned>* triIndices = 0);
+											GenericProgressCallback* progressCb = nullptr,
+											std::vector<unsigned>* triIndices = nullptr);
 
 protected:
 
@@ -150,16 +150,16 @@ protected:
 		\param[out] triIndices triangle index for each samples point (output only - optional)
 		\return the sampled points
 	**/
-	static SimpleCloud* samplePointsOnMesh(	GenericMesh* mesh,
+	static PointCloud* samplePointsOnMesh(	GenericMesh* mesh,
 											double samplingDensity,
 											unsigned theoreticNumberOfPoints,
-											GenericProgressCallback* progressCb = 0,
-											GenericChunkedArray<1,unsigned>* triIndices = 0);
+											GenericProgressCallback* progressCb = nullptr,
+											std::vector<unsigned>* triIndices = nullptr);
 
 	//! Map used to count the number of triangles using each edge
 	/** Edges are represented by two 32 bits indexes merged as a 64 integer
 	**/
-	typedef std::map<unsigned long long, unsigned> EdgeUsageMap;
+	using EdgeUsageMap = std::map<unsigned long long, unsigned>;
 
 	//! Computes the unique key corresponding to an edge
 	static unsigned long long ComputeEdgeKey(unsigned i1, unsigned i2);

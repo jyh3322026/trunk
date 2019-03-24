@@ -18,34 +18,41 @@
 #include "ccWaveformDialog.h"
 
 //Local
-#include "ccQCustomPlot.h"
+#include "ccFileUtils.h"
 #include "ccPersistentSettings.h"
-#include "ccGuiParameters.h"
+#include "ccQCustomPlot.h"
+
+//common
+#include <ccPickingHub.h>
 
 //qCC_db
 #include <ccPointCloud.h>
+#include <ccProgressDialog.h>
 
 //Qt
 #include <QCloseEvent>
 #include <QSettings>
 
 //System
-#include <assert.h>
+#include <cassert>
+#include <cmath>
 
 //Gui
 #include "ui_waveDlg.h"
 
 ccWaveWidget::ccWaveWidget(QWidget* parent/*=0*/)
 	: QCustomPlot(parent)
-	, m_titlePlot(0)
-	, m_curve(0)
-	, m_dt(0)
-	, m_minA(0)
-	, m_maxA(0)
-	, m_vertBar(0)
+	, m_titlePlot(nullptr)
+	, m_curve(nullptr)
+	, m_dt(0.0)
+	, m_minA(0.0)
+	, m_maxA(0.0)
+	, m_echoPos(-1.0)
+	, m_vertBar(nullptr)
 	, m_drawVerticalIndicator(false)
-	, m_verticalIndicatorPositionPercent(0)
-	, m_lastMouseClick(0,0)
+	, m_verticalIndicatorPositionPercent(0.0)
+	, m_peakBar(nullptr)
+	, m_lastMouseClick(0, 0)
 {
 	setWindowTitle("Waveform");
 	setFocusPolicy(Qt::StrongFocus);
@@ -80,7 +87,7 @@ void ccWaveWidget::clear()
 
 void ccWaveWidget::clearInternal()
 {
-	m_curveValues.clear();
+	m_curveValues.resize(0);
 	m_dt = 0;
 	m_minA = m_maxA = 0;
 }
@@ -115,7 +122,9 @@ void ccWaveWidget::setAxisLabels(const QString& xLabel, const QString& yLabel)
 	}
 }
 
-void ccWaveWidget::init(ccPointCloud* cloud, unsigned pointIndex, bool logScale)
+static double AbsLog(double c) { return (c >= 0 ? log1p(c) : -log1p(-c)); }
+
+void ccWaveWidget::init(ccPointCloud* cloud, unsigned pointIndex, bool logScale, double maxValue/*=0.0*/)
 {
 	clearInternal();
 
@@ -124,23 +133,21 @@ void ccWaveWidget::init(ccPointCloud* cloud, unsigned pointIndex, bool logScale)
 		return;
 	}
 
-	const ccWaveform& w = cloud->fwfData()[pointIndex];
-	uint8_t descriptorID = w.descriptorID();
-	if (descriptorID == 0 || !cloud->fwfDescriptors().contains(descriptorID))
+	const ccWaveformProxy& w = cloud->waveformProxy(pointIndex);
+	if (!w.isValid())
 	{
 		//no valid descriptor
 		return;
 	}
 
-	const WaveformDescriptor& d = cloud->fwfDescriptors()[descriptorID];
-	if (d.numberOfSamples == 0)
+	if (w.numberOfSamples() == 0)
 	{
 		return;
 	}
 
 	try
 	{
-		m_curveValues.resize(d.numberOfSamples, 0);
+		m_curveValues.resize(w.numberOfSamples(), 0);
 	}
 	catch (const std::bad_alloc&)
 	{
@@ -149,19 +156,12 @@ void ccWaveWidget::init(ccPointCloud* cloud, unsigned pointIndex, bool logScale)
 		return;
 	}
 
-	for (uint32_t i = 0; i < d.numberOfSamples; ++i)
+	for (uint32_t i = 0; i < w.numberOfSamples(); ++i)
 	{
-		double c = w.getSample(i, d);
+		double c = w.getSample(i);
 		if (logScale)
 		{
-			if (c >= 0)
-			{
-				c = log(1.0 + c);
-			}
-			else // c < 0
-			{
-				c = -log(1.0 - c);
-			}
+			c = AbsLog(c);
 		}
 		m_curveValues[i] = c;
 
@@ -176,10 +176,14 @@ void ccWaveWidget::init(ccPointCloud* cloud, unsigned pointIndex, bool logScale)
 		}
 	}
 
-	m_dt = d.samplingRate_ps;
+	if (maxValue != 0)
+	{
+		m_maxA = logScale ? AbsLog(maxValue) : maxValue;
+	}
 
-	refresh();
-};
+	m_dt = w.descriptor().samplingRate_ps;
+	m_echoPos = w.echoTime_ps();
+}
 
 void ccWaveWidget::refresh()
 {
@@ -199,7 +203,7 @@ void ccWaveWidget::refresh()
 		{
 			//remove previous title
 			plotLayout()->remove(m_titlePlot);
-			m_titlePlot = 0;
+			m_titlePlot = nullptr;
 		}
 		m_titlePlot = new QCPPlotTitle(this, m_titleStr);
 		
@@ -210,18 +214,15 @@ void ccWaveWidget::refresh()
 	}
 
 	//clear previous display
-	m_vertBar	= 0;
-	m_curve		= 0;
+	m_vertBar = nullptr;
+	m_curve = nullptr;
+	m_peakBar = nullptr;
 	this->clearGraphs();
 	this->clearPlottables();
 
-	if (m_curveValues.empty())
-	{
-		return;
-	}
-
 	//wave curve
 	int curveSize = static_cast<int>(m_curveValues.size());
+	if (curveSize != 0)
 	{
 		QVector<double> x(curveSize), y(curveSize);
 		
@@ -265,14 +266,37 @@ void ccWaveWidget::refresh()
 
 		m_vertBar->setData(keyData, valueData);
 
-		//precision
-		int precision = static_cast<int>(ccGui::Parameters().displayedNumPrecision);
-		
+		//precision		
 		QString valueStr = QString("Sample %0").arg(curvePos);
 		m_vertBar->setText(valueStr);
 		valueStr = QString("= %0").arg(curvePos < curveSize ? m_curveValues[curvePos] : 0);
 		m_vertBar->appendText(valueStr);
 		m_vertBar->setTextAlignment(m_verticalIndicatorPositionPercent > 0.5);
+	}
+
+	if (m_echoPos >= 0)
+	{
+		m_peakBar = new QCPBarsWithText(xAxis, yAxis);
+		addPlottable(m_peakBar);
+
+		// now we can modify properties of vertBar
+		m_peakBar->setName("PeakLine");
+		m_peakBar->setWidth(0);
+		m_peakBar->setBrush(QBrush(Qt::blue));
+		m_peakBar->setPen(QPen(Qt::blue));
+		m_peakBar->setAntialiasedFill(false);
+		QVector<double> keyData(1);
+		QVector<double> valueData(1);
+
+		//horizontal position
+		keyData[0] = m_echoPos;
+		valueData[0] = m_maxA;
+
+		m_peakBar->setData(keyData, valueData);
+
+		//precision
+		m_peakBar->setText("Peak");
+		m_peakBar->setTextAlignment(m_echoPos > 0.5 * curveSize * m_dt);
 	}
 
 	//rescaleAxes();
@@ -332,32 +356,48 @@ void ccWaveWidget::mouseMoveEvent(QMouseEvent *event)
 	}
 }
 
-//void ccWaveWidget::wheelEvent(QWheelEvent* e)
-//{
-//	e->ignore();
-//}
-
-ccWaveDialog::ccWaveDialog(ccPointCloud* cloud, QWidget* parent/*=0*/)
+ccWaveDialog::ccWaveDialog(	ccPointCloud* cloud,
+							ccPickingHub* pickingHub,
+							QWidget* parent/*=0*/)
 	: QDialog(parent, Qt::WindowMaximizeButtonHint | Qt::WindowCloseButtonHint)
 	, m_cloud(cloud)
 	, m_widget(new ccWaveWidget(this))
+	, m_pickingHub(pickingHub)
 	, m_gui(new Ui_WaveDialog)
+	, m_waveMax(0)
 {
 	m_gui->setupUi(this);
 	
 	QHBoxLayout* hboxLayout = new QHBoxLayout(m_gui->waveFrame);
 	hboxLayout->addWidget(m_widget);
-	hboxLayout->setContentsMargins(0,0,0,0);
+	hboxLayout->setContentsMargins(0, 0, 0, 0);
 	m_gui->waveFrame->setLayout(hboxLayout);
 
 	if (cloud && cloud->size())
 	{
 		m_gui->pointIndexSpinBox->setMaximum(static_cast<int>(cloud->size()));
-		m_gui->pointIndexSpinBox->setSuffix(QString(" / %1").arg(cloud->size()-1));
+		m_gui->pointIndexSpinBox->setSuffix(QString(" / %1").arg(cloud->size() - 1));
+
+		//init m_waveMax
+		double waveMin = 0;
+		ccProgressDialog pDlg(parent);
+		if (cloud->computeFWFAmplitude(waveMin, m_waveMax, &pDlg))
+		{
+			ccLog::Print(QString("[ccWaveDialog] Cloud '%1': max FWF amplitude = %2").arg(cloud->getName()).arg(m_waveMax));
+		}
+		else
+		{
+			ccLog::Warning("[ccWaveDialog] Input cloud has no valid FWF data");
+		}
 	}
 
 	connect(m_gui->pointIndexSpinBox, SIGNAL(valueChanged(int)), this, SLOT(onPointIndexChanged(int)));
-	connect(m_gui->logScaleCheckBox, SIGNAL(toggled(bool)), this, SLOT(onLogScaleToggled(bool)));
+	connect(m_gui->logScaleCheckBox, SIGNAL(toggled(bool)), this, SLOT(updateCurrentWaveform()));
+	connect(m_gui->fixedAmplitudeCheckBox, SIGNAL(toggled(bool)), this, SLOT(updateCurrentWaveform()));
+	connect(m_gui->pointPickingToolButton, SIGNAL(toggled(bool)), SLOT(onPointPickingButtonToggled(bool)));
+	connect(this, &QDialog::finished, [&]() { m_gui->pointPickingToolButton->setChecked(false); }); //auto disable picking mode when the dialog is closed
+	connect(m_gui->saveWaveToolButton, SIGNAL(clicked()), SLOT(onExportWaveAsCSV()));
+
 
 	//force update
 	onPointIndexChanged(0);
@@ -365,24 +405,111 @@ ccWaveDialog::ccWaveDialog(ccPointCloud* cloud, QWidget* parent/*=0*/)
 
 ccWaveDialog::~ccWaveDialog()
 {
-	if (m_gui)
-	{
-		delete m_gui;
-	}
+
+	delete m_gui;
 }
 
 void ccWaveDialog::onPointIndexChanged(int index)
 {
+	if (!m_widget)
+	{
+		assert(false);
+		return;
+	}
 	if (index < 0 || !m_cloud)
 	{
 		assert(false);
 		return;
 	}
 
-	m_widget->init(m_cloud, static_cast<unsigned>(index), m_gui->logScaleCheckBox->isChecked());
+	m_widget->init(m_cloud, static_cast<unsigned>(index), m_gui->logScaleCheckBox->isChecked(), m_gui->fixedAmplitudeCheckBox->isChecked() ? m_waveMax : 0.0);
+	m_widget->refresh();
 }
 
-void ccWaveDialog::onLogScaleToggled(bool)
+void ccWaveDialog::onItemPicked(const PickedItem& pi)
+{
+	if (pi.entity == m_cloud)
+	{
+		m_gui->pointIndexSpinBox->setValue(static_cast<int>(pi.itemIndex));
+	}
+}
+
+void ccWaveDialog::updateCurrentWaveform()
 {
 	onPointIndexChanged(m_gui->pointIndexSpinBox->value());
+}
+
+void ccWaveDialog::onPointPickingButtonToggled(bool state)
+{
+	if (!m_pickingHub)
+	{
+		assert(false);
+		return;
+	}
+
+	if (state)
+	{
+		if (!m_pickingHub->addListener(this))
+		{
+			ccLog::Error("Another tool is currently using the point picking mechanism.\nYou'll have to close it first.");
+			m_gui->pointPickingToolButton->blockSignals(true);
+			m_gui->pointPickingToolButton->setChecked(false);
+			m_gui->pointPickingToolButton->blockSignals(false);
+			return;
+		}
+	}
+	else
+	{
+		m_pickingHub->removeListener(this);
+	}
+}
+
+void ccWaveDialog::onExportWaveAsCSV()
+{
+	if (!m_cloud)
+	{
+		assert(false);
+		return;
+	}
+
+	int pointIndex = m_gui->pointIndexSpinBox->value();
+	if (pointIndex >= static_cast<int>(m_cloud->waveforms().size()))
+	{
+		assert(false);
+		return;
+	}
+	
+	const ccWaveformProxy& w = m_cloud->waveformProxy(pointIndex);
+	if (!w.isValid())
+	{
+		//no valid descriptor
+		return;
+	}
+	if (w.numberOfSamples() == 0)
+	{
+		//nothing to do
+		return;
+	}
+
+	//persistent settings
+	QSettings settings;
+	settings.beginGroup(ccPS::SaveFile());
+	QString currentPath = settings.value(ccPS::CurrentPath(), ccFileUtils::defaultDocPath()).toString();
+
+	currentPath += QString("/") + QString("waveform_%1.csv").arg(pointIndex);
+
+	//ask for a filename
+	QString filename = QFileDialog::getSaveFileName(this, "Select output file", currentPath, "*.csv");
+	if (filename.isEmpty())
+	{
+		//process cancelled by user
+		return;
+	}
+
+	//save last saving location
+	settings.setValue(ccPS::CurrentPath(), QFileInfo(filename).absolutePath());
+	settings.endGroup();
+
+	//save file
+	w.toASCII(filename);
 }

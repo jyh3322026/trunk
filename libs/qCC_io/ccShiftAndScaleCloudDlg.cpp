@@ -25,8 +25,10 @@
 #include "ccGlobalShiftManager.h"
 
 //Qt
-#include <QPushButton>
+#include <QDebug>
+#include <QDir>
 #include <QFile>
+#include <QPushButton>
 #include <QTextStream>
 #include <QStringList>
 
@@ -40,18 +42,6 @@
 //default name for the Global Shift List file
 static QString s_defaultGlobalShiftListFilename("global_shift_list.txt");
 
-//semi-persistent settings
-struct LastShiftInfo : ccShiftAndScaleCloudDlg::ShiftInfo
-{
-	bool valid;
-
-	LastShiftInfo()
-		: ccShiftAndScaleCloudDlg::ShiftInfo("Last input")
-		, valid(false)
-	{}
-};
-static LastShiftInfo s_lastInfo;
-
 ccShiftAndScaleCloudDlg::ccShiftAndScaleCloudDlg(const CCVector3d& Pg,
 												 double Dg/*=0*/,
 												 QWidget* parent/*=0*/)
@@ -62,7 +52,7 @@ ccShiftAndScaleCloudDlg::ccShiftAndScaleCloudDlg(const CCVector3d& Pg,
 	, m_activeInfoIndex(-1)
 	, m_originalPoint(Pg)
 	, m_originalDiagonal(Dg)
-	, m_localPoint(0,0,0)
+	, m_localPoint(0, 0, 0)
 	, m_localDiagonal(-1.0)
 	, m_reversedMode(false)
 {
@@ -70,6 +60,7 @@ ccShiftAndScaleCloudDlg::ccShiftAndScaleCloudDlg(const CCVector3d& Pg,
 
 	showWarning(false);
 	showKeepGlobalPosCheckbox(false);
+	showPreserveShiftOnSave(true);
 	showScaleItems(m_originalDiagonal > 0.0);
 	showCancelButton(false);
 }
@@ -95,6 +86,7 @@ ccShiftAndScaleCloudDlg::ccShiftAndScaleCloudDlg(	const CCVector3d& Pl,
 	showWarning(false);
 	showTitle(false);
 	showKeepGlobalPosCheckbox(true);
+	showPreserveShiftOnSave(false);
 	showScaleItems(m_originalDiagonal > 0.0 && m_localDiagonal > 0.0);
 	showCancelButton(true);
 
@@ -109,6 +101,13 @@ ccShiftAndScaleCloudDlg::~ccShiftAndScaleCloudDlg()
 		delete m_ui;
 		m_ui = 0;
 	}
+}
+
+void ccShiftAndScaleCloudDlg::setShiftFieldsPrecision(int precision)
+{
+	m_ui->shiftX->setDecimals(precision);
+	m_ui->shiftY->setDecimals(precision);
+	m_ui->shiftZ->setDecimals(precision);
 }
 
 void ccShiftAndScaleCloudDlg::init()
@@ -151,9 +150,9 @@ void ccShiftAndScaleCloudDlg::displayMoreInfo()
 }
 
 bool ccShiftAndScaleCloudDlg::addFileInfo()
-{
+{	
 	//try to load the 'global_shift_list.txt" file
-	return loadInfoFromFile(QApplication::applicationDirPath() + QString("/")+ s_defaultGlobalShiftListFilename);
+	return loadInfoFromFile(QDir::currentPath() + QString("/")+ s_defaultGlobalShiftListFilename);
 }
 
 bool ccShiftAndScaleCloudDlg::loadInfoFromFile(QString filename)
@@ -191,7 +190,7 @@ bool ccShiftAndScaleCloudDlg::loadInfoFromFile(QString filename)
 		//decode items
 		bool ok = true;
 		unsigned errors = 0;
-		ShiftInfo info;
+		ccGlobalShiftManager::ShiftInfo info;
 		info.name = tokens[0].trimmed();
 		info.shift.x = tokens[1].toDouble(&ok);
 		if (!ok) ++errors;
@@ -225,8 +224,10 @@ bool ccShiftAndScaleCloudDlg::loadInfoFromFile(QString filename)
 	}
 	
 	//now add the new entries in the combo-box
-	for (size_t i=originalSize; i<m_defaultInfos.size(); ++i)
+	for (size_t i = originalSize; i < m_defaultInfos.size(); ++i)
+	{
 		m_ui->loadComboBox->addItem(m_defaultInfos[i].name);
+	}
 	m_ui->loadComboBox->setEnabled(m_defaultInfos.size() >= 2);
 
 	return true;
@@ -256,15 +257,15 @@ void ccShiftAndScaleCloudDlg::updateGlobalSystem()
 		diag = m_localDiagonal / getScale();
 	}
 
-	m_ui->xOriginLabel->setText(QString("x = %1").arg(P.x,0,'f'));
-	m_ui->xOriginLabel->setStyleSheet(AlmostEq(P.x,m_originalPoint.x) ? QString() : QString("color: purple;"));
-	m_ui->yOriginLabel->setText(QString("y = %1").arg(P.y,0,'f'));
-	m_ui->yOriginLabel->setStyleSheet(AlmostEq(P.y,m_originalPoint.y) ? QString() : QString("color: purple;"));
-	m_ui->zOriginLabel->setText(QString("z = %1").arg(P.z,0,'f'));
-	m_ui->zOriginLabel->setStyleSheet(AlmostEq(P.z,m_originalPoint.z) ? QString() : QString("color: purple;"));
+	m_ui->xOriginLabel->setText(QString("x = %1").arg(P.x, 0, 'f'));
+	m_ui->xOriginLabel->setStyleSheet(AlmostEq(P.x, m_originalPoint.x) ? QString() : QString("color: purple;"));
+	m_ui->yOriginLabel->setText(QString("y = %1").arg(P.y, 0, 'f'));
+	m_ui->yOriginLabel->setStyleSheet(AlmostEq(P.y, m_originalPoint.y) ? QString() : QString("color: purple;"));
+	m_ui->zOriginLabel->setText(QString("z = %1").arg(P.z, 0, 'f'));
+	m_ui->zOriginLabel->setStyleSheet(AlmostEq(P.z, m_originalPoint.z) ? QString() : QString("color: purple;"));
 
-	m_ui->diagOriginLabel->setText(QString("diagonal = %1").arg(diag,0,'f'));
-	m_ui->diagOriginLabel->setStyleSheet(AlmostEq(diag,m_originalDiagonal) ? QString() : QString("color: purple;"));
+	m_ui->diagOriginLabel->setText(QString("diagonal = %1").arg(diag, 0, 'f'));
+	m_ui->diagOriginLabel->setStyleSheet(AlmostEq(diag, m_originalDiagonal) ? QString() : QString("color: purple;"));
 }
 
 void ccShiftAndScaleCloudDlg::updateLocalSystem()
@@ -278,20 +279,20 @@ void ccShiftAndScaleCloudDlg::updateLocalSystem()
 	}
 
 	//adaptive precision
-	double maxCoord = std::max(fabs(localPoint.x),fabs(localPoint.y));
-	maxCoord = std::max(fabs(localPoint.z),maxCoord);
-	int digitsBeforeDec = static_cast<int>(floor(log10(maxCoord)))+1;
-	int prec = std::max(0,8-digitsBeforeDec);
+	double maxCoord = std::max(fabs(localPoint.x), fabs(localPoint.y));
+	maxCoord = std::max(fabs(localPoint.z), maxCoord);
+	int digitsBeforeDec = static_cast<int>(floor(log10(maxCoord))) + 1;
+	int prec = std::max(0, 8 - digitsBeforeDec);
 
-	m_ui->xDestLabel->setText(QString("x = %1").arg(localPoint.x,0,'f',prec));
-	m_ui->xDestLabel->setStyleSheet(ccGlobalShiftManager::NeedShift(localPoint.x) ? QString("color: red;") : QString() );
-	m_ui->yDestLabel->setText(QString("y = %1").arg(localPoint.y,0,'f',prec));
-	m_ui->yDestLabel->setStyleSheet(ccGlobalShiftManager::NeedShift(localPoint.y) ? QString("color: red;") : QString() );
-	m_ui->zDestLabel->setText(QString("z = %1").arg(localPoint.z,0,'f',prec));
-	m_ui->zDestLabel->setStyleSheet(ccGlobalShiftManager::NeedShift(localPoint.z) ? QString("color: red;") : QString() );
+	m_ui->xDestLabel->setText(QString("x = %1").arg(localPoint.x, 0, 'f', prec));
+	m_ui->xDestLabel->setStyleSheet(ccGlobalShiftManager::NeedShift(localPoint.x) ? QString("color: red;") : QString());
+	m_ui->yDestLabel->setText(QString("y = %1").arg(localPoint.y, 0, 'f', prec));
+	m_ui->yDestLabel->setStyleSheet(ccGlobalShiftManager::NeedShift(localPoint.y) ? QString("color: red;") : QString());
+	m_ui->zDestLabel->setText(QString("z = %1").arg(localPoint.z, 0, 'f', prec));
+	m_ui->zDestLabel->setStyleSheet(ccGlobalShiftManager::NeedShift(localPoint.z) ? QString("color: red;") : QString());
 
-	m_ui->diagDestLabel->setText(QString("diagonal = %1").arg(localDiagonal,0,'f',prec));
-	m_ui->diagDestLabel->setStyleSheet(ccGlobalShiftManager::NeedRescale(localDiagonal) ? QString("color: red;") : QString() );
+	m_ui->diagDestLabel->setText(QString("diagonal = %1").arg(localDiagonal, 0, 'f', prec));
+	m_ui->diagDestLabel->setStyleSheet(ccGlobalShiftManager::NeedRescale(localDiagonal) ? QString("color: red;") : QString());
 }
 
 void ccShiftAndScaleCloudDlg::setShift(const CCVector3d& shift)
@@ -358,6 +359,21 @@ void ccShiftAndScaleCloudDlg::showKeepGlobalPosCheckbox(bool state)
 	m_ui->keepGlobalPosCheckBox->setVisible(state);
 }
 
+void ccShiftAndScaleCloudDlg::showPreserveShiftOnSave(bool state)
+{
+	m_ui->preserveShiftOnSaveCheckBox->setVisible(state);
+}
+
+bool ccShiftAndScaleCloudDlg::preserveShiftOnSave() const
+{
+	return m_ui->preserveShiftOnSaveCheckBox->isChecked();
+}
+
+void ccShiftAndScaleCloudDlg::setPreserveShiftOnSave(bool state)
+{
+	m_ui->preserveShiftOnSaveCheckBox->setChecked(state);
+}
+
 bool ccShiftAndScaleCloudDlg::keepGlobalPos() const
 {
 	return m_ui->keepGlobalPosCheckBox->isChecked();
@@ -371,7 +387,7 @@ void ccShiftAndScaleCloudDlg::setKeepGlobalPos(bool state)
 void ccShiftAndScaleCloudDlg::onGlobalPosCheckBoxToggled(bool state)
 {
 	//set the thickest border to the point that will be modified
-	m_ui->smallCubeFrame->setLineWidth(state  ? 2 : 1);
+	m_ui->smallCubeFrame->setLineWidth(state ? 2 : 1);
 	m_ui->bigCubeFrame->setLineWidth(state ? 1 : 2);
 
 	updateGlobalSystem();
@@ -380,30 +396,8 @@ void ccShiftAndScaleCloudDlg::onGlobalPosCheckBoxToggled(bool state)
 
 void ccShiftAndScaleCloudDlg::onClick(QAbstractButton* button)
 {
-	bool saveInfo = false;
-	m_applyAll = false;
-	m_cancel = false;
-
-	if (button == m_ui->buttonBox->button(QDialogButtonBox::Yes))
-	{
-		saveInfo = true;
-	}
-	else if (button == m_ui->buttonBox->button(QDialogButtonBox::YesToAll))
-	{
-		saveInfo = true;
-		m_applyAll = true;
-	}
-	else if (button == m_ui->buttonBox->button(QDialogButtonBox::Cancel))
-	{
-		m_cancel = true;
-	}
-
-	if (saveInfo)
-	{
-		s_lastInfo.valid = true;
-		s_lastInfo.shift = getShift();
-		s_lastInfo.scale = getScale();
-	}
+	m_applyAll = (button == m_ui->buttonBox->button(QDialogButtonBox::YesToAll));
+	m_cancel = (button == m_ui->buttonBox->button(QDialogButtonBox::Cancel));
 }
 
 void ccShiftAndScaleCloudDlg::onLoadIndexChanged(int index)
@@ -416,13 +410,7 @@ void ccShiftAndScaleCloudDlg::onLoadIndexChanged(int index)
 		setScale(m_defaultInfos[index].scale);
 }
 
-bool ccShiftAndScaleCloudDlg::getLast(ShiftInfo& info) const
-{
-	info = s_lastInfo;
-	return s_lastInfo.valid;
-}
-
-bool ccShiftAndScaleCloudDlg::getInfo(size_t index, ShiftInfo& info) const
+bool ccShiftAndScaleCloudDlg::getInfo(size_t index, ccGlobalShiftManager::ShiftInfo& info) const
 {
 	if (index >= m_defaultInfos.size())
 		return false;
@@ -440,7 +428,7 @@ void ccShiftAndScaleCloudDlg::setCurrentProfile(int index)
 	}
 }
 
-int ccShiftAndScaleCloudDlg::addShiftInfo(const ShiftInfo& info)
+int ccShiftAndScaleCloudDlg::addShiftInfo(const ccGlobalShiftManager::ShiftInfo& info)
 {
 	try
 	{
@@ -455,5 +443,16 @@ int ccShiftAndScaleCloudDlg::addShiftInfo(const ShiftInfo& info)
 	m_ui->loadComboBox->addItem(m_defaultInfos.back().name);
 	m_ui->loadComboBox->setEnabled(m_defaultInfos.size() >= 2);
 
-	return static_cast<int>(m_defaultInfos.size())-1;
+	return static_cast<int>(m_defaultInfos.size()) - 1;
+}
+
+int ccShiftAndScaleCloudDlg::addShiftInfo(const std::vector<ccGlobalShiftManager::ShiftInfo>& infos)
+{
+	for (const ccGlobalShiftManager::ShiftInfo& info : infos)
+	{
+		if (addShiftInfo(info) < 0)
+			break;
+	}
+
+	return static_cast<int>(m_defaultInfos.size()) - 1;
 }

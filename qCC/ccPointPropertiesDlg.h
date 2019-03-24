@@ -35,14 +35,14 @@ class ccPointPropertiesDlg : public ccPointPickingGenericInterface, public Ui::P
 public:
 
 	//! Default constructor
-	explicit ccPointPropertiesDlg(QWidget* parent);
+	explicit ccPointPropertiesDlg(ccPickingHub* pickingHub, QWidget* parent);
 	//! Default destructor
 	virtual ~ccPointPropertiesDlg();
 
 	//inherited from ccPointPickingGenericInterface
-	virtual bool start();
-	virtual void stop(bool state);
-	virtual bool linkWith(ccGLWindow* win);
+	virtual bool start() override;
+	virtual void stop(bool state) override;
+	virtual bool linkWith(ccGLWindow* win) override;
 
 protected slots:
 
@@ -74,7 +74,7 @@ protected:
 	};
 
 	//inherited from ccPointPickingGenericInterface
-	void processPickedPoint(ccPointCloud* cloud, unsigned pointIndex, int x, int y);
+	void processPickedPoint(ccPointCloud* cloud, unsigned pointIndex, int x, int y) override;
 
 	//! Current picking mode
 	Mode m_pickingMode;

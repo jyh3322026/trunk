@@ -41,10 +41,10 @@ public:
 	Delaunay2dMesh();
 
 	//! Delaunay2dMesh destructor
-	virtual ~Delaunay2dMesh();
+	~Delaunay2dMesh() override;
 
 	//! Returns whether 2D Delaunay triangulation is supported or not
-	/** 2D Delaunay triangulation requires Triangle library.
+	/** 2D Delaunay triangulation requires the CGAL library.
 	**/
 	static bool Available();
 
@@ -62,41 +62,43 @@ public:
 	//! Build the Delaunay mesh on top a set of 2D points
 	/** \param points2D a set of 2D points
 		\param pointCountToUse number of points to use from the input set (0 = all)
-		\param outputErrorStr error string as output by Triangle lib. (if any) [optional]
+		\param outputErrorStr error string as output by the CGAL lib. (if any) [optional]
 		\return success
 	**/
 	virtual bool buildMesh(	const std::vector<CCVector2>& points2D,
-								size_t pointCountToUse = 0,
-								char* outputErrorStr = 0);
+								std::size_t pointCountToUse = 0,
+								char* outputErrorStr = nullptr);
 
 	//! Build the Delaunay mesh from a set of 2D polylines
 	/** \param points2D a set of 2D points
 		\param segments2D constraining segments (as 2 indexes per segment)
-		\param outputErrorStr error string as output by Triangle lib. (if any) [optional]
+		\param outputErrorStr error string as output by the CGAL lib. (if any) [optional]
 		\return success
 	**/
 	virtual bool buildMesh(	const std::vector<CCVector2>& points2D,
 							const std::vector<int>& segments2D,
-							char* outputErrorStr = 0);
+							char* outputErrorStr = nullptr);
 
 	//! Removes the triangles falling outside of a given (2D) polygon
 	/** \param vertices2D vertices of the mesh as 2D points (typically the one used to triangulate the mesh!)
 		\param polygon2D vertices of the 2D boundary polygon (ordered)
+		\param removeOutside whether to remove triangles outside (default) or inside
 		\return success
 	**/
 	virtual bool removeOuterTriangles(	const std::vector<CCVector2>& vertices2D,
-										const std::vector<CCVector2>& polygon2D);
+										const std::vector<CCVector2>& polygon2D,
+										bool removeOutside = true);
 
 	//inherited methods (see GenericMesh)
-	virtual unsigned size() const { return m_numberOfTriangles; }
-	virtual void forEach(genericTriangleAction& action);
-	virtual void getBoundingBox(CCVector3& bbMin, CCVector3& bbMax);
-	virtual void placeIteratorAtBegining();
-	virtual GenericTriangle* _getNextTriangle();
-	virtual GenericTriangle* _getTriangle(unsigned triangleIndex);
-	virtual VerticesIndexes* getNextTriangleVertIndexes();
-	virtual VerticesIndexes* getTriangleVertIndexes(unsigned triangleIndex);
-	virtual void getTriangleVertices(unsigned triangleIndex, CCVector3& A, CCVector3& B, CCVector3& C);
+	unsigned size() const override { return m_numberOfTriangles; }
+	void forEach(genericTriangleAction action) override;
+	void getBoundingBox(CCVector3& bbMin, CCVector3& bbMax) override;
+	void placeIteratorAtBeginning() override;
+	GenericTriangle* _getNextTriangle() override;
+	GenericTriangle* _getTriangle(unsigned triangleIndex) override;
+	VerticesIndexes* getNextTriangleVertIndexes() override;
+	VerticesIndexes* getTriangleVertIndexes(unsigned triangleIndex) override;
+	void getTriangleVertices(unsigned triangleIndex, CCVector3& A, CCVector3& B, CCVector3& C) const override;
 
 	//! Returns triangles indexes array (pointer to)
 	/** Handle with care!

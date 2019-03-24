@@ -18,22 +18,22 @@
 #include "ccRegistrationTools.h"
 
 //CCLib
-#include <MeshSamplingTools.h>
-#include <GenericIndexedCloudPersist.h>
-#include <SimpleCloud.h>
-#include <RegistrationTools.h>
-#include <DistanceComputationTools.h>
 #include <CloudSamplingTools.h>
+#include <DistanceComputationTools.h>
 #include <Garbage.h>
-#include <SortAlgo.h>
+#include <GenericIndexedCloudPersist.h>
+#include <MeshSamplingTools.h>
+#include <ParallelSort.h>
+#include <PointCloud.h>
+#include <RegistrationTools.h>
 
 //qCC_db
-#include <ccHObjectCaster.h>
-#include <ccPointCloud.h>
 #include <ccGenericMesh.h>
+#include <ccHObjectCaster.h>
+#include <ccLog.h>
+#include <ccPointCloud.h>
 #include <ccProgressDialog.h>
 #include <ccScalarField.h>
-#include <ccLog.h>
 
 //system
 #include <set>
@@ -68,8 +68,8 @@ bool ccRegistrationTools::ICP(	ccHObject* data,
 	Garbage<CCLib::GenericIndexedCloudPersist> cloudGarbage;
 
 	//if the 'model' entity is a mesh, we need to sample points on it
-	CCLib::GenericIndexedCloudPersist* modelCloud = 0;
-	ccGenericMesh* modelMesh = 0;
+	CCLib::GenericIndexedCloudPersist* modelCloud = nullptr;
+	ccGenericMesh* modelMesh = nullptr;
 	if (model->isKindOf(CC_TYPES::MESH))
 	{
 		modelMesh = ccHObjectCaster::ToGenericMesh(model);
@@ -81,7 +81,7 @@ bool ccRegistrationTools::ICP(	ccHObject* data,
 	}
 
 	//if the 'data' entity is a mesh, we need to sample points on it
-	CCLib::GenericIndexedCloudPersist* dataCloud = 0;
+	CCLib::GenericIndexedCloudPersist* dataCloud = nullptr;
 	if (data->isKindOf(CC_TYPES::MESH))
 	{
 		dataCloud = CCLib::MeshSamplingTools::samplePointsOnMesh(ccHObjectCaster::ToGenericMesh(data), s_defaultSampledPointsOnDataMesh, &pDlg);
@@ -98,7 +98,7 @@ bool ccRegistrationTools::ICP(	ccHObject* data,
 	}
 
 	//we activate a temporary scalar field for registration distances computation
-	CCLib::ScalarField* dataDisplayedSF = 0;
+	CCLib::ScalarField* dataDisplayedSF = nullptr;
 	int oldDataSfIdx = -1, dataSfIdx = -1;
 
 	//if the 'data' entity is a real ccPointCloud, we can even create a proper temporary SF for registration distances
@@ -140,14 +140,14 @@ bool ccRegistrationTools::ICP(	ccHObject* data,
 		//level = 8 if < 10.000.000
 		//level = 9 if > 10.000.000
 		int gridLevel = static_cast<int>(floor(log10(static_cast<double>(std::max(dataCloud->size(), modelCloud->size()))))) + 2;
-			gridLevel = std::min(std::max(gridLevel,7),9);
+		    gridLevel = std::min(std::max(gridLevel, 7), 9);
 		int result = -1;
 		if (modelMesh)
 		{
 			CCLib::DistanceComputationTools::Cloud2MeshDistanceComputationParams c2mParams;
 			c2mParams.octreeLevel = gridLevel;
 			c2mParams.maxSearchDist = 0;
-			c2mParams.useDistanceMap = true,
+			c2mParams.useDistanceMap = true;
 			c2mParams.signedDistances = false;
 			c2mParams.flipNormals = false;
 			c2mParams.multiThread = false;
@@ -186,7 +186,9 @@ bool ccRegistrationTools::ICP(	ccHObject* data,
 			{
 				distances[i] = dataCloud->getPointScalarValue(i);
 			}
-			SortAlgo(distances.begin(), distances.end());
+			
+			ParallelSort(distances.begin(), distances.end());
+			
 			//now look for the max value at 'finalOverlapRatio+margin' percent
 			maxSearchDist = distances[static_cast<unsigned>(std::max(1.0,count*(finalOverlapRatio+s_overlapMarginRatio)))-1];
 		}
@@ -224,8 +226,8 @@ bool ccRegistrationTools::ICP(	ccHObject* data,
 	}
 
 	//weights
-	CCLib::ScalarField* modelWeights = 0;
-	CCLib::ScalarField* dataWeights = 0;
+	CCLib::ScalarField* modelWeights = nullptr;
+	CCLib::ScalarField* dataWeights = nullptr;
 	{
 		if (!modelMesh && useModelSFAsWeights)
 		{
@@ -238,7 +240,7 @@ bool ccRegistrationTools::ICP(	ccHObject* data,
 			}
 			else
 			{
-				ccLog::Warning("[ICP] 'useDataSFAsWeights' is true but only point clouds scalar fields can be used as weights!");
+				ccLog::Warning("[ICP] 'useDataSFAsWeights' is true but only point cloud scalar fields can be used as weights!");
 			}
 		}
 
@@ -246,13 +248,15 @@ bool ccRegistrationTools::ICP(	ccHObject* data,
 		{
 			if (!dataDisplayedSF)
 			{
-				if (dataCloud == (CCLib::GenericIndexedCloudPersist*)data && data->isA(CC_TYPES::POINT_CLOUD))
+				if (dataCloud == ccHObjectCaster::ToPointCloud(data))
 					ccLog::Warning("[ICP] 'useDataSFAsWeights' is true but data has no displayed scalar field!");
 				else
-					ccLog::Warning("[ICP] 'useDataSFAsWeights' is true but inly point clouds scalar fields can be used as weights!");
+					ccLog::Warning("[ICP] 'useDataSFAsWeights' is true but only point cloud scalar fields can be used as weights!");
 			}
 			else
+			{
 				dataWeights = dataDisplayedSF;
+			}
 		}
 	}
 
@@ -288,7 +292,7 @@ bool ccRegistrationTools::ICP(	ccHObject* data,
 	}
 	else if (result == CCLib::ICPRegistrationTools::ICP_APPLY_TRANSFO)
 	{
-		transMat = FromCCLibMatrix<PointCoordinateType,float>(transform.R, transform.T, transform.s);
+		transMat = FromCCLibMatrix<PointCoordinateType, float>(transform.R, transform.T, transform.s);
 		finalScale = transform.s;
 	}
 
@@ -299,7 +303,6 @@ bool ccRegistrationTools::ICP(	ccHObject* data,
 		ccPointCloud* pc = static_cast<ccPointCloud*>(data);
 		pc->setCurrentScalarField(oldDataSfIdx);
 		pc->deleteScalarField(dataSfIdx);
-		dataSfIdx = -1;
 	}
 
 	return (result < CCLib::ICPRegistrationTools::ICP_ERROR);

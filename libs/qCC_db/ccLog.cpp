@@ -21,7 +21,7 @@
 #include <CCPlatform.h>
 
 //System
-#include <assert.h>
+#include <cassert>
 #include <vector>
 
 #if !defined(CC_WINDOWS)
@@ -32,7 +32,7 @@
  *** Globals ***
  ***************/
 
-//buffer for formated string generation
+//buffer for formatted string generation
 static const size_t s_bufferMaxSize = 4096;
 static char s_buffer[s_bufferMaxSize];
 
@@ -54,7 +54,7 @@ static bool s_backupEnabled;
 static std::vector<Message> s_backupMessages;
 
 //unique console instance
-static ccLog* s_instance = 0;
+static ccLog* s_instance = nullptr;
 
 ccLog* ccLog::TheInstance()
 {
@@ -84,7 +84,7 @@ void ccLog::LogMessage(const QString& message, int level)
 	{
 		try
 		{
-			s_backupMessages.push_back(Message(message, level));
+			s_backupMessages.emplace_back(message, level);
 		}
 		catch (const std::bad_alloc&)
 		{

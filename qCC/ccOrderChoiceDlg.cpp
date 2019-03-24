@@ -17,8 +17,8 @@
 
 #include "ccOrderChoiceDlg.h"
 
-//local
-#include "ccQtHelpers.h"
+//common
+#include <ccQtHelpers.h>
 
 //qCC_plugins
 #include <ccMainAppInterface.h>
@@ -46,15 +46,13 @@ ccOrderChoiceDlg::ccOrderChoiceDlg(	ccHObject* firstEntity,
 {
 	m_gui->setupUi(this);
 
-	connect(m_gui->swapButton, SIGNAL(clicked()), this, SLOT(swap()));
+	connect(m_gui->swapButton, &QAbstractButton::clicked, this, &ccOrderChoiceDlg::swap);
 
 	m_gui->firstlabel->setText(firstRole);
 	m_gui->secondlabel->setText(secondRole);
 
-	QColor qRed(255,0,0);
-	QColor qYellow(255,255,0);
-	ccQtHelpers::SetButtonColor(m_gui->firstColorButton,qRed);
-	ccQtHelpers::SetButtonColor(m_gui->secondColorButton,qYellow);
+	ccQtHelpers::SetButtonColor(m_gui->firstColorButton, Qt::red);
+	ccQtHelpers::SetButtonColor(m_gui->secondColorButton, Qt::yellow);
 
 	setColorsAndLabels();
 }

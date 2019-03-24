@@ -18,9 +18,9 @@
 #include "ccBilateralFilter.h"
 
 //system
-#include <math.h>
-#include <assert.h>
 #include <algorithm>
+#include <assert.h>
+#include <cmath>
 
 //! Max kernel size
 /** Can't add this as a static const definition (in the header file)
@@ -168,7 +168,7 @@ void ccBilateralFilter::shade(GLuint texDepth, GLuint texColor, ViewportParamete
 	m_shader.setUniformValue("SX", static_cast<float>(m_width));
 	m_shader.setUniformValue("SY", static_cast<float>(m_height));
 	m_shader.setUniformValue("NHalf", m_halfSpatialSize);
-	m_shader.setUniformValueArray("DistCoefs", &(m_dampingPixelDist.front()), 64, 1);
+	m_shader.setUniformValueArray("DistCoefs", m_dampingPixelDist.data(), 64, 1);
 	m_shader.setUniformValue("SigmaDepth", m_depthSigma);
 
 	//Texture 1 --> 2D
@@ -230,7 +230,7 @@ void ccBilateralFilter::updateDampingTable()
 		for (unsigned d = 0; d <= m_halfSpatialSize; d++)
 		{
 			//pixel distance based damping
-			m_dampingPixelDist[c*(m_halfSpatialSize + 1) + d] = exp((c*c + d*d) / (-q));
+			m_dampingPixelDist[c*(m_halfSpatialSize + 1) + d] = std::exp((c*c + d*d) / (-q));
 		}
 	}
 }

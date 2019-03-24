@@ -16,33 +16,29 @@
 //#                                                                        #
 //##########################################################################
 
-#include "Delaunay2dMesh.h"
+#include <Delaunay2dMesh.h>
 
 //local
-#include "GenericIndexedCloud.h"
-#include "ManualSegmentationTools.h"
-#include "Polyline.h"
-#include "ChunkedPointCloud.h"
+#include <ManualSegmentationTools.h>
+#include <PointCloud.h>
+#include <Polyline.h>
 
 #if defined(USE_CGAL_LIB)
 //CGAL Lib
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
-#include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #include <CGAL/Delaunay_triangulation_2.h>
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #endif
 
-//system
-#include <assert.h>
-#include <string.h>
 
 using namespace CCLib;
 
 Delaunay2dMesh::Delaunay2dMesh()
-	: m_associatedCloud(0)
-	, m_triIndexes(0)
-	, m_globalIterator(0)
-	, m_globalIteratorEnd(0)
+	: m_associatedCloud(nullptr)
+	, m_triIndexes(nullptr)
+	, m_globalIterator(nullptr)
+	, m_globalIteratorEnd(nullptr)
 	, m_numberOfTriangles(0)
 	, m_cloudIsOwnedByMesh(false)
 {
@@ -50,10 +46,9 @@ Delaunay2dMesh::Delaunay2dMesh()
 
 Delaunay2dMesh::~Delaunay2dMesh()
 {
-	linkMeshWith(0);
+	linkMeshWith(nullptr);
 
-	if (m_triIndexes)
-		delete[] m_triIndexes;
+	delete[] m_triIndexes;
 }
 
 bool Delaunay2dMesh::Available()
@@ -85,17 +80,17 @@ bool Delaunay2dMesh::buildMesh(	const std::vector<CCVector2>& points2D,
 #if defined(USE_CGAL_LIB)
 
 	//CGAL boilerplate
-	typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-	//We define a vertex_base with info. The "info" (size_t) allow us to keep track of the original point index.
-	typedef CGAL::Triangulation_vertex_base_with_info_2<size_t, K> Vb;
-	typedef CGAL::Constrained_triangulation_face_base_2<K> Fb;
-	typedef CGAL::No_intersection_tag  Itag; //This tag could ben changed if we decide to handle intersection
-	typedef CGAL::Triangulation_data_structure_2<Vb, Fb> Tds;
-	typedef CGAL::Constrained_Delaunay_triangulation_2<K, Tds, Itag> CDT;
-	typedef CDT::Point cgalPoint;
+	using K = CGAL::Exact_predicates_inexact_constructions_kernel;
+	//We define a vertex_base with info. The "info" (std::size_t) allow us to keep track of the original point index.
+	using Vb = CGAL::Triangulation_vertex_base_with_info_2<std::size_t, K>;
+	using Fb = CGAL::Constrained_triangulation_face_base_2<K>;
+	using Itag = CGAL::No_intersection_tag; //This tag could ben changed if we decide to handle intersection
+	using Tds = CGAL::Triangulation_data_structure_2<Vb, Fb>;
+	using CDT = CGAL::Constrained_Delaunay_triangulation_2<K, Tds, Itag>;
+	using cgalPoint = CDT::Point;
 
-	std::vector< std::pair<cgalPoint, size_t > > constraints;
-	size_t constrCount = segments2D.size();
+	std::vector< std::pair<cgalPoint, std::size_t > > constraints;
+	std::size_t constrCount = segments2D.size();
 
 	try
 	{
@@ -111,9 +106,9 @@ bool Delaunay2dMesh::buildMesh(	const std::vector<CCVector2>& points2D,
 	CDT cdt;
 
 	//We build the constraints
-	for(size_t i = 0; i < constrCount; ++i) {
+	for(std::size_t i = 0; i < constrCount; ++i) {
 		const CCVector2 * pt = &points2D[segments2D[i]];
-		constraints.push_back(std::make_pair(cgalPoint(pt->x, pt->y), segments2D[i]));
+		constraints.emplace_back(cgalPoint(pt->x, pt->y), segments2D[i]);
 	}
 	//The CDT  is built according to the constraints
 	cdt.insert(constraints.begin(), constraints.end());
@@ -145,21 +140,21 @@ bool Delaunay2dMesh::buildMesh(	const std::vector<CCVector2>& points2D,
 }
 
 bool Delaunay2dMesh::buildMesh(	const std::vector<CCVector2>& points2D,
-								size_t pointCountToUse/*=0*/,
+								std::size_t pointCountToUse/*=0*/,
 								char* outputErrorStr/*=0*/)
 {
 #if defined(USE_CGAL_LIB)
 
 	//CGAL boilerplate
-	typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-	//We define a vertex_base with info. The "info" (size_t) allow us to keep track of the original point index.
-	typedef CGAL::Triangulation_vertex_base_with_info_2<size_t, K> Vb;
-	typedef CGAL::Triangulation_data_structure_2<Vb> Tds;
-	typedef CGAL::Delaunay_triangulation_2<K, Tds> DT;
-	typedef DT::Point cgalPoint;
+	using K = CGAL::Exact_predicates_inexact_constructions_kernel;
+	//We define a vertex_base with info. The "info" (std::size_t) allow us to keep track of the original point index.
+	using Vb = CGAL::Triangulation_vertex_base_with_info_2<std::size_t, K>;
+	using Tds = CGAL::Triangulation_data_structure_2<Vb>;
+	using DT = CGAL::Delaunay_triangulation_2<K, Tds>;
+	using cgalPoint = DT::Point;
 
-	std::vector< std::pair<cgalPoint, size_t > > pts;
-	size_t pointCount = points2D.size();
+	std::vector< std::pair<cgalPoint, std::size_t > > pts;
+	std::size_t pointCount = points2D.size();
 
 	//we will use at most 'pointCountToUse' points (if not 0)
 	if (pointCountToUse > 0 && pointCountToUse < pointCount)
@@ -188,12 +183,12 @@ bool Delaunay2dMesh::buildMesh(	const std::vector<CCVector2>& points2D,
 	if (m_triIndexes)
 	{
 		delete[] m_triIndexes;
-		m_triIndexes = 0;
+		m_triIndexes = nullptr;
 	}
 
-	for(size_t i = 0; i < pointCount; ++i) {
+	for(std::size_t i = 0; i < pointCount; ++i) {
 		const CCVector2 * pt = &points2D[i];
-		pts.push_back(std::make_pair(cgalPoint(pt->x, pt->y), i));
+		pts.emplace_back(cgalPoint(pt->x, pt->y), i);
 	}
 
 	//The delaunay triangulation is built according to the 2D point cloud
@@ -226,13 +221,14 @@ bool Delaunay2dMesh::buildMesh(	const std::vector<CCVector2>& points2D,
 }
 
 bool Delaunay2dMesh::removeOuterTriangles(	const std::vector<CCVector2>& vertices2D,
-											const std::vector<CCVector2>& polygon2D)
+											const std::vector<CCVector2>& polygon2D,
+											bool removeOutside/*=true*/)
 {
 	if (!m_triIndexes || m_numberOfTriangles == 0)
 		return false;
 
 	//we expect the same number of 2D points as the actual number of points in the associated mesh (if any)
-	if (m_associatedCloud && static_cast<size_t>(m_associatedCloud->size()) != vertices2D.size())
+	if (m_associatedCloud && static_cast<std::size_t>(m_associatedCloud->size()) != vertices2D.size())
 		return false;
 
 	unsigned lastValidIndex = 0;
@@ -240,7 +236,7 @@ bool Delaunay2dMesh::removeOuterTriangles(	const std::vector<CCVector2>& vertice
 	//test each triangle center
 	{
 		const int* _triIndexes = m_triIndexes;
-		for (unsigned i=0; i<m_numberOfTriangles; ++i,_triIndexes+=3)
+		for (unsigned i = 0; i < m_numberOfTriangles; ++i, _triIndexes += 3)
 		{
 			//compute the triangle's barycenter
 			const CCVector2& A = vertices2D[_triIndexes[0]];
@@ -249,11 +245,12 @@ bool Delaunay2dMesh::removeOuterTriangles(	const std::vector<CCVector2>& vertice
 			CCVector2 G = (A + B + C) / 3.0;
 
 			//if G is inside the 'polygon'
-			if (CCLib::ManualSegmentationTools::isPointInsidePoly(G,polygon2D))
+			bool isInside = CCLib::ManualSegmentationTools::isPointInsidePoly(G, polygon2D);
+			if ((removeOutside && isInside) || (!removeOutside && !isInside))
 			{
 				//we keep the corresponding triangle
 				if (lastValidIndex != i)
-					memcpy(m_triIndexes+3*lastValidIndex,_triIndexes,3*sizeof(int));
+					memcpy(m_triIndexes + 3 * lastValidIndex, _triIndexes, 3 * sizeof(int));
 				++lastValidIndex;
 			}
 		}
@@ -264,18 +261,18 @@ bool Delaunay2dMesh::removeOuterTriangles(	const std::vector<CCVector2>& vertice
 	if (m_numberOfTriangles)
 	{
 		//shouldn't fail as m_numberOfTriangles is smaller!
-		m_triIndexes = static_cast<int*>(realloc(m_triIndexes,sizeof(int)*3*m_numberOfTriangles));
+		m_triIndexes = static_cast<int*>(realloc(m_triIndexes, sizeof(int) * 3 * m_numberOfTriangles));
 	}
 	else
 	{
 		//no triangle left!
 		delete[] m_triIndexes;
-		m_triIndexes = 0;
+		m_triIndexes = nullptr;
 	}
 
 	//update iterators
 	m_globalIterator = m_triIndexes;
-	m_globalIteratorEnd = m_triIndexes + 3*m_numberOfTriangles;
+	m_globalIteratorEnd = m_triIndexes + 3 * m_numberOfTriangles;
 
 	return true;
 }
@@ -316,7 +313,7 @@ bool Delaunay2dMesh::removeTrianglesWithEdgesLongerThan(PointCoordinateType maxE
 		else //no more triangles?!
 		{
 			delete m_triIndexes;
-			m_triIndexes = 0;
+			m_triIndexes = nullptr;
 		}
 		m_globalIterator = m_triIndexes;
 		m_globalIteratorEnd = m_triIndexes + 3*m_numberOfTriangles;
@@ -325,7 +322,7 @@ bool Delaunay2dMesh::removeTrianglesWithEdgesLongerThan(PointCoordinateType maxE
 	return true;
 }
 
-void Delaunay2dMesh::forEach(genericTriangleAction& action)
+void Delaunay2dMesh::forEach(genericTriangleAction action)
 {
 	if (!m_associatedCloud)
 		return;
@@ -342,7 +339,7 @@ void Delaunay2dMesh::forEach(genericTriangleAction& action)
 	}
 }
 
-void Delaunay2dMesh::placeIteratorAtBegining()
+void Delaunay2dMesh::placeIteratorAtBeginning()
 {
 	m_globalIterator = m_triIndexes;
 }
@@ -351,7 +348,7 @@ GenericTriangle* Delaunay2dMesh::_getNextTriangle()
 {
 	assert(m_associatedCloud);
 	if (m_globalIterator >= m_globalIteratorEnd)
-        return 0;
+        return nullptr;
 
 	m_associatedCloud->getPoint(*m_globalIterator++,m_dumpTriangle.A);
 	m_associatedCloud->getPoint(*m_globalIterator++,m_dumpTriangle.B);
@@ -363,7 +360,7 @@ GenericTriangle* Delaunay2dMesh::_getNextTriangle()
 VerticesIndexes* Delaunay2dMesh::getNextTriangleVertIndexes()
 {
 	if (m_globalIterator >= m_globalIteratorEnd)
-        return 0;
+        return nullptr;
 
 	m_dumpTriangleIndexes.i1 = m_globalIterator[0];
 	m_dumpTriangleIndexes.i2 = m_globalIterator[1];
@@ -383,10 +380,10 @@ GenericTriangle* Delaunay2dMesh::_getTriangle(unsigned triangleIndex)
 	m_associatedCloud->getPoint(*tri++,m_dumpTriangle.B);
 	m_associatedCloud->getPoint(*tri++,m_dumpTriangle.C);
 
-	return (GenericTriangle*)&m_dumpTriangle;
+	return static_cast<GenericTriangle*>(&m_dumpTriangle);
 }
 
-void Delaunay2dMesh::getTriangleVertices(unsigned triangleIndex, CCVector3& A, CCVector3& B, CCVector3& C)
+void Delaunay2dMesh::getTriangleVertices(unsigned triangleIndex, CCVector3& A, CCVector3& B, CCVector3& C) const
 {
 	assert(m_associatedCloud && triangleIndex < m_numberOfTriangles);
 

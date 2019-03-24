@@ -47,7 +47,7 @@ public:
 	virtual int getTriangleMtlIndex(unsigned triangleIndex) const override { return -1; }
 	virtual bool hasTextures() const override { return false; }
 	virtual TextureCoordsContainer* getTexCoordinatesTable() const override { return 0; }
-	virtual void getTriangleTexCoordinates(unsigned triIndex, float* &tx1, float* &tx2, float* &tx3) const override { tx1 = tx2 = tx3 = 0; }
+	virtual void getTriangleTexCoordinates(unsigned triIndex, TexCoords2D* &tx1, TexCoords2D* &tx2, TexCoords2D* &tx3) const override { tx1 = tx2 = tx3 = nullptr; }
 	virtual bool hasPerTriangleTexCoordIndexes() const override { return false; }
 	virtual void getTriangleTexCoordinatesIndexes(unsigned triangleIndex, int& i1, int& i2, int& i3) const override { i1 = i2 = i3 = -1; }
 	virtual bool hasTriNormals() const override { return false; }
@@ -55,6 +55,7 @@ public:
 	virtual bool getTriangleNormals(unsigned triangleIndex, CCVector3& Na, CCVector3& Nb, CCVector3& Nc) const override { return false; }
 	virtual NormsIndexesTableType* getTriNormsTable() const override { return 0; }
 	virtual unsigned capacity() const override { return 0; }
+	virtual bool trianglePicking(const CCVector2d& clickPos, const ccGLCameraParameters& camera, int& nearestTriIndex, double& nearestSquareDist, CCVector3d& nearestPoint) override { return false; }
 
 	//inherited methods (ccHObject)
 	virtual bool isSerializable() const override { return true; }
@@ -63,13 +64,13 @@ public:
 
 	//inherited methods (GenericIndexedMesh)
 	virtual unsigned size() const override { return 0; }
-	virtual void forEach(genericTriangleAction& action) override {}
-	virtual void placeIteratorAtBegining() override {}
+	virtual void forEach(genericTriangleAction action) override {}
+	virtual void placeIteratorAtBeginning() override {}
 	virtual CCLib::GenericTriangle* _getNextTriangle() override { return 0; }
 	virtual CCLib::GenericTriangle* _getTriangle(unsigned index) override { return 0; }
 	virtual CCLib::VerticesIndexes* getNextTriangleVertIndexes() override { return 0; }
 	virtual CCLib::VerticesIndexes* getTriangleVertIndexes(unsigned triangleIndex) override { return 0; }
-	virtual void getTriangleVertices(unsigned triangleIndex, CCVector3& A, CCVector3& B, CCVector3& C) override {}
+	virtual void getTriangleVertices(unsigned triangleIndex, CCVector3& A, CCVector3& B, CCVector3& C) const override {}
 	virtual void getBoundingBox(CCVector3& bbMin, CCVector3& bbMax) override {}
 
 protected:

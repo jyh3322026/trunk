@@ -45,6 +45,8 @@ public:
 		ccColor::Rgbaf lightAmbientColor;
 		//! Light specular color (RGBA)
 		ccColor::Rgbaf lightSpecularColor;
+		//! Double sided light
+		bool lightDoubleSided;
 
 		//! Default mesh diffuse color (front)
 		ccColor::Rgbaf meshFrontDiff;
@@ -110,6 +112,9 @@ public:
 
 		//! Octree computation (for picking) behavior
 		ComputeOctreeForPicking autoComputeOctree;
+
+		//! Whether to draw rounded points (slower) or not
+		bool drawRoundedPoints;
 
 		//! Default constructor
 		ParamStruct();

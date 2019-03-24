@@ -22,15 +22,16 @@
 #include "ccLog.h"
 
 //CCLib
-#include <GenericChunkedArray.h>
+#include <CCPlatform.h>
 #include <CCTypes.h>
 
 //System
-#include <stdint.h>
+#include <cassert>
+#include <cstdint>
 
 //Qt
-#include <QFile>
 #include <QDataStream>
+#include <QFile>
 
 //! Serializable object interface
 class ccSerializableObject
@@ -38,7 +39,7 @@ class ccSerializableObject
 public:
 
 	//! Desctructor
-	virtual ~ccSerializableObject() {}
+	virtual ~ccSerializableObject() = default;
 
 	//! Returns whether object is serializable of not
 	virtual bool isSerializable() const { return false; }
@@ -100,7 +101,7 @@ public:
 	{
 		if (flags & ccSerializableObject::DF_POINT_COORDS_64_BITS)
 		{
-			for (unsigned i=0; i<count; ++i, ++out)
+			for (unsigned i = 0; i < count; ++i, ++out)
 			{
 				double val;
 				stream >> val;
@@ -109,7 +110,7 @@ public:
 		}
 		else
 		{
-			for (unsigned i=0; i<count; ++i, ++out)
+			for (unsigned i = 0; i < count; ++i, ++out)
 			{
 				float val;
 				stream >> val;
@@ -123,7 +124,7 @@ public:
 	{
 		if (flags & ccSerializableObject::DF_SCALAR_VAL_32_BITS)
 		{
-			for (unsigned i=0; i<count; ++i, ++out)
+			for (unsigned i = 0; i < count; ++i, ++out)
 			{
 				float val;
 				stream >> val;
@@ -132,7 +133,7 @@ public:
 		}
 		else
 		{
-			for (unsigned i=0; i<count; ++i, ++out)
+			for (unsigned i = 0; i < count; ++i, ++out)
 			{
 				double val;
 				stream >> val;
@@ -141,167 +142,154 @@ public:
 		}
 	}
 
-	//! Helper: saves a GenericChunkedArray structure to file
-	/** \param chunkArray GenericChunkedArray structure to save (must be allocated)
+	//! Helper: saves a vector to file
+	/** \param data vector to save (must be allocated)
 		\param out output file (must be already opened)
 		\return success
 	**/
-	template <int N, class ElementType> static bool GenericArrayToFile(const GenericChunkedArray<N,ElementType>& chunkArray, QFile& out) 
+	template <class Type, int N, class ComponentType> static bool GenericArrayToFile(const std::vector<Type>& data, QFile& out)
 	{
 		assert(out.isOpen() && (out.openMode() & QIODevice::WriteOnly));
 
-		if (!chunkArray.isAllocated())
+		if (data.empty())
+		{
 			return ccSerializableObject::MemoryError();
+		}
 
 		//component count (dataVersion>=20)
-		::uint8_t componentCount = static_cast< ::uint8_t >(N);
-		if (out.write((const char*)&componentCount,1) < 0)
+		::uint8_t componentCount = static_cast<::uint8_t>(N);
+		if (out.write((const char*)&componentCount, 1) < 0)
 			return ccSerializableObject::WriteError();
 
 		//element count = array size (dataVersion>=20)
-		::uint32_t elementCount = static_cast< ::uint32_t >(chunkArray.currentSize());
-		if (out.write((const char*)&elementCount,4) < 0)
+		::uint32_t elementCount = static_cast<::uint32_t>(data.size());
+		if (out.write((const char*)&elementCount, 4) < 0)
 			return ccSerializableObject::WriteError();
 
 		//array data (dataVersion>=20)
 		{
-#ifdef CC_ENV_64
-			if (out.write((const char*)chunkArray.data(),sizeof(ElementType)*N*chunkArray.currentSize()) < 0)
-				return ccSerializableObject::WriteError();
-#else
-			//--> we write each chunk as a block (faster)
-			while (elementCount != 0)
+			//DGM: do it by chunks, in case it's too big to be processed by the system
+			const char* _data = (const char*)data.data();
+			qint64 byteCount = static_cast<qint64>(elementCount);
+			byteCount *= sizeof(Type);
+			while (byteCount != 0)
 			{
-				unsigned chunksCount = chunkArray.chunksCount();
-				for (unsigned i=0; i<chunksCount; ++i)
-				{
-					//DGM: since dataVersion>=22, we make sure to write as much items as declared in 'currentSize'!
-					unsigned toWrite = std::min<unsigned>(elementCount,chunkArray.chunkSize(i));
-					if (out.write((const char*)chunkArray.chunkStartPtr(i),sizeof(ElementType)*N*toWrite) < 0)
-						return ccSerializableObject::WriteError();
-					assert(toWrite <= elementCount);
-					elementCount -= toWrite;
-				}
+				static const qint64 s_maxByteSaveCount = (1 << 26); //64 Mb each time
+				qint64 saveCount = std::min(byteCount, s_maxByteSaveCount);
+				if (out.write(_data, saveCount) < 0)
+					return ccSerializableObject::WriteError();
+				_data += saveCount;
+				byteCount -= saveCount;
 			}
-#endif //CC_ENV_64
 		}
 		return true;
 	}
 
-	//! Helper: loads a GenericChunkedArray structure from file
-	/** \param chunkArray GenericChunkedArray structure to load
+	//! Helper: loads a vector structure from file
+	/** \param data vector to load
 		\param in input file (must be already opened)
 		\param dataVersion version current data version
 		\return success
 	**/
-	template <int N, class ElementType> static bool GenericArrayFromFile(GenericChunkedArray<N,ElementType>& chunkArray, QFile& in, short dataVersion) 
+	template <class Type, int N, class ComponentType> static bool GenericArrayFromFile(std::vector<Type>& data, QFile& in, short dataVersion)
 	{
 		::uint8_t componentCount = 0;
 		::uint32_t elementCount = 0;
-		if (!ReadArrayHeader(in,dataVersion,componentCount,elementCount))
+		if (!ReadArrayHeader(in, dataVersion, componentCount, elementCount))
+		{
 			return false;
+		}
 		if (componentCount != N)
+		{
 			return ccSerializableObject::CorruptError();
+		}
 
 		if (elementCount)
 		{
 			//try to allocate memory
-			if (!chunkArray.resize(elementCount))
+			try
+			{
+				data.resize(elementCount);
+			}
+			catch (const std::bad_alloc&)
+			{
 				return ccSerializableObject::MemoryError();
+			}
 
 			//array data (dataVersion>=20)
 			{
-#ifdef CC_ENV_64
 				//Apparently Qt and/or Windows don't like to read too many bytes in a row...
 				static const qint64 MaxElementPerChunk = (static_cast<qint64>(1) << 24);
-				qint64 byteCount = static_cast<qint64>(sizeof(ElementType)*N) * chunkArray.currentSize();
-				char* dest = (char*)chunkArray.data();
+				assert(sizeof(ComponentType) * N == sizeof(Type));
+				qint64 byteCount = static_cast<qint64>(data.size()) * (sizeof(ComponentType) * N);
+				char* dest = (char*)data.data();
 				while (byteCount > 0)
 				{
 					qint64 chunkSize = std::min(MaxElementPerChunk, byteCount);
 					if (in.read(dest, chunkSize) < 0)
+					{
 						return ccSerializableObject::ReadError();
+					}
 					byteCount -= chunkSize;
 					dest += chunkSize;
 				}
-#else
-				//--> we read each chunk as a block (faster)
-				unsigned chunksCount = chunkArray.chunksCount();
-				for (unsigned i=0; i<chunksCount; ++i)
-					if (in.read((char*)chunkArray.chunkStartPtr(i),sizeof(ElementType)*N*chunkArray.chunkSize(i)) < 0)
-						return ccSerializableObject::ReadError();
-#endif //CC_ENV_64
 			}
-
-			//update array boundaries
-			chunkArray.computeMinAndMax();
 		}
 
 		return true;
 	}
 
-	//! Helper: loads a GenericChunkedArray structure from a file stored with a different type
-	/** \param chunkArray GenericChunkedArray structure to load
+	//! Helper: loads a vector structure from a file stored with a different type
+	/** \param data vector to load
 		\param in input file (must be already opened)
 		\param dataVersion version current data version
 		\return success
 	**/
-	template <int N, class ElementType, class FileElementType> static bool GenericArrayFromTypedFile(GenericChunkedArray<N,ElementType>& chunkArray, QFile& in, short dataVersion)
+	template <class Type, int N, class ComponentType, class FileComponentType> static bool GenericArrayFromTypedFile(std::vector<Type>& data, QFile& in, short dataVersion)
 	{
 		::uint8_t componentCount = 0;
 		::uint32_t elementCount = 0;
-		if (!ReadArrayHeader(in,dataVersion,componentCount,elementCount))
+		if (!ReadArrayHeader(in, dataVersion, componentCount, elementCount))
+		{
 			return false;
+		}
 		if (componentCount != N)
+		{
 			return ccSerializableObject::CorruptError();
+		}
 
 		if (elementCount)
 		{
 			//try to allocate memory
-			if (!chunkArray.resize(elementCount))
+			try
+			{
+				data.resize(elementCount);
+			}
+			catch (const std::bad_alloc&)
+			{
 				return ccSerializableObject::MemoryError();
+			}
 
 			//array data (dataVersion>=20)
 			//--> saldy we can't read it as a block...
 			//we must convert each element, value by value!
-			FileElementType dummyArray[N] = {0};
-#ifdef CC_ENV_64
-			ElementType* data = chunkArray.data();
-			for (unsigned i=0; i<elementCount; ++i)
+			FileComponentType dummyArray[N] = { 0 };
+
+			ComponentType* _data = (ComponentType*)data.data();
+			for (unsigned i = 0; i < elementCount; ++i)
 			{
-				if (in.read((char*)dummyArray,sizeof(FileElementType)*N) >= 0)
+				if (in.read((char*)dummyArray, sizeof(FileComponentType) * N) >= 0)
 				{
-					for (unsigned k=0; k<N; ++k)
-						*data++ = static_cast<ElementType>(dummyArray[k]);
+					for (unsigned k = 0; k < N; ++k)
+					{
+						*_data++ = static_cast<ComponentType>(dummyArray[k]);
+					}
 				}
 				else
 				{
 					return ccSerializableObject::ReadError();
 				}
 			}
-#else
-			unsigned chunksCount = chunkArray.chunksCount();
-			for (unsigned i=0; i<chunksCount; ++i)
-			{
-				unsigned chunkSize = chunkArray.chunkSize(i);
-				ElementType* chunkStart = chunkArray.chunkStartPtr(i);
-				for (unsigned j=0; j<chunkSize; ++j)
-				{
-					if (in.read((char*)dummyArray,sizeof(FileElementType)*N) >= 0)
-					{
-						for (unsigned k=0; k<N; ++k)
-							*chunkStart++ = static_cast<ElementType>(dummyArray[k]);
-					}
-					else
-					{
-						return ccSerializableObject::ReadError();
-					}
-				}
-			}
-#endif //CC_ENV_64
-
-			//update array boundaries
-			chunkArray.computeMinAndMax();
 		}
 
 		return true;
@@ -320,11 +308,11 @@ protected:
 			return ccSerializableObject::CorruptError();
 
 		//component count (dataVersion>=20)
-		if (in.read((char*)&componentCount,1) < 0)
+		if (in.read((char*)&componentCount, 1) < 0)
 			return ccSerializableObject::ReadError();
 
 		//element count = array size (dataVersion>=20)
-		if (in.read((char*)&elementCount,4) < 0)
+		if (in.read((char*)&elementCount, 4) < 0)
 			return ccSerializableObject::ReadError();
 
 		return true;

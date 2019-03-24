@@ -32,9 +32,8 @@ class CC_CORE_LIB_API GenericIndexedCloud : virtual public GenericCloud
 {
 
 public:
-
 	//! Default destructor
-	virtual ~GenericIndexedCloud() {}
+	~GenericIndexedCloud() override = default;
 
 	//! Returns the ith point
 	/**	Virtual method to request a point with a specific index.
@@ -48,7 +47,7 @@ public:
 		\param index of the requested point (between 0 and the cloud size minus 1)
 		\return the requested point (undefined behavior if index is invalid)
 	**/
-	virtual const CCVector3* getPoint(unsigned index) = 0;
+	virtual const CCVector3* getPoint(unsigned index) const = 0;
 
 	//! Returns the ith point
 	/**	Virtual method to request a point with a specific index.

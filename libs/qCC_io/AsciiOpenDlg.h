@@ -22,11 +22,13 @@
 #include "qCC_io.h"
 
 //Qt
-#include <QString>
 #include <QDialog>
+#include <QString>
 
 //system
 #include <vector>
+
+const unsigned ASCII_OPEN_DLG_TYPES_COUNT = 18;
 
 enum CC_ASCII_OPEN_DLG_TYPES {	ASCII_OPEN_DLG_None			= 0,
 								ASCII_OPEN_DLG_X			= 1,
@@ -42,9 +44,10 @@ enum CC_ASCII_OPEN_DLG_TYPES {	ASCII_OPEN_DLG_None			= 0,
 								ASCII_OPEN_DLG_Gf			= 11,
 								ASCII_OPEN_DLG_Bf			= 12,
 								ASCII_OPEN_DLG_Grey			= 13,
-								ASCII_OPEN_DLG_Scalar		= 14,
-								ASCII_OPEN_DLG_RGB32i		= 15, //RGBA as a single 32 bits integer (PCL style)
-								ASCII_OPEN_DLG_RGB32f		= 16, //RGBA as a single 32 bits float (PCL style)
+								ASCII_OPEN_DLG_RGB32i		= 14, //RGBA as a single 32 bits integer (PCL style)
+								ASCII_OPEN_DLG_RGB32f		= 15, //RGBA as a single 32 bits float (PCL style)
+								ASCII_OPEN_DLG_Label		= 16,
+								ASCII_OPEN_DLG_Scalar		= ASCII_OPEN_DLG_TYPES_COUNT - 1, //should always be the last one! (see AsciiOpenDlg::CheckOpenSequence)
 };
 
 //! Default ASCII header columns
@@ -68,10 +71,10 @@ public:
 	static QString Scalar() { return "SF"; }
 	static QString RGB32i() { return "RGB32i"; }
 	static QString RGB32f() { return "RGB32f"; }
+	static QString Label()	{ return "Label"; }
 };
 
-const unsigned ASCII_OPEN_DLG_TYPES_NUMBER = 17;
-const char ASCII_OPEN_DLG_TYPES_NAMES[ASCII_OPEN_DLG_TYPES_NUMBER][24] = {	"Ignore",
+const char ASCII_OPEN_DLG_TYPES_NAMES[ASCII_OPEN_DLG_TYPES_COUNT][24] = {	"Ignore",
 																			"coord. X",
 																			"coord. Y",
 																			"coord. Z",
@@ -85,9 +88,10 @@ const char ASCII_OPEN_DLG_TYPES_NAMES[ASCII_OPEN_DLG_TYPES_NUMBER][24] = {	"Igno
 																			"Green.float (0-1)",
 																			"Blue.float (0-1)",
 																			"Grey",
-																			"Scalar",
 																			"RGBAi",
 																			"RGBAf",
+																			"Label",
+																			"Scalar"
 																			};
 
 class QComboBox;
@@ -104,15 +108,15 @@ public:
 	//! Default constructor
 	/** \param parent parent widget
 	**/
-	explicit AsciiOpenDlg(QWidget* parent = 0);
+	explicit AsciiOpenDlg(QWidget* parent = nullptr);
 
 	//! Default destructor
-	virtual ~AsciiOpenDlg();
+	~AsciiOpenDlg() override;
 
 	//! Sets filename
 	/** \param filename filename
 	**/
-	void setFilename(QString filename);
+	void setFilename(const QString &filename);
 
 	//! Restores the previous context ('Apply all' button)
 	/** \return whether a context was saved or not
@@ -139,7 +143,7 @@ public:
 	};
 
 	//! ASCII open sequence
-	typedef std::vector<SequenceItem> Sequence;
+	using Sequence = std::vector<SequenceItem>;
 
 	//! Returns the whole "opening" sequence as set by the user
 	Sequence getOpenSequence() const;
@@ -159,6 +163,9 @@ public:
 	//! Returns the max number of points per cloud
 	unsigned getMaxCloudSize() const;
 
+	//! Whether labels should be visible in 2D
+	bool showLabelsIn2D() const;
+
 	//! Returns whether the current sequence is 'safe'
 	/** A safe sequence is safe if it matches the header (if any)
 		or if the file has less than 6 columns.
@@ -169,6 +176,9 @@ public:
 	/** \return validity (+ error message if not)
 	**/
 	static bool CheckOpenSequence(const Sequence& sequence, QString& errorMessage);
+
+	//! Resets the "apply all" flag (if set)
+	static void ResetApplyAll();
 
 public slots:
 	//! Slot called when separator changes
@@ -190,9 +200,6 @@ protected:
 	//! Tries to guess the best separator automagically
 	void autoFindBestSeparator();
 
-	// Resizes dialog width to fit all displayed table columns
-	void resizeWidthToFitTableColumns();
-
 	//associated UI
 	Ui_AsciiOpenDialog* m_ui;
 
@@ -201,8 +208,11 @@ protected:
 	double m_averageLineSize;
 	QString m_filename;
 	QString m_headerLine;
+
+	enum ColumnType { TEXT = 0, UNKNOWN = 1, IGNORED = 2, VALID = 3 };
+	
 	//! Identifies columns with numbers only [mandatory]
-	std::vector<bool> m_columnsValidty;
+	std::vector<ColumnType> m_columnType;
 
 	unsigned m_columnsCount;
 };

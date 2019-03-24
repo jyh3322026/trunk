@@ -18,20 +18,20 @@
 #include "ccPointListPickingDlg.h"
 
 //Qt
-#include <QSettings>
+#include <QApplication>
+#include <QClipboard>
 #include <QFileDialog>
 #include <QMenu>
-#include <QClipboard>
-#include <QApplication>
 #include <QMessageBox>
+#include <QSettings>
 
 //CCLib
 #include <CCConst.h>
 
 //qCC_db
+#include <cc2DLabel.h>
 #include <ccLog.h>
 #include <ccPointCloud.h>
-#include <cc2DLabel.h>
 #include <ccPolyline.h>
 
 //qCC_io
@@ -40,30 +40,32 @@
 //local
 #include "ccGLWindow.h"
 #include "mainwindow.h"
+
 #include "db_tree/ccDBRoot.h"
 
 //system
-#include <assert.h>
+#include <cassert>
 
 //semi persistent settings
-static unsigned s_pickedPointsStartIndex = 0;
+static int s_pickedPointsStartIndex = 0;
 static bool s_showGlobalCoordsCheckBoxChecked = false;
 static const char s_pickedPointContainerName[] = "Picked points list";
 static const char s_defaultLabelBaseName[] = "Point #";
 
-ccPointListPickingDlg::ccPointListPickingDlg(QWidget* parent)
-	: ccPointPickingGenericInterface(parent)
-	, Ui::PointListPickingDlg()
-	, m_associatedCloud(0)
-	, m_lastPreviousID(0)
-	, m_orderedLabelsContainer(0)
+ccPointListPickingDlg::ccPointListPickingDlg(ccPickingHub* pickingHub, QWidget* parent)
+    : ccPointPickingGenericInterface(pickingHub, parent)
+    , Ui::PointListPickingDlg()
+    , m_associatedCloud(nullptr)
+    , m_lastPreviousID(0)
+    , m_orderedLabelsContainer(nullptr)
 {
-	setupUi(this);
+    setupUi(this);
 
 	exportToolButton->setPopupMode(QToolButton::MenuButtonPopup);
 	QMenu* menu = new QMenu(exportToolButton);
 	QAction* exportASCII_xyz = menu->addAction("x,y,z");
 	QAction* exportASCII_ixyz = menu->addAction("local index,x,y,z");
+	QAction* exportASCII_gxyz = menu->addAction("global index,x,y,z");
 	QAction* exportASCII_lxyz = menu->addAction("label name,x,y,z");
 	QAction* exportToNewCloud = menu->addAction("new cloud");
 	QAction* exportToNewPolyline = menu->addAction("new polyline");
@@ -74,18 +76,21 @@ ccPointListPickingDlg::ccPointListPickingDlg(QWidget* parent)
 	startIndexSpinBox->setValue(s_pickedPointsStartIndex);
 	showGlobalCoordsCheckBox->setChecked(s_showGlobalCoordsCheckBoxChecked);
 
-	connect(cancelToolButton,			SIGNAL(clicked()),			this,				SLOT(cancelAndExit()));
-	connect(revertToolButton,			SIGNAL(clicked()),			this,				SLOT(removeLastEntry()));
-	connect(validToolButton,			SIGNAL(clicked()),			this,				SLOT(applyAndExit()));
-	connect(exportToolButton,			SIGNAL(clicked()),			exportToolButton,	SLOT(showMenu()));
-	connect(exportASCII_xyz,			SIGNAL(triggered()),		this,				SLOT(exportToASCII_xyz()));
-	connect(exportASCII_ixyz,			SIGNAL(triggered()),		this,				SLOT(exportToASCII_ixyz()));
-	connect(exportASCII_lxyz,			SIGNAL(triggered()),		this,				SLOT(exportToASCII_lxyz()));
-	connect(exportToNewCloud,			SIGNAL(triggered()),		this,				SLOT(exportToNewCloud()));
-	connect(exportToNewPolyline,		SIGNAL(triggered()),		this,				SLOT(exportToNewPolyline()));
-	connect(markerSizeSpinBox,			SIGNAL(valueChanged(int)),	this,				SLOT(markerSizeChanged(int)));
-	connect(startIndexSpinBox,			SIGNAL(valueChanged(int)),	this,				SLOT(startIndexChanged(int)));
-	connect(showGlobalCoordsCheckBox,	SIGNAL(clicked()),			this,				SLOT(updateList()));
+	connect(cancelToolButton,		&QAbstractButton::clicked,	this,				&ccPointListPickingDlg::cancelAndExit);
+	connect(revertToolButton,		&QAbstractButton::clicked,	this,				&ccPointListPickingDlg::removeLastEntry);
+	connect(validToolButton,		&QAbstractButton::clicked,	this,				&ccPointListPickingDlg::applyAndExit);
+	connect(exportToolButton,		&QAbstractButton::clicked,	exportToolButton,	&QToolButton::showMenu);
+	connect(exportASCII_xyz,		&QAction::triggered,		this,				&ccPointListPickingDlg::exportToASCII_xyz);
+	connect(exportASCII_ixyz,		&QAction::triggered,		this,				&ccPointListPickingDlg::exportToASCII_ixyz);
+	connect(exportASCII_gxyz,		&QAction::triggered,		this,				&ccPointListPickingDlg::exportToASCII_gxyz);
+	connect(exportASCII_lxyz,		&QAction::triggered,		this,				&ccPointListPickingDlg::exportToASCII_lxyz);
+	connect(exportToNewCloud,		&QAction::triggered,		this,				&ccPointListPickingDlg::exportToNewCloud);
+	connect(exportToNewPolyline,	&QAction::triggered,		this,				&ccPointListPickingDlg::exportToNewPolyline);
+	
+	connect(markerSizeSpinBox,	static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged),	this,	&ccPointListPickingDlg::markerSizeChanged);
+	connect(startIndexSpinBox,	static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged),	this,	&ccPointListPickingDlg::startIndexChanged);
+	
+	connect(showGlobalCoordsCheckBox, &QAbstractButton::clicked, this, &ccPointListPickingDlg::updateList);
 
 	updateList();
 }
@@ -98,7 +103,7 @@ unsigned ccPointListPickingDlg::getPickedPoints(std::vector<cc2DLabel*>& pickedP
 	{
 		//get all labels
 		ccHObject::Container labels;
-		unsigned count = m_orderedLabelsContainer->filterChildren(labels,false,CC_TYPES::LABEL_2D);
+		unsigned count = m_orderedLabelsContainer->filterChildren(labels, false, CC_TYPES::LABEL_2D);
 
 		try
 		{
@@ -109,7 +114,7 @@ unsigned ccPointListPickingDlg::getPickedPoints(std::vector<cc2DLabel*>& pickedP
 			ccLog::Error("Not enough memory!");
 			return 0;
 		}
-		for (unsigned i=0; i<count; ++i)
+		for (unsigned i = 0; i < count; ++i)
 		{
 			if (labels[i]->isA(CC_TYPES::LABEL_2D)) //Warning: cc2DViewportLabel is also a kind of 'CC_TYPES::LABEL_2D'!
 			{
@@ -129,15 +134,15 @@ void ccPointListPickingDlg::linkWithCloud(ccPointCloud* cloud)
 {
 	m_associatedCloud = cloud;
 	m_lastPreviousID = 0;
-	
+
 	if (m_associatedCloud)
 	{
 		//find default container
-		m_orderedLabelsContainer = 0;
+		m_orderedLabelsContainer = nullptr;
 		ccHObject::Container groups;
 		m_associatedCloud->filterChildren(groups,true,CC_TYPES::HIERARCHY_OBJECT);
-		
-		for (ccHObject::Container::const_iterator it=groups.begin(); it!=groups.end(); ++it)
+
+		for (ccHObject::Container::const_iterator it = groups.begin(); it != groups.end(); ++it)
 		{
 			if ((*it)->getName() == s_pickedPointContainerName)
 			{
@@ -149,7 +154,7 @@ void ccPointListPickingDlg::linkWithCloud(ccPointCloud* cloud)
 		std::vector<cc2DLabel*> previousPickedPoints;
 		unsigned count = getPickedPoints(previousPickedPoints);
 		//find highest unique ID among the VISIBLE labels
-		for (unsigned i=0; i<count; ++i)
+		for (unsigned i = 0; i < count; ++i)
 		{
 			m_lastPreviousID = std::max(m_lastPreviousID, previousPickedPoints[i]->getUniqueID());
 		}
@@ -176,24 +181,24 @@ void ccPointListPickingDlg::cancelAndExit()
 			dbRoot->removeElements(m_toBeAdded);
 		}
 
-		for (size_t j=0; j<m_toBeDeleted.size(); ++j)
+		for (auto & object : m_toBeDeleted)
 		{
-			m_toBeDeleted[j]->prepareDisplayForRefresh();
-			m_toBeDeleted[j]->setEnabled(true);
+			object->prepareDisplayForRefresh();
+			object->setEnabled(true);
 		}
-		
+
 		if (m_orderedLabelsContainer->getChildrenNumber() == 0)
 		{
 			dbRoot->removeElement(m_orderedLabelsContainer);
 			//m_associatedCloud->removeChild(m_orderedLabelsContainer);
-			m_orderedLabelsContainer = 0;
+			m_orderedLabelsContainer = nullptr;
 		}
 	}
 
-	m_toBeDeleted.clear();
-	m_toBeAdded.clear();
-	m_associatedCloud = 0;
-	m_orderedLabelsContainer = 0;
+	m_toBeDeleted.resize(0);
+	m_toBeAdded.resize(0);
+	m_associatedCloud = nullptr;
+	m_orderedLabelsContainer = nullptr;
 
 	MainWindow::RefreshAllGLWindow();
 
@@ -216,7 +221,7 @@ void ccPointListPickingDlg::exportToNewCloud()
 		if (cloud->reserve(count))
 		{
 			cloud->setName("Picking list");
-			for (unsigned i=0; i<count; ++i)
+			for (unsigned i = 0; i < count; ++i)
 			{
 				const cc2DLabel::PickedPoint& PP = labels[i]->getPoint(0);
 				const CCVector3* P = PP.cloud->getPoint(PP.index);
@@ -226,13 +231,13 @@ void ccPointListPickingDlg::exportToNewCloud()
 			cloud->setDisplay(m_associatedCloud->getDisplay());
 			cloud->setGlobalShift(m_associatedCloud->getGlobalShift());
 			cloud->setGlobalScale(m_associatedCloud->getGlobalScale());
-			MainWindow::TheInstance()->db()->addElement(cloud);
+			MainWindow::TheInstance()->addToDB(cloud);
 		}
 		else
 		{
 			ccLog::Error("Can't export picked points as point cloud: not enough memory!");
 			delete cloud;
-			cloud = 0;
+			cloud = nullptr;
 		}
 	}
 	else
@@ -263,12 +268,12 @@ void ccPointListPickingDlg::exportToNewPolyline()
 			return;
 		}
 
-		for (unsigned i=0; i<count; ++i)
+		for (unsigned i = 0; i < count; ++i)
 		{
 			const cc2DLabel::PickedPoint& PP = labels[i]->getPoint(0);
 			vertices->addPoint(*PP.cloud->getPoint(PP.index));
 		}
-		polyline->addPointIndex(0,count);
+		polyline->addPointIndex(0, count);
 		polyline->setVisible(true);
 		vertices->setEnabled(false);
 		polyline->setGlobalShift(m_associatedCloud->getGlobalShift());
@@ -276,7 +281,7 @@ void ccPointListPickingDlg::exportToNewPolyline()
 		polyline->addChild(vertices);
 		polyline->setDisplay_recursive(m_associatedCloud->getDisplay());
 
-		MainWindow::TheInstance()->db()->addElement(polyline,true);
+		MainWindow::TheInstance()->addToDB(polyline);
 	}
 	else
 	{
@@ -290,12 +295,12 @@ void ccPointListPickingDlg::applyAndExit()
 	{
 		//apply modifications
 		MainWindow::TheInstance()->db()->removeElements(m_toBeDeleted); //no need to redraw as they should already be invisible
-		m_associatedCloud = 0;
+		m_associatedCloud = nullptr;
 	}
 
-	m_toBeDeleted.clear();
-	m_toBeAdded.clear();
-	m_orderedLabelsContainer = 0;
+	m_toBeDeleted.resize(0);
+	m_toBeAdded.resize(0);
+	m_orderedLabelsContainer = nullptr;
 
 	updateList();
 
@@ -350,15 +355,15 @@ void ccPointListPickingDlg::removeLastEntry()
 
 void ccPointListPickingDlg::startIndexChanged(int value)
 {
-	unsigned int uValue = static_cast<unsigned int>(value);
-
-	if (uValue != s_pickedPointsStartIndex)
+	if (value != s_pickedPointsStartIndex)
 	{
-		s_pickedPointsStartIndex = uValue;
+		s_pickedPointsStartIndex = value;
 
 		updateList();
 		if (m_associatedWin)
+		{
 			m_associatedWin->redraw();
+		}
 	}
 }
 
@@ -395,9 +400,9 @@ void ccPointListPickingDlg::exportToASCII(ExportFormat format)
 	settings.endGroup();
 
 	filename = QFileDialog::getSaveFileName(this,
-											"Export to ASCII",
-											filename,
-											AsciiFilter::GetFileFilter());
+	                                        "Export to ASCII",
+	                                        filename,
+	                                        AsciiFilter::GetFileFilter());
 
 	if (filename.isEmpty())
 		return;
@@ -406,7 +411,7 @@ void ccPointListPickingDlg::exportToASCII(ExportFormat format)
 	settings.setValue("filename", filename);
 	settings.endGroup();
 
-	FILE* fp = fopen(qPrintable(filename),"wt");
+	FILE* fp = fopen(qPrintable(filename), "wt");
 	if (!fp)
 	{
 		ccLog::Error(QString("Failed to open file '%1' for saving!").arg(filename));
@@ -420,10 +425,10 @@ void ccPointListPickingDlg::exportToASCII(ExportFormat format)
 	if (shift.norm2() != 0 || scale != 1.0)
 	{
 		if (QMessageBox::warning(	this,
-									"Apply global shift",
-									"Do you want to apply global shift/scale to exported points?",
-									QMessageBox::Yes | QMessageBox::No,
-									QMessageBox::Yes ) == QMessageBox::No)
+		                            "Apply global shift",
+		                            "Do you want to apply global shift/scale to exported points?",
+		                            QMessageBox::Yes | QMessageBox::No,
+		                            QMessageBox::Yes ) == QMessageBox::No)
 		{
 			//reset shift
 			shift = CCVector3d(0,0,0);
@@ -434,20 +439,31 @@ void ccPointListPickingDlg::exportToASCII(ExportFormat format)
 	//starting index
 	unsigned startIndex = static_cast<unsigned>(std::max(0, startIndexSpinBox->value()));
 
-	for (unsigned i=0; i<count; ++i)
+	for (unsigned i = 0; i < count; ++i)
 	{
 		assert(labels[i]->size() == 1);
 		const cc2DLabel::PickedPoint& PP = labels[i]->getPoint(0);
 		const CCVector3* P = PP.cloud->getPoint(PP.index);
 
-		if (format == PLP_ASCII_EXPORT_IXYZ)
-			fprintf(fp,"%u,",i+startIndex);
-		else if (format == PLP_ASCII_EXPORT_LXYZ)
-			fprintf(fp,"%s,",qPrintable(labels[i]->getName()));
+		switch (format)
+		{
+		case PLP_ASCII_EXPORT_IXYZ:
+			fprintf(fp, "%u,", i + startIndex);
+			break;
+		case PLP_ASCII_EXPORT_GXYZ:
+			fprintf(fp, "%u,", PP.index);
+			break;
+		case PLP_ASCII_EXPORT_LXYZ:
+			fprintf(fp, "%s,", qPrintable(labels[i]->getName()));
+			break;
+		default:
+			//nothing to do
+			break;
+		}
 
-		fprintf(fp,"%.12f,%.12f,%.12f\n",	static_cast<double>(P->x)/scale - shift.x,
-											static_cast<double>(P->y)/scale - shift.y,
-											static_cast<double>(P->z)/scale - shift.z);
+		fprintf(fp, "%.12f,%.12f,%.12f\n",	static_cast<double>(P->x) / scale - shift.x,
+		                                    static_cast<double>(P->y) / scale - shift.y,
+		                                    static_cast<double>(P->z) / scale - shift.z);
 	}
 
 	fclose(fp);
@@ -459,7 +475,9 @@ void ccPointListPickingDlg::updateList()
 {
 	//get all labels
 	std::vector<cc2DLabel*> labels;
-	unsigned count = getPickedPoints(labels);
+	const int count = static_cast<int>( getPickedPoints(labels) );
+
+	const int oldRowCount = tableWidget->rowCount();
 
 	revertToolButton->setEnabled(count);
 	validToolButton->setEnabled(count);
@@ -467,34 +485,56 @@ void ccPointListPickingDlg::updateList()
 	countLineEdit->setText(QString::number(count));
 	tableWidget->setRowCount(count);
 
-	if (!count)
+	if ( count == 0 )
+	{
 		return;
+	}
+
+	// If we have any new rows, create QTableWidgetItems for them
+	if ( (count - oldRowCount) > 0 )
+	{
+		for ( int i = oldRowCount; i < count; ++i )
+		{
+			tableWidget->setVerticalHeaderItem( i, new QTableWidgetItem );
+
+			for ( int j = 0; j < 4; ++j )
+			{
+				tableWidget->setItem( i, j, new QTableWidgetItem );
+			}
+		}
+	}
 
 	//starting index
-	int startIndex = startIndexSpinBox->value();
-	int precision = m_associatedWin ? m_associatedWin->getDisplayParameters().displayedNumPrecision : 6;
+	const int startIndex = startIndexSpinBox->value();
+	const int precision = m_associatedWin ? static_cast<int>(m_associatedWin->getDisplayParameters().displayedNumPrecision) : 6;
 
-	bool showAbsolute = showGlobalCoordsCheckBox->isEnabled() && showGlobalCoordsCheckBox->isChecked();
+	const bool showAbsolute = showGlobalCoordsCheckBox->isEnabled() && showGlobalCoordsCheckBox->isChecked();
 
-	for (unsigned i=0; i<count; ++i)
+	for ( int i = 0; i < count; ++i )
 	{
-		const cc2DLabel::PickedPoint& PP = labels[i]->getPoint(0);
+		cc2DLabel* label = labels[static_cast<unsigned int>( i )];
+
+		const cc2DLabel::PickedPoint& PP = label->getPoint(0);
 		const CCVector3* P = PP.cloud->getPoint(PP.index);
 		CCVector3d Pd = (showAbsolute ? PP.cloud->toGlobal3d(*P) : CCVector3d::fromArray(P->u));
 
 		//point index in list
-		tableWidget->setVerticalHeaderItem(i,new QTableWidgetItem(QString("%1").arg(i+startIndex)));
-		//update name as well
-		if (	labels[i]->getUniqueID() > m_lastPreviousID
-			||	labels[i]->getName().startsWith(s_defaultLabelBaseName) ) //DGM: we don't change the name of old labels that have a non-default name
-		{
-			labels[i]->setName(s_defaultLabelBaseName + QString::number(i+startIndex));
-		}
-		//point absolute index (in cloud)
-		tableWidget->setItem(i,0,new QTableWidgetItem(QString("%1").arg(PP.index)));
+		tableWidget->verticalHeaderItem( i )->setText( QStringLiteral( "%1" ).arg( i + startIndex ) );
 
-		for (unsigned j=0; j<3; ++j)
-			tableWidget->setItem(i,j+1,new QTableWidgetItem(QString("%1").arg(Pd.u[j],0,'f',precision)));
+		//update name as well
+		if (	label->getUniqueID() > m_lastPreviousID
+		    ||	label->getName().startsWith(s_defaultLabelBaseName) ) //DGM: we don't change the name of old labels that have a non-default name
+		{
+			label->setName(s_defaultLabelBaseName + QString::number(i+startIndex));
+		}
+
+		//point absolute index (in cloud)
+		tableWidget->item( i, 0 )->setText( QStringLiteral( "%1" ).arg( PP.index ) );
+
+		for ( int j = 0; j < 3; ++j )
+		{
+			tableWidget->item( i, j + 1 )->setText( QStringLiteral( "%1" ).arg( Pd.u[j], 0, 'f', precision ) );
+		}
 	}
 
 	tableWidget->scrollToBottom();
@@ -516,8 +556,8 @@ void ccPointListPickingDlg::processPickedPoint(ccPointCloud* cloud, unsigned poi
 	{
 		newLabel->setDisplay(display);
 		QSize size = display->getScreenSize();
-		newLabel->setPosition(	static_cast<float>(x+20) / size.width(),
-								static_cast<float>(y+20) / size.height() );
+		newLabel->setPosition(	static_cast<float>(x + 20) / size.width(),
+		                        static_cast<float>(y + 20) / size.height() );
 	}
 
 	//add default container if necessary
@@ -526,11 +566,11 @@ void ccPointListPickingDlg::processPickedPoint(ccPointCloud* cloud, unsigned poi
 		m_orderedLabelsContainer = new ccHObject(s_pickedPointContainerName);
 		m_associatedCloud->addChild(m_orderedLabelsContainer);
 		m_orderedLabelsContainer->setDisplay(display);
-		MainWindow::TheInstance()->addToDB(m_orderedLabelsContainer,false,true,false,false);
+		MainWindow::TheInstance()->addToDB(m_orderedLabelsContainer, false, true, false, false);
 	}
 	assert(m_orderedLabelsContainer);
 	m_orderedLabelsContainer->addChild(newLabel);
-	MainWindow::TheInstance()->addToDB(newLabel,false,true,false,false);
+	MainWindow::TheInstance()->addToDB(newLabel, false, true, false, false);
 	m_toBeAdded.push_back(newLabel);
 
 	//automatically send the new point coordinates to the clipboard
@@ -540,7 +580,7 @@ void ccPointListPickingDlg::processPickedPoint(ccPointCloud* cloud, unsigned poi
 		const CCVector3* P = cloud->getPoint(pointIndex);
 		int precision = m_associatedWin ? m_associatedWin->getDisplayParameters().displayedNumPrecision : 6;
 		int indexInList = startIndexSpinBox->value() + static_cast<int>(m_orderedLabelsContainer->getChildrenNumber()) - 1;
-		clipboard->setText(QString("CC_POINT_#%0(%1;%2;%3)").arg(indexInList).arg(P->x,0,'f',precision).arg(P->y,0,'f',precision).arg(P->z,0,'f',precision));
+		clipboard->setText(QString("CC_POINT_#%0(%1;%2;%3)").arg(indexInList).arg(P->x, 0, 'f', precision).arg(P->y, 0, 'f', precision).arg(P->z, 0, 'f', precision));
 	}
 
 	updateList();

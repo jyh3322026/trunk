@@ -19,7 +19,6 @@
 
 //Local
 #include "ccColorScalesManager.h"
-#include "ccColorRampShader.h"
 
 //CCLib
 #include <CCConst.h>
@@ -38,7 +37,7 @@ ccScalarField::ccScalarField(const char* name/*=0*/)
 	, m_symmetricalScale(false)
 	, m_logScale(false)
 	, m_alwaysShowZero(false)
-	, m_colorScale(0)
+	, m_colorScale(nullptr)
 	, m_colorRampSteps(0)
 	, m_modified(true)
 	, m_globalShift(0)
@@ -326,7 +325,7 @@ bool ccScalarField::toFile(QFile& out) const
 		return WriteError();
 
 	//data (dataVersion>=20)
-	if (!ccSerializationHelper::GenericArrayToFile(*this, out))
+	if (!ccSerializationHelper::GenericArrayToFile<ScalarType, 1, ScalarType>(*this, out))
 		return WriteError();
 
 	//displayed values & saturation boundaries (dataVersion>=20)
@@ -367,7 +366,7 @@ bool ccScalarField::toFile(QFile& out) const
 
 	//color scale (dataVersion>=27)
 	{
-		bool hasColorScale = (m_colorScale != 0);
+		bool hasColorScale = (m_colorScale != nullptr);
 		if (out.write((const char*)&hasColorScale, sizeof(bool)) < 0)
 			return WriteError();
 
@@ -413,19 +412,21 @@ bool ccScalarField::fromFile(QFile& in, short dataVersion, int flags)
 		bool fileScalarIsFloat = (flags & ccSerializableObject::DF_SCALAR_VAL_32_BITS);
 		if (fileScalarIsFloat && sizeof(ScalarType) == 8) //file is 'float' and current type is 'double'
 		{
-			result = ccSerializationHelper::GenericArrayFromTypedFile<1, ScalarType, float>(*this, in, dataVersion);
+			result = ccSerializationHelper::GenericArrayFromTypedFile<ScalarType, 1, ScalarType, float>(*this, in, dataVersion);
 		}
 		else if (!fileScalarIsFloat && sizeof(ScalarType) == 4) //file is 'double' and current type is 'float'
 		{
-			result = ccSerializationHelper::GenericArrayFromTypedFile<1, ScalarType, double>(*this, in, dataVersion);
+			result = ccSerializationHelper::GenericArrayFromTypedFile<ScalarType, 1, ScalarType, double>(*this, in, dataVersion);
 		}
 		else
 		{
-			result = ccSerializationHelper::GenericArrayFromFile(*this, in, dataVersion);
+			result = ccSerializationHelper::GenericArrayFromFile<ScalarType, 1, ScalarType>(*this, in, dataVersion);
 		}
 	}
 	if (!result)
+	{
 		return false;
+	}
 
 	//convert former 'hidden/NaN' values for non strictly positive SFs (dataVersion < 26)
 	if (dataVersion < 26)
@@ -434,12 +435,16 @@ bool ccScalarField::fromFile(QFile& in, short dataVersion, int flags)
 
 		for (unsigned i = 0; i < currentSize(); ++i)
 		{
-			ScalarType val = getValue(i);
+			ScalarType &val = getValue(i);
 			//convert former 'HIDDEN_VALUE' and 'BIG_VALUE' to 'NAN_VALUE'
 			if ((onlyPositiveValues && val < 0) || (!onlyPositiveValues && val >= FORMER_BIG_VALUE))
+			{
 				val = NAN_VALUE;
+			}
 		}
 	}
+
+	computeMinAndMax();
 
 	//displayed values & saturation boundaries (dataVersion>=20)
 	double minDisplayed = 0;
@@ -473,14 +478,18 @@ bool ccScalarField::fromFile(QFile& in, short dataVersion, int flags)
 
 	//'logarithmic scale' state (dataVersion>=20)
 	if (in.read((char*)&m_logScale, sizeof(bool)) < 0)
+	{
 		return ReadError();
+	}
 
 	if (dataVersion < 27)
 	{
 		bool autoBoundaries = false;
 		//'automatic boundaries update' state (dataVersion>=20)
 		if (in.read((char*)&autoBoundaries, sizeof(bool)) < 0)
+		{
 			return ReadError();
+		}
 		//warn the user that this option is deprecated
 		if (!autoBoundaries)
 		{
@@ -575,7 +584,7 @@ bool ccScalarField::fromFile(QFile& in, short dataVersion, int flags)
 			}
 		}
 
-		//A scalar fiels must have a color scale!
+		//A scalar field must have a color scale!
 		if (!m_colorScale)
 			m_colorScale = ccColorScalesManager::GetDefaultScale();
 

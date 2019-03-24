@@ -48,7 +48,7 @@ public:
 		\param viewMat the optional 4x4 visualization matrix (OpenGL style)
 		\return a cloud structure containing references to the extracted points (references to - no duplication)
 	**/
-	static ReferenceCloud* segment(GenericIndexedCloudPersist* aCloud, const Polyline* poly, bool keepInside, const float* viewMat=0);
+	static ReferenceCloud* segment(GenericIndexedCloudPersist* aCloud, const Polyline* poly, bool keepInside, const float* viewMat = nullptr);
 
 	//! Selects the points which associated scalar value fall inside or outside a specified interval
 	/** \warning: be sure to activate an OUTPUT scalar field on the input cloud
@@ -87,15 +87,15 @@ public:
 		\param pointsIndexes the vertices indexes as a set of references
 		\param pointsWillBeInside specifies if the points corresponding to the input indexes should be the new mesh vertices, or the opposite
 		\param progressCb the client application can get some notification of the process progress through this callback mechanism (see GenericProgressCallback)
-		\param destCloud optionnaly, a cloud object can be specified to be associated to the new created mesh object, instead of the cloud associated to the ReferenceCloud "pointsIndexes"
-		\param indexShift optionnaly, a shift can be added to all vertex indexes of the new mesh
+		\param destCloud optionally, a cloud object can be specified to be associated to the new created mesh object, instead of the cloud associated to the ReferenceCloud "pointsIndexes"
+		\param indexShift optionally, a shift can be added to all vertex indexes of the new mesh
 		\return a new mesh structure, or 0 if something went wrong
 	**/
 	static GenericIndexedMesh* segmentMesh(	GenericIndexedMesh* theMesh,
 											ReferenceCloud* pointsIndexes,
 											bool pointsWillBeInside,
-											GenericProgressCallback* progressCb = 0,
-											GenericIndexedCloud* destCloud = 0,
+											GenericProgressCallback* progressCb = nullptr,
+											GenericIndexedCloud* destCloud = nullptr,
 											unsigned indexShift = 0);
 
 	//! Input/output parameters for the segmentMeshWitAAPlane method
@@ -116,8 +116,8 @@ public:
 		std::vector<unsigned> origTriIndexesMapOutside;
 
 		MeshCutterParams()
-			: insideMesh(0)
-			, outsideMesh(0)
+			: insideMesh(nullptr)
+			, outsideMesh(nullptr)
 			, generateOutsideMesh(false)
 			, epsilon(ZERO_TOLERANCE)
 			, planeOrthoDim(0)
@@ -131,12 +131,12 @@ public:
 	static bool segmentMeshWitAAPlane(GenericIndexedMesh* mesh,
 		GenericIndexedCloudPersist* vertices,
 		MeshCutterParams& ioParams,
-		GenericProgressCallback* progressCb = 0);
+		GenericProgressCallback* progressCb = nullptr);
 
 	static bool segmentMeshWitAABox(GenericIndexedMesh* mesh,
 		GenericIndexedCloudPersist* vertices,
 		MeshCutterParams& ioParams,
-		GenericProgressCallback* progressCb = 0);
+		GenericProgressCallback* progressCb = nullptr);
 };
 
 }

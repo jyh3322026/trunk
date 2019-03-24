@@ -21,22 +21,20 @@
 #include "ccClipBox.h"
 
 //Local
-#include "ccCylinder.h"
 #include "ccCone.h"
+#include "ccCylinder.h"
+#include "ccHObjectCaster.h"
 #include "ccSphere.h"
 #include "ccTorus.h"
-#include "ccHObjectCaster.h"
 
 //system
-#include <assert.h>
+#include <cassert>
 
 //Components geometry
-static QSharedPointer<ccCylinder> c_arrowShaft(0);
-static QSharedPointer<ccCone> c_arrowHead(0);
-static QSharedPointer<ccSphere> c_centralSphere(0);
-static QSharedPointer<ccTorus> c_torus(0);
-
-#define USE_OPENGL
+static QSharedPointer<ccCylinder> c_arrowShaft(nullptr);
+static QSharedPointer<ccCone> c_arrowHead(nullptr);
+static QSharedPointer<ccSphere> c_centralSphere(nullptr);
+static QSharedPointer<ccTorus> c_torus(nullptr);
 
 void DrawUnitArrow(int ID, const CCVector3& start, const CCVector3& direction, PointCoordinateType scale, const ccColor::Rgb& col, CC_DRAW_CONTEXT& context)
 {
@@ -80,9 +78,9 @@ void DrawUnitArrow(int ID, const CCVector3& start, const CCVector3& direction, P
 	}
 
 	if (!c_arrowShaft)
-		c_arrowShaft = QSharedPointer<ccCylinder>(new ccCylinder(0.15f,0.6f,0,"ArrowShaft",12));
+		c_arrowShaft = QSharedPointer<ccCylinder>(new ccCylinder(0.15f,0.6f,nullptr,"ArrowShaft",12));
 	if (!c_arrowHead)
-		c_arrowHead = QSharedPointer<ccCone>(new ccCone(0.3f,0,0.4f,0,0,0,"ArrowHead",24));
+		c_arrowHead = QSharedPointer<ccCone>(new ccCone(0.3f,0,0.4f,0,0,nullptr,"ArrowHead",24));
 
 	glFunc->glTranslatef(0,0,0.3f);
 	c_arrowShaft->setTempColor(col);
@@ -134,7 +132,7 @@ static void DrawUnitTorus(int ID, const CCVector3& center, const CCVector3& dire
 	}
 
 	if (!c_torus)
-		c_torus = QSharedPointer<ccTorus>(new ccTorus(0.2f, 0.4f, 2.0*M_PI, false, 0, 0, "Torus", 12));
+		c_torus = QSharedPointer<ccTorus>(new ccTorus(0.2f, 0.4f, 2.0*M_PI, false, 0, nullptr, "Torus", 12));
 
 	glFunc->glTranslatef(0,0,0.3f);
 	c_torus->setTempColor(col);
@@ -192,31 +190,34 @@ static void DrawUnitCross(int ID, const CCVector3& center, PointCoordinateType s
 	DrawUnitArrow(0, center, CCVector3( 0, 0, 1), scale, col, context);
 }
 
-ccClipBox::ccClipBox(ccHObject* associatedEntity, QString name/*= QString("clipping box")*/)
+ccClipBox::ccClipBox(QString name/*= QString("clipping box")*/)
 	: ccHObject(name)
-	, m_associatedEntity(0)
+	, m_entityContainer("entities")
 	, m_showBox(true)
 	, m_activeComponent(NONE)
 {
 	setSelectionBehavior(SELECTION_IGNORED);
-
-	setAssociatedEntity(associatedEntity);
 }
 
 ccClipBox::~ccClipBox()
 {
-	setAssociatedEntity(0);
+	releaseAssociatedEntities();
 }
 
 void ccClipBox::update()
 {
-	if (!m_associatedEntity)
+	if (m_entityContainer.getChildrenNumber() == 0)
 	{
 		return;
 	}
 
-#ifdef USE_OPENGL
-	m_associatedEntity->removeAllClipPlanes();
+	//remove any existing clipping plane
+	{
+		for (unsigned ci = 0; ci < m_entityContainer.getChildrenNumber(); ++ci)
+		{
+			m_entityContainer.getChild(ci)->removeAllClipPlanes();
+		}
+	}
 	
 	//now add the 6 box clipping planes
 	ccBBox extents;
@@ -239,7 +240,10 @@ void ccClipBox::update()
 
 			//compute the 'constant' coefficient knowing that P belongs to the plane if (P - (C - half_dim * N)).N = 0
 			posPlane.equation.w = -static_cast<double>(C.dot(N)) + halfDim.u[d];
-			m_associatedEntity->addClipPlanes(posPlane);
+			for (unsigned ci = 0; ci < m_entityContainer.getChildrenNumber(); ++ci)
+			{
+				m_entityContainer.getChild(ci)->addClipPlanes(posPlane);
+			}
 		}
 
 		//negative side
@@ -252,12 +256,12 @@ void ccClipBox::update()
 			//compute the 'constant' coefficient knowing that P belongs to the plane if (P - (C + half_dim * N)).N = 0
 			//negPlane.equation.w = -(static_cast<double>(C.dot(N)) + halfDim.u[d]);
 			negPlane.equation.w = static_cast<double>(C.dot(N)) + halfDim.u[d];
-			m_associatedEntity->addClipPlanes(negPlane);
+			for (unsigned ci = 0; ci < m_entityContainer.getChildrenNumber(); ++ci)
+			{
+				m_entityContainer.getChild(ci)->addClipPlanes(negPlane);
+			}
 		}
 	}
-#else
-	flagPointsInside();
-#endif
 }
 
 void ccClipBox::reset()
@@ -265,9 +269,9 @@ void ccClipBox::reset()
 	m_box.clear();
 	resetGLTransformation();
 
-	if (m_associatedEntity)
+	if (m_entityContainer.getChildrenNumber())
 	{
-		m_box = m_associatedEntity->getOwnBB();
+		m_box = m_entityContainer.getBB_recursive();
 	}
 
 	update();
@@ -301,52 +305,24 @@ void ccClipBox::get(ccBBox& extents, ccGLMatrix& transformation)
 	}
 }
 
-bool ccClipBox::setAssociatedEntity(ccHObject* entity)
+void ccClipBox::releaseAssociatedEntities()
 {
-	//release previous one
-	if (m_associatedEntity)
+	for (unsigned ci = 0; ci < m_entityContainer.getChildrenNumber(); ++ci)
 	{
-#ifdef USE_OPENGL
-		m_associatedEntity->removeAllClipPlanes();
-#else
-		ccGenericPointCloud* points = ccHObjectCaster::ToGenericPointCloud(m_associatedEntity);
-		if (points)
-			points->unallocateVisibilityArray();
-#endif
+		m_entityContainer.getChild(ci)->removeAllClipPlanes();
 	}
-	m_associatedEntity = 0;
+	m_entityContainer.removeAllChildren();
+}
 
-	//try to initialize new one
-	if (entity)
+bool ccClipBox::addAssociatedEntity(ccHObject* entity)
+{
+	m_entityContainer.addChild(entity, DP_NONE); //no dependency!
+
+	//no need to reset the clipping box if the entity has not a valid bounding-box
+	if (entity->getBB_recursive().isValid())
 	{
-#ifdef USE_OPENGL
-		m_associatedEntity = entity;
-#else
-		if (!entity->isKindOf(CC_TYPES::POINT_CLOUD) && !entity->isKindOf(CC_TYPES::MESH))
-		{
-			ccLog::Warning("[Clipping box] Unhandled type of entity");
-			return false;
-		}
-		else
-		{
-			ccGenericPointCloud* points = ccHObjectCaster::ToGenericPointCloud(entity);
-			if (points)
-			{
-				if (points->resetVisibilityArray())
-				{
-					m_associatedEntity = entity;
-				}
-				else
-				{
-					ccLog::Warning("[Clipping box] Not enough memory");
-					return false;
-				}
-			}
-		}
-#endif
+		reset();
 	}
-
-	reset();
 
 	return true;
 }
@@ -433,7 +409,7 @@ bool ccClipBox::move2D(int x, int y, int dx, int dy, int screenWidth, int screen
 		return false;
 
 	//convert mouse position to vector (screen-centered)
-	CCVector3d currentOrientation = PointToVector(x,y,screenWidth,screenHeight);
+	CCVector3d currentOrientation = PointToVector(x, y, screenWidth, screenHeight);
 
 	ccGLMatrixd rotMat = ccGLMatrixd::FromToRotation(m_lastOrientation,currentOrientation);
 
@@ -562,7 +538,7 @@ bool ccClipBox::move3D(const CCVector3d& uInput)
 
 		//look for the most parallel dimension
 		double maxDot = m_viewMatrix.getColumnAsVec3D(0).dot(RxU);
-		for (int i=1; i<3; ++i)
+		for (int i = 1; i < 3; ++i)
 		{
 			double dot = m_viewMatrix.getColumnAsVec3D(i).dot(RxU);
 			if (fabs(dot) > fabs(maxDot))
@@ -620,24 +596,6 @@ void ccClipBox::shift(const CCVector3& v)
 	emit boxModified(&m_box);
 }
 
-void ccClipBox::flagPointsInside(bool shrink/*=false*/)
-{
-	if (!m_associatedEntity->isKindOf(CC_TYPES::POINT_CLOUD) && !m_associatedEntity->isKindOf(CC_TYPES::MESH))
-	{
-		ccLog::Warning("[ccClipBox::update] Unhandled type of entity");
-		return;
-	}
-
-	ccGenericPointCloud* cloud = m_associatedEntity ? ccHObjectCaster::ToGenericPointCloud(m_associatedEntity) : 0;
-	if (!cloud || !cloud->isVisibilityTableInstantiated())
-	{
-		assert(false);
-		return;
-	}
-
-	flagPointsInside(cloud, cloud->getTheVisibilityArray(), shrink);
-}
-
 void ccClipBox::flagPointsInside(	ccGenericPointCloud* cloud,
 									ccGenericPointCloud::VisibilityTableType* visTable,
 									bool shrink/*=false*/) const
@@ -648,7 +606,7 @@ void ccClipBox::flagPointsInside(	ccGenericPointCloud* cloud,
 		assert(false);
 		return;
 	}
-	if (cloud->size() != visTable->currentSize())
+	if (cloud->size() != visTable->size())
 	{
 		///size mismatch
 		assert(false);
@@ -666,11 +624,11 @@ void ccClipBox::flagPointsInside(	ccGenericPointCloud* cloud,
 #endif
 		for (int i = 0; i < count; ++i)
 		{
-			if (!shrink || visTable->getValue(static_cast<unsigned>(i)) == POINT_VISIBLE)
+			if (!shrink || visTable->at(i) == POINT_VISIBLE)
 			{
 				CCVector3 P = *cloud->getPoint(static_cast<unsigned>(i));
 				transMat.apply(P);
-				visTable->setValue(static_cast<unsigned>(i), m_box.contains(P) ? POINT_VISIBLE : POINT_HIDDEN);
+				visTable->at(i) = (m_box.contains(P) ? POINT_VISIBLE : POINT_HIDDEN);
 			}
 		}
 	}
@@ -681,10 +639,10 @@ void ccClipBox::flagPointsInside(	ccGenericPointCloud* cloud,
 #endif
 		for (int i = 0; i < count; ++i)
 		{
-			if (!shrink || visTable->getValue(static_cast<unsigned>(i)) == POINT_VISIBLE)
+			if (!shrink || visTable->at(i) == POINT_VISIBLE)
 			{
 				const CCVector3* P = cloud->getPoint(static_cast<unsigned>(i));
-				visTable->setValue(static_cast<unsigned>(i), m_box.contains(*P) ? POINT_VISIBLE : POINT_HIDDEN);
+				visTable->at(i) = (m_box.contains(*P) ? POINT_VISIBLE : POINT_HIDDEN);
 			}
 		}
 	}
@@ -708,9 +666,9 @@ PointCoordinateType ccClipBox::computeArrowsScale() const
 {
 	PointCoordinateType scale = m_box.getDiagNorm() / 10;
 
-	if (m_associatedEntity)
+	if (m_entityContainer.getChildrenNumber() != 0)
 	{
-		scale = std::max<PointCoordinateType>(scale, m_associatedEntity->getOwnBB().getDiagNorm() / 100);
+		scale = std::max<PointCoordinateType>(scale, getBox().getDiagNorm() / 25);
 	}
 
 	return scale;
@@ -767,12 +725,16 @@ void ccClipBox::drawMeOnly(CC_DRAW_CONTEXT& context)
 		//custom arrow 'context'
 		CC_DRAW_CONTEXT componentContext = context;
 		componentContext.drawingFlags &= (~CC_DRAW_ENTITY_NAMES); //we must remove the 'push name flag' so that the arows don't push their own!
-		componentContext.display = 0;
+		componentContext.display = nullptr;
 
 		if (pushName) //2nd level = sub-item
 		{
 			glFunc->glPushName(0); //fake ID, will be replaced by the arrows one if any
 		}
+
+		//force the light on
+		glFunc->glPushAttrib(GL_LIGHTING_BIT);
+		glFunc->glEnable(GL_LIGHT0);
 
 		DrawUnitArrow(X_MINUS_ARROW*pushName, CCVector3(minC.x, center.y, center.z), CCVector3(-1.0, 0.0, 0.0), scale, ccColor::red, componentContext);
 		DrawUnitArrow(X_PLUS_ARROW*pushName, CCVector3(maxC.x, center.y, center.z), CCVector3(1.0, 0.0, 0.0), scale, ccColor::red, componentContext);
@@ -788,6 +750,8 @@ void ccClipBox::drawMeOnly(CC_DRAW_CONTEXT& context)
 		DrawUnitTorus(X_PLUS_TORUS*pushName, CCVector3(maxC.x, center.y, center.z), CCVector3(1.0, 0.0, 0.0), scale, c_lightRed, componentContext);
 		DrawUnitTorus(Y_PLUS_TORUS*pushName, CCVector3(center.x, maxC.y, center.z), CCVector3(0.0, 1.0, 0.0), scale, c_lightGreen, componentContext);
 		DrawUnitTorus(Z_PLUS_TORUS*pushName, CCVector3(center.x, center.y, maxC.z), CCVector3(0.0, 0.0, 1.0), scale, c_lightBlue, componentContext);
+
+		glFunc->glPopAttrib();
 
 		if (pushName)
 		{

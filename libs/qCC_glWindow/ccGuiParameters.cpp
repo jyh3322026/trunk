@@ -77,7 +77,9 @@ void ccGui::ParamStruct::reset()
 	labelMarkerCol		= ccColor::defaultLabelMarkerColor;
 	bbDefaultCol		= ccColor::yellow;
 
+	lightDoubleSided			= true;
 	drawBackgroundGradient		= true;
+	drawRoundedPoints			= false;
 	decimateMeshOnMove			= true;
 	minLoDMeshSize				= 2500000;
 	decimateCloudOnMove			= true;
@@ -92,8 +94,14 @@ void ccGui::ParamStruct::reset()
 	colorScaleShaderSupported	= false;
 	colorScaleRampWidth			= 50;
 
+#ifdef Q_OS_MAC
+	defaultFontSize				= 12;
+	labelFontSize				= 10;
+#else
 	defaultFontSize				= 10;
 	labelFontSize				= 8;
+#endif
+	
 	displayedNumPrecision		= 6;
 	labelOpacity				= 75;
 
@@ -112,7 +120,7 @@ void ccGui::ParamStruct::fromPersistentSettings()
 	lightAmbientColor	= ccColor::Rgbaf (reinterpret_cast<float*>        (settings.value("lightAmbientColor",		QByteArray::fromRawData((const char*)ccColor::darkest.rgba,					c_fColorArraySize )).toByteArray().data()));
 	lightSpecularColor	= ccColor::Rgbaf (reinterpret_cast<float*>        (settings.value("lightSpecularColor",		QByteArray::fromRawData((const char*)ccColor::darker.rgba,					c_fColorArraySize )).toByteArray().data()));
 	lightDiffuseColor	= ccColor::Rgbaf (reinterpret_cast<float*>        (settings.value("lightDiffuseColor",		QByteArray::fromRawData((const char*)ccColor::bright.rgba,					c_fColorArraySize )).toByteArray().data()));
-	meshFrontDiff		= ccColor::Rgbaf (reinterpret_cast<float*>        (settings.value("meshFrontDiff",			QByteArray::fromRawData((const char*)ccColor::defaultMeshFrontDiff.rgba,		c_fColorArraySize )).toByteArray().data()));
+	meshFrontDiff		= ccColor::Rgbaf (reinterpret_cast<float*>        (settings.value("meshFrontDiff",			QByteArray::fromRawData((const char*)ccColor::defaultMeshFrontDiff.rgba,	c_fColorArraySize )).toByteArray().data()));
 	meshBackDiff		= ccColor::Rgbaf (reinterpret_cast<float*>        (settings.value("meshBackDiff",			QByteArray::fromRawData((const char*)ccColor::defaultMeshBackDiff.rgba,		c_fColorArraySize )).toByteArray().data()));
 	meshSpecular		= ccColor::Rgbaf (reinterpret_cast<float*>        (settings.value("meshSpecular",			QByteArray::fromRawData((const char*)ccColor::middle.rgba,					c_fColorArraySize )).toByteArray().data()));
 	pointsDefaultCol	= ccColor::Rgbaub(reinterpret_cast<unsigned char*>(settings.value("pointsDefaultColor",		QByteArray::fromRawData((const char*)ccColor::defaultColor.rgb,				c_ubColorArraySize)).toByteArray().data()));
@@ -120,9 +128,11 @@ void ccGui::ParamStruct::fromPersistentSettings()
 	backgroundCol		= ccColor::Rgbaub(reinterpret_cast<unsigned char*>(settings.value("backgroundColor",		QByteArray::fromRawData((const char*)ccColor::defaultBkgColor.rgb,			c_ubColorArraySize)).toByteArray().data()));
 	labelBackgroundCol	= ccColor::Rgbaub(reinterpret_cast<unsigned char*>(settings.value("labelBackgroundColor",	QByteArray::fromRawData((const char*)ccColor::defaultLabelBkgColor.rgb,		c_ubColorArraySize)).toByteArray().data()));
 	labelMarkerCol		= ccColor::Rgbaub(reinterpret_cast<unsigned char*>(settings.value("labelMarkerColor",		QByteArray::fromRawData((const char*)ccColor::defaultLabelMarkerColor.rgb,	c_ubColorArraySize)).toByteArray().data()));
-	bbDefaultCol		= ccColor::Rgbaub(reinterpret_cast<unsigned char*>(settings.value("bbDefaultColor",			QByteArray::fromRawData((const char*)ccColor::yellow.rgba,					c_ubColorArraySize)).toByteArray().data()));
+	bbDefaultCol		= ccColor::Rgbaub(reinterpret_cast<unsigned char*>(settings.value("bbDefaultColor",			QByteArray::fromRawData((const char*)ccColor::yellow.rgb,					c_ubColorArraySize)).toByteArray().data()));
 
+	lightDoubleSided			=                                      settings.value("lightDoubleSided",        true ).toBool();
 	drawBackgroundGradient		=                                      settings.value("backgroundGradient",      true ).toBool();
+	drawRoundedPoints			=                                      settings.value("drawRoundedPoints",       false).toBool();
 	decimateMeshOnMove			=                                      settings.value("meshDecimation",          true ).toBool();
 	minLoDMeshSize				=                                      settings.value("minLoDMeshSize",       2500000 ).toUInt();
 	decimateCloudOnMove			=                                      settings.value("cloudDecimation",         true ).toBool();
@@ -149,19 +159,20 @@ void ccGui::ParamStruct::toPersistentSettings() const
 	QSettings settings;
 	settings.beginGroup("OpenGL");
 
-	settings.setValue("lightDiffuseColor",        QByteArray::fromRawData((const char*)lightDiffuseColor.rgba,  c_fColorArraySize ));
-	settings.setValue("lightAmbientColor",        QByteArray::fromRawData((const char*)lightAmbientColor.rgba,  c_fColorArraySize ));
-	settings.setValue("lightSpecularColor",       QByteArray::fromRawData((const char*)lightSpecularColor.rgba, c_fColorArraySize ));
-	settings.setValue("meshFrontDiff",            QByteArray::fromRawData((const char*)meshFrontDiff.rgba,      c_fColorArraySize ));
-	settings.setValue("meshBackDiff",             QByteArray::fromRawData((const char*)meshBackDiff.rgba,       c_fColorArraySize ));
-	settings.setValue("meshSpecular",             QByteArray::fromRawData((const char*)meshSpecular.rgba,       c_fColorArraySize ));
-	settings.setValue("pointsDefaultColor",       QByteArray::fromRawData((const char*)pointsDefaultCol.rgb,    c_ubColorArraySize));
-	settings.setValue("textDefaultColor",         QByteArray::fromRawData((const char*)textDefaultCol.rgb,      c_ubColorArraySize));
-	settings.setValue("backgroundColor",          QByteArray::fromRawData((const char*)backgroundCol.rgb,       c_ubColorArraySize));
-	settings.setValue("labelBackgroundColor",     QByteArray::fromRawData((const char*)labelBackgroundCol.rgb,  c_ubColorArraySize));
-	settings.setValue("labelMarkerColor",         QByteArray::fromRawData((const char*)labelMarkerCol.rgb,      c_ubColorArraySize));
-	settings.setValue("bbDefaultColor",           QByteArray::fromRawData((const char*)bbDefaultCol.rgb,        c_ubColorArraySize));
+	settings.setValue("lightDiffuseColor",        QByteArray((const char*)lightDiffuseColor.rgba,  c_fColorArraySize ));
+	settings.setValue("lightAmbientColor",        QByteArray((const char*)lightAmbientColor.rgba,  c_fColorArraySize ));
+	settings.setValue("lightSpecularColor",       QByteArray((const char*)lightSpecularColor.rgba, c_fColorArraySize ));
+	settings.setValue("meshFrontDiff",            QByteArray((const char*)meshFrontDiff.rgba,      c_fColorArraySize ));
+	settings.setValue("meshBackDiff",             QByteArray((const char*)meshBackDiff.rgba,       c_fColorArraySize ));
+	settings.setValue("meshSpecular",             QByteArray((const char*)meshSpecular.rgba,       c_fColorArraySize ));
+	settings.setValue("pointsDefaultColor",       QByteArray((const char*)pointsDefaultCol.rgb,    c_ubColorArraySize));
+	settings.setValue("textDefaultColor",         QByteArray((const char*)textDefaultCol.rgb,      c_ubColorArraySize));
+	settings.setValue("backgroundColor",          QByteArray((const char*)backgroundCol.rgb,       c_ubColorArraySize));
+	settings.setValue("labelBackgroundColor",     QByteArray((const char*)labelBackgroundCol.rgb,  c_ubColorArraySize));
+	settings.setValue("labelMarkerColor",         QByteArray((const char*)labelMarkerCol.rgb,      c_ubColorArraySize));
+	settings.setValue("bbDefaultColor",           QByteArray((const char*)bbDefaultCol.rgb,        c_ubColorArraySize));
 	settings.setValue("backgroundGradient",       drawBackgroundGradient);
+	settings.setValue("drawRoundedPoints",        drawRoundedPoints);
 	settings.setValue("meshDecimation",           decimateMeshOnMove);
 	settings.setValue("minLoDMeshSize",	          minLoDMeshSize);
 	settings.setValue("cloudDecimation",          decimateCloudOnMove);

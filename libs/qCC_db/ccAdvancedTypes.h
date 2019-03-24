@@ -19,7 +19,8 @@
 #define CC_ADVANCED_TYPES_HEADER
 
 //Local
-#include "ccChunkedArray.h"
+#include "ccArray.h"
+#include "ccColorTypes.h"
 #include "ccNormalCompressor.h"
 
 /***************************************************
@@ -27,52 +28,54 @@
 ***************************************************/
 
 //! Array of compressed 3D normals (single index)
-class QCC_DB_LIB_API NormsIndexesTableType : public ccChunkedArray<1,CompressedNormType>
+class NormsIndexesTableType : public ccArray<CompressedNormType, 1, CompressedNormType>
 {
 public:
 	//! Default constructor
-	NormsIndexesTableType() : ccChunkedArray<1,CompressedNormType>("Compressed normals") {}
+	NormsIndexesTableType() : ccArray<CompressedNormType, 1, CompressedNormType>("Compressed normals") {}
+	virtual ~NormsIndexesTableType() = default;
+	
+	//inherited from ccArray/ccHObject
+	CC_CLASS_ENUM getClassID() const override { return CC_TYPES::NORMAL_INDEXES_ARRAY; }
 
-	//inherited from ccChunkedArray/ccHObject
-	virtual CC_CLASS_ENUM getClassID() const override { return CC_TYPES::NORMAL_INDEXES_ARRAY; }
-
-	//! Duplicates array (overloaded from ccChunkedArray::clone)
-	virtual NormsIndexesTableType* clone() override
+	//! Duplicates array (overloaded from ccArray::clone)
+	NormsIndexesTableType* clone() override
 	{
 		NormsIndexesTableType* cloneArray = new NormsIndexesTableType();
 		if (!copy(*cloneArray))
 		{
-			ccLog::Error("[NormsIndexesTableType::clone] Failed to clone array (not enough memory?)");
+			ccLog::Warning("[NormsIndexesTableType::clone] Failed to clone array (not enough memory)");
 			cloneArray->release();
-			return 0;
+			return nullptr;
 		}
 		cloneArray->setName(getName());
 		return cloneArray;
 	}
 
-	//inherited from ccHObject/ccChunkedArray
-	virtual bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
+	//inherited from ccHObject/ccArray
+	QCC_DB_LIB_API bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
 };
 
 //! Array of (uncompressed) 3D normals (Nx,Ny,Nz)
-class QCC_DB_LIB_API NormsTableType : public ccChunkedArray<3,PointCoordinateType>
+class NormsTableType : public ccArray<CCVector3, 3,PointCoordinateType>
 {
 public:
 	//! Default constructor
-	NormsTableType() : ccChunkedArray<3,PointCoordinateType>("Normals") {}
+	NormsTableType() : ccArray<CCVector3, 3, PointCoordinateType>("Normals") {}
+	virtual ~NormsTableType() = default;
 
-	//inherited from ccChunkedArray/ccHObject
-	virtual CC_CLASS_ENUM getClassID() const override { return CC_TYPES::NORMALS_ARRAY; }
+	//inherited from ccArray/ccHObject
+	CC_CLASS_ENUM getClassID() const override { return CC_TYPES::NORMALS_ARRAY; }
 
-	//! Duplicates array (overloaded from ccChunkedArray::clone)
-	virtual NormsTableType* clone() override
+	//! Duplicates array (overloaded from ccArray::clone)
+	NormsTableType* clone() override
 	{
 		NormsTableType* cloneArray = new NormsTableType();
 		if (!copy(*cloneArray))
 		{
-			ccLog::Error("[NormsTableType::clone] Failed to clone array (not enough memory?)");
+			ccLog::Warning("[NormsTableType::clone] Failed to clone array (not enough memory)");
 			cloneArray->release();
-			return 0;
+			return nullptr;
 		}
 		cloneArray->setName(getName());
 		return cloneArray;
@@ -80,49 +83,67 @@ public:
 };
 
 //! Array of RGB colors for each point
-class QCC_DB_LIB_API ColorsTableType : public ccChunkedArray<3,ColorCompType>
+class ColorsTableType : public ccArray<ccColor::Rgb, 3, ColorCompType>
 {
 public:
 	//! Default constructor
-	ColorsTableType() : ccChunkedArray<3,ColorCompType>("RGB colors") {}
+	ColorsTableType() : ccArray<ccColor::Rgb, 3, ColorCompType>("RGB colors") {}
+	virtual ~ColorsTableType() = default;
 
-	//inherited from ccChunkedArray/ccHObject
-	virtual CC_CLASS_ENUM getClassID() const override { return CC_TYPES::RGB_COLOR_ARRAY; }
+	//inherited from ccArray/ccHObject
+	CC_CLASS_ENUM getClassID() const override { return CC_TYPES::RGB_COLOR_ARRAY; }
 
-	//! Duplicates array (overloaded from ccChunkedArray::clone)
-	virtual ColorsTableType* clone() override
+	//! Duplicates array (overloaded from ccArray::clone)
+	ColorsTableType* clone() override
 	{
 		ColorsTableType* cloneArray = new ColorsTableType();
 		if (!copy(*cloneArray))
 		{
-			ccLog::Error("[ColorsTableType::clone] Failed to clone array (not enough memory?)");
+			ccLog::Warning("[ColorsTableType::clone] Failed to clone array (not enough memory)");
 			cloneArray->release();
-			return 0;
+			return nullptr;
 		}
 		cloneArray->setName(getName());
 		return cloneArray;
 	}
 };
 
+//! 2D texture coordinates
+struct TexCoords2D
+{
+	TexCoords2D() : tx(-1.0f), ty(-1.0f) {}
+	TexCoords2D(float x, float y) : tx(x), ty(y) {}
+
+	union
+	{
+		struct
+		{
+			float tx, ty;
+		};
+		float t[2];
+	};
+};
+
 //! Array of 2D texture coordinates
-class QCC_DB_LIB_API TextureCoordsContainer : public ccChunkedArray<2,float>
+class TextureCoordsContainer : public ccArray<TexCoords2D, 2, float>
 {
 public:
 	//! Default constructor
-	TextureCoordsContainer() : ccChunkedArray<2,float>("Texture coordinates") {}
+	TextureCoordsContainer() : ccArray<TexCoords2D, 2, float>("Texture coordinates") {}
+	virtual ~TextureCoordsContainer() = default;
 
-	//inherited from ccChunkedArray/ccHObject
-	virtual CC_CLASS_ENUM getClassID() const override { return CC_TYPES::TEX_COORDS_ARRAY; }
+	//inherited from ccArray/ccHObject
+	CC_CLASS_ENUM getClassID() const override { return CC_TYPES::TEX_COORDS_ARRAY; }
 
-	//! Duplicates array (overloaded from ccChunkedArray::clone)
-	virtual TextureCoordsContainer* clone() override
+	//! Duplicates array (overloaded from ccArray::clone)
+	TextureCoordsContainer* clone() override
 	{
 		TextureCoordsContainer* cloneArray = new TextureCoordsContainer();
 		if (!copy(*cloneArray))
 		{
-			ccLog::Error("[TextureCoordsContainer::clone] Failed to clone array (not enough memory?)");
+			ccLog::Warning("[TextureCoordsContainer::clone] Failed to clone array (not enough memory)");
 			cloneArray->release();
-			return 0;
+			return nullptr;
 		}
 		cloneArray->setName(getName());
 		return cloneArray;

@@ -20,11 +20,10 @@
 
 //Local
 #include "ccSensor.h"
-#include "ccAdvancedTypes.h"
+#include "ccDepthBuffer.h"
 
 //CCLib
 #include <GenericCloud.h>
-
 
 class ccPointCloud;
 
@@ -57,16 +56,16 @@ public:
 	ccGBLSensor(const ccGBLSensor& sensor);
 
 	//! Destructor
-	virtual ~ccGBLSensor() {}
+	~ccGBLSensor() override = default;
 
 	//inherited from ccHObject
-	virtual CC_CLASS_ENUM getClassID() const override { return CC_TYPES::GBL_SENSOR; }
-	virtual bool isSerializable() const override { return true; }
-	virtual ccBBox getOwnBB(bool withGLFeatures = false) override;
-	virtual ccBBox getOwnFitBB(ccGLMatrix& trans) override;
+	CC_CLASS_ENUM getClassID() const override { return CC_TYPES::GBL_SENSOR; }
+	bool isSerializable() const override { return true; }
+	ccBBox getOwnBB(bool withGLFeatures = false) override;
+	ccBBox getOwnFitBB(ccGLMatrix& trans) override;
 
 	//inherited from ccSensor
-	virtual bool applyViewport(ccGenericGLDisplay* win = 0) override;
+	bool applyViewport(ccGenericGLDisplay* win = nullptr) override;
 
 	//! Determines a 3D point "visibility" relatively to the sensor field of view
 	/** Relies on the sensor associated depth map (see ccGBLSensor::computeDepthBuffer).
@@ -78,7 +77,7 @@ public:
 		\param P the point to test
 		\return the point's visibility (POINT_VISIBLE, POINT_HIDDEN, POINT_OUT_OF_RANGE or POINT_OUT_OF_FOV)
 	**/
-	virtual unsigned char checkVisibility(const CCVector3& P) const override;
+	unsigned char checkVisibility(const CCVector3& P) const override;
 
 	//! Computes angular parameters automatically (all but the angular steps!)
 	/** WARNING: this method uses the cloud global iterator.
@@ -86,7 +85,7 @@ public:
 	bool computeAutoParameters(CCLib::GenericCloud* theCloud);
 
 	//! Returns the error string corresponding to an error code
-	/** Errors codes are returned by ccGBLSensor::computeDepthBuffer or DepthBuffer::fillHoles for instance.
+	/** Errors codes are returned by ccGBLSensor::computeDepthBuffer or ccDepthBuffer::fillHoles for instance.
 	**/
 	static QString GetErrorString(int errorCode);
 
@@ -177,7 +176,7 @@ public: //projection tools
 						double posIndex = 0 ) const;
 
 	//! 2D grid of normals
-	typedef GenericChunkedArray<3,PointCoordinateType> NormalGrid;
+	using NormalGrid = std::vector<CCVector3>;
 
 	//! Projects a set of point cloud normals in the sensor world
 	/** WARNING: this method uses the cloud global iterator
@@ -191,7 +190,7 @@ public: //projection tools
 								double posIndex = 0 ) const;
 
 	//! 2D grid of colors
-	typedef GenericChunkedArray<3,ColorCompType> ColorGrid;
+	using ColorGrid = std::vector<ccColor::Rgb>;
 
 	//! Projects a set of point cloud colors in the sensor frame defined by this instance
 	/** WARNING: this method uses the cloud global iterator
@@ -204,39 +203,6 @@ public: //projection tools
 
 public: //depth buffer management
 
-	//! Sensor "depth map"
-	/** Contains an array of depth values (along each scanned direction) and its dimensions.
-		This array corresponds roughly to what have been "seen" by the sensor during
-		acquisition (the 3D points are simply projected in the sensor frame).
-	**/
-	struct QCC_DB_LIB_API DepthBuffer
-	{
-		//! Z-Buffer grid
-		std::vector<PointCoordinateType> zBuff;
-		//! Pitch step (may differ from the sensor's)
-		PointCoordinateType deltaPhi;
-		//! Yaw step (may differ from the sensor's)
-		PointCoordinateType deltaTheta;
-		//! Buffer width
-		unsigned width;
-		//! Buffer height
-		unsigned height;
-
-		//! Default constructor
-		DepthBuffer();
-		//! Destructor
-		~DepthBuffer();
-
-		//! Clears the buffer
-		void clear();
-
-		//! Applies a mean filter to fill small holes (= lack of information) of the depth map.
-		/**	The depth buffer must have been created before (see GroundBasedLidarSensor::computeDepthBuffer).
-			\return a negative value if an error occurs, 0 otherwise
-		**/
-		int fillHoles();
-	};
-
 	//! Projects a point cloud along the sensor point of view defined by this instance
 	/** WARNING: this method uses the cloud global iterator
 		\param cloud a point cloud
@@ -244,12 +210,12 @@ public: //depth buffer management
 		\param projectedCloud optional (empty) cloud to store the projected points
 		\return whether the depth buffer was successfully created or not
 	**/
-	bool computeDepthBuffer(CCLib::GenericCloud* cloud, int& errorCode, ccPointCloud* projectedCloud = 0);
+	bool computeDepthBuffer(CCLib::GenericCloud* cloud, int& errorCode, ccPointCloud* projectedCloud = nullptr);
 
 	//! Returns the associated depth buffer
 	/** Call ccGBLSensor::computeDepthBuffer first otherwise the returned buffer will be 0.
 	**/
-	inline const DepthBuffer& getDepthBuffer() const { return m_depthBuffer; }
+	inline const ccDepthBuffer& getDepthBuffer() const { return m_depthBuffer; }
 
 	//! Removes the associated depth buffer
 	void clearDepthBuffer();
@@ -257,9 +223,9 @@ public: //depth buffer management
 protected:
 
 	//Inherited from ccHObject
-	virtual bool toFile_MeOnly(QFile& out) const override;
-	virtual bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
-	virtual void drawMeOnly(CC_DRAW_CONTEXT& context) override;
+	bool toFile_MeOnly(QFile& out) const override;
+	bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
+	void drawMeOnly(CC_DRAW_CONTEXT& context) override;
 
 	//! Converts 2D angular coordinates (yaw,pitch) in integer depth buffer coordinates
 	bool convertToDepthMapCoords(PointCoordinateType yaw, PointCoordinateType pitch, unsigned& i, unsigned& j) const;
@@ -295,7 +261,7 @@ protected:
 	PointCoordinateType m_uncertainty;
 
 	//! Associated Z-buffer
-	DepthBuffer m_depthBuffer;
+	ccDepthBuffer m_depthBuffer;
 };
 
 #endif //CC_GROUND_LIDAR_SENSOR_HEADER

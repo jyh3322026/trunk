@@ -16,48 +16,42 @@
 //##########################################################################
 
 #include "ccRenderingTools.h"
-#include "ccGuiParameters.h"
 
 //qCC
 #include "ccGLWindow.h"
 
 //qCC_db
-#include <ccIncludeGL.h>
-#include <ccGenericPointCloud.h>
-#include <ccGBLSensor.h>
 #include <ccColorScalesManager.h>
+#include <ccGBLSensor.h>
+#include <ccGenericPointCloud.h>
 #include <ccScalarField.h>
 
-//CCLib
-#include <ScalarField.h>
-
 //Qt
-#include <QLabel>
 #include <QDialog>
+#include <QLabel>
 #include <QVBoxLayout>
 
-//system
-#include <assert.h>
-#include <cmath>
-#include <limits>
 
 void ccRenderingTools::ShowDepthBuffer(ccGBLSensor* sensor, QWidget* parent/*=0*/, unsigned maxDim/*=1024*/)
 {
 	if (!sensor)
 		return;
 
-	const ccGBLSensor::DepthBuffer& depthBuffer = sensor->getDepthBuffer();
+	const ccDepthBuffer& depthBuffer = sensor->getDepthBuffer();
 	if (depthBuffer.zBuff.empty())
+	{
 		return;
+	}
 
 	//determine min and max depths
-	ScalarType minDist = 0, maxDist = 0;
+	ScalarType minDist = 0.0f;
+	ScalarType maxDist = 0.0f;
 	{
-		const ScalarType* _zBuff = &(depthBuffer.zBuff.front());
-		double sumDist = 0;
-		double sumDist2 = 0;
+		const PointCoordinateType* _zBuff = depthBuffer.zBuff.data();
+		double sumDist = 0.0;
+		double sumDist2 = 0.0;
 		unsigned count = 0;
-		for (unsigned x=0; x<depthBuffer.height*depthBuffer.width; ++x,++_zBuff)
+		for (unsigned x = 0; x < depthBuffer.height*depthBuffer.width; ++x, ++_zBuff)
 		{
 			if (x == 0)
 			{
@@ -65,8 +59,8 @@ void ccRenderingTools::ShowDepthBuffer(ccGBLSensor* sensor, QWidget* parent/*=0*
 			}
 			else if (*_zBuff > 0)
 			{
-				maxDist = std::max(maxDist,*_zBuff);
-				minDist = std::min(minDist,*_zBuff);
+				maxDist = std::max(maxDist, *_zBuff);
+				minDist = std::min(minDist, *_zBuff);
 			}
 
 			if (*_zBuff > 0)
@@ -92,12 +86,12 @@ void ccRenderingTools::ShowDepthBuffer(ccGBLSensor* sensor, QWidget* parent/*=0*
 		assert(colorScale);
 		ScalarType coef = maxDist - minDist < ZERO_TOLERANCE ? 0 : static_cast<ScalarType>(ccColorScale::MAX_STEPS - 1) / (maxDist - minDist);
 
-		const ScalarType* _zBuff = &(depthBuffer.zBuff.front());
-		for (unsigned y=0; y<depthBuffer.height; ++y)
+		const PointCoordinateType* _zBuff = depthBuffer.zBuff.data();
+		for (unsigned y = 0; y < depthBuffer.height; ++y)
 		{
-			for (unsigned x=0; x<depthBuffer.width; ++x,++_zBuff)
+			for (unsigned x = 0; x < depthBuffer.width; ++x, ++_zBuff)
 			{
-				const ccColor::Rgba& col = (*_zBuff >= minDist ? colorScale->getColorByIndex(static_cast<unsigned>((std::min(maxDist,*_zBuff)-minDist)*coef)) : ccColor::black);
+				const ccColor::Rgb& col = (*_zBuff >= minDist ? colorScale->getColorByIndex(static_cast<unsigned>((std::min(maxDist, *_zBuff) - minDist)*coef)) : ccColor::black);
 				bufferImage.setPixel(x, depthBuffer.height - 1 - y, qRgb(col.r, col.g, col.b));
 			}
 		}
@@ -158,12 +152,13 @@ struct vlabel
 };
 
 //! A set of 'vlabel' structures
-typedef std::list<vlabel> vlabelSet;
+using vlabelSet = std::list<vlabel>;
 
 //helper: returns the neighbouring labels at a given position
 //(first: above label, second: below label)
 //Warning: set must be already sorted!
-typedef std::pair<vlabelSet::iterator,vlabelSet::iterator> vlabelPair;
+using vlabelPair = std::pair<vlabelSet::iterator,vlabelSet::iterator>;
+
 static vlabelPair GetVLabelsAround(int y, vlabelSet& set)
 {
 	if (set.empty())
@@ -193,10 +188,10 @@ const double c_log10 = log(10.0);
 //Convert standard range to log scale
 void ConvertToLogScale(ScalarType& dispMin, ScalarType& dispMax)
 {
-	ScalarType absDispMin = (dispMax < 0 ? std::min(-dispMax, -dispMin) : std::max<ScalarType>(dispMin, 0));
-	ScalarType absDispMax = std::max(fabs(dispMin), fabs(dispMax));
-	dispMin = log10(std::max(absDispMin, static_cast<ScalarType>(ZERO_TOLERANCE)));
-	dispMax = log10(std::max(absDispMax, static_cast<ScalarType>(ZERO_TOLERANCE)));
+	ScalarType absDispMin = (dispMax < 0 ? std::min(-dispMax, -dispMin) : std::max<ScalarType>(dispMin, 0)); 
+	ScalarType absDispMax = std::max(std::abs(dispMin), std::abs(dispMax));
+	dispMin = std::log10(std::max(absDispMin, FLT_EPSILON));
+	dispMax = std::log10(std::max(absDispMax, FLT_EPSILON));
 }
 
 void ccRenderingTools::DrawColorRamp(const CC_DRAW_CONTEXT& context)
@@ -379,8 +374,8 @@ void ccRenderingTools::DrawColorRamp(const CC_DRAW_CONTEXT& context, const ccSca
 	glFunc->glPushAttrib(GL_DEPTH_BUFFER_BIT);
 	glFunc->glDisable(GL_DEPTH_TEST);
 
-	std::vector<double> sortedKeyValues(keyValues.begin(),keyValues.end());
-	double maxRange = sortedKeyValues.back()-sortedKeyValues.front();
+	std::vector<double> sortedKeyValues(keyValues.begin(), keyValues.end());
+	double maxRange = sortedKeyValues.back() - sortedKeyValues.front();
 
 	//display color ramp
 	{
@@ -404,25 +399,25 @@ void ccRenderingTools::DrawColorRamp(const CC_DRAW_CONTEXT& context, const ccSca
 				{
 					value = exp(value*c_log10);
 				}
-				const ColorCompType* col = sf->getColor(static_cast<ScalarType>(value));
+				const ccColor::Rgb* col = sf->getColor(static_cast<ScalarType>(value));
 				if (!col)
 				{
 					//special case: if we have user-defined labels, we want all the labels to be displayed with their associated color
 					if (customLabels)
 					{
 						assert(sf->getColorScale() && !sf->getColorScale()->isRelative());
-						col = sf->getColorScale()->getColorByValue(value, ccColor::lightGrey.rgba);
+						col = sf->getColorScale()->getColorByValue(value, &ccColor::lightGrey);
 					}
 					else
 					{
-						col = ccColor::lightGrey.rgba;
+						col = &ccColor::lightGrey;
 					}
 				}
 				assert(col);
-				glFunc->glColor3ubv(col);
+				glFunc->glColor3ubv(col->rgb);
 
-				glFunc->glVertex2i(x,y+j);
-				glFunc->glVertex2i(x+scaleWidth,y+j);
+				glFunc->glVertex2i(x, y + j);
+				glFunc->glVertex2i(x + scaleWidth, y + j);
 
 				if (showHistogram)
 				{
@@ -433,17 +428,17 @@ void ccRenderingTools::DrawColorRamp(const CC_DRAW_CONTEXT& context, const ccSca
 					if (bin >= 0 && bin < static_cast<int>(histogram.size())) //in symmetrical case we can get values outside of the real SF range
 					{
 						hVal = histogram[bin];
-						if (bin+1 < static_cast<int>(histogram.size()))
+						if (bin + 1 < static_cast<int>(histogram.size()))
 						{
 							//linear interpolation
-							double alpha = bind-static_cast<double>(bin);
-							hVal = (1.0-alpha) * hVal + alpha * histogram[bin+1];
+							double alpha = bind - static_cast<double>(bin);
+							hVal = (1.0 - alpha) * hVal + alpha * histogram[bin + 1];
 						}
 					}
 
-					int xSpan = std::max(static_cast<int>(hVal / histogram.maxValue * (scaleWidth/2)),1);
-					glFunc->glVertex2i(histoStart,y+j);
-					glFunc->glVertex2i(histoStart+xSpan,y+j);
+					int xSpan = std::max(static_cast<int>(hVal / histogram.maxValue * (scaleWidth / 2)), 1);
+					glFunc->glVertex2i(histoStart, y + j);
+					glFunc->glVertex2i(histoStart + xSpan, y + j);
 				}
 			}
 			glFunc->glEnd();
@@ -454,8 +449,8 @@ void ccRenderingTools::DrawColorRamp(const CC_DRAW_CONTEXT& context, const ccSca
 			double value = sortedKeyValues.front();
 			if (logScale)
 				value = exp(value*c_log10);
-			const ColorCompType* col = sf->getColor(static_cast<ScalarType>(value));
-			glFunc->glColor3ubv(col ? col : ccColor::lightGrey.rgba);
+			const ccColor::Rgb* col = sf->getColor(static_cast<ScalarType>(value));
+			glFunc->glColor3ubv(col ? col->rgb : ccColor::lightGrey.rgb);
 			glFunc->glBegin(GL_POLYGON);
 			glFunc->glVertex2i(x,y);
 			glFunc->glVertex2i(x+scaleWidth,y);
@@ -485,12 +480,12 @@ void ccRenderingTools::DrawColorRamp(const CC_DRAW_CONTEXT& context, const ccSca
 		vlabelSet drawnLabels;
 
 		//add first label
-		drawnLabels.push_back(vlabel(0, 0, strHeight, sortedKeyValues.front()));
+		drawnLabels.emplace_back(0, 0, strHeight, sortedKeyValues.front());
 
 		if (keyValues.size() > 1)
 		{
 			//add last label
-			drawnLabels.push_back(vlabel(scaleMaxHeight, scaleMaxHeight - strHeight, scaleMaxHeight, sortedKeyValues.back()));
+			drawnLabels.emplace_back(scaleMaxHeight, scaleMaxHeight - strHeight, scaleMaxHeight, sortedKeyValues.back());
 		}
 
 		//we try to display the other keyPoints (if any)
@@ -562,7 +557,7 @@ void ccRenderingTools::DrawColorRamp(const CC_DRAW_CONTEXT& context, const ccSca
 			if (logScale)
 				sfTitle += QString("[Log scale]");
 			//we leave some (vertical) space for the top-most label!
-			win->displayText(sfTitle, glW-xShift, glH-yShift+strHeight, ccGLWindow::ALIGN_HRIGHT | ccGLWindow::ALIGN_VTOP, 0, 0, &font);
+			win->displayText(sfTitle, glW-xShift, glH-yShift+strHeight, ccGLWindow::ALIGN_HRIGHT | ccGLWindow::ALIGN_VTOP, 0, nullptr, &font);
 		}
 
 		//precision (same as color scale)
@@ -595,7 +590,7 @@ void ccRenderingTools::DrawColorRamp(const CC_DRAW_CONTEXT& context, const ccSca
 			if (logScale)
 				value = exp(value*c_log10);
 
-			win->displayText(QString::number(value,format,precision), x, y+it->yPos, align, 0, 0, &font);
+			win->displayText(QString::number(value,format,precision), x, y+it->yPos, align, 0, nullptr, &font);
 			glFunc->glBegin(GL_LINES);
 			glFunc->glVertex2i(xTick,yTick+it->yPos);
 			glFunc->glVertex2i(xTick+tickSize,yTick+it->yPos);

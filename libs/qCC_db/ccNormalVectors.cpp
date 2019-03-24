@@ -24,6 +24,8 @@
 //CCLib
 #include <CCGeom.h>
 #include <DgmOctreeReferenceCloud.h>
+#include <GenericIndexedMesh.h>
+#include <GenericProgressCallback.h>
 #include <Neighbourhood.h>
 
 //System
@@ -34,11 +36,11 @@
 static ccSingleton<ccNormalVectors> s_uniqueInstance;
 
 //Number of points for local modeling to compute normals with 2D1/2 Delaunay triangulation
-#define	NUMBER_OF_POINTS_FOR_NORM_WITH_TRI 6
+static const unsigned NUMBER_OF_POINTS_FOR_NORM_WITH_TRI = 6;
 //Number of points for local modeling to compute normals with least square plane
-#define	NUMBER_OF_POINTS_FOR_NORM_WITH_LS 6
+static const unsigned NUMBER_OF_POINTS_FOR_NORM_WITH_LS = 3;
 //Number of points for local modeling to compute normals with quadratic 'height' function
-#define	NUMBER_OF_POINTS_FOR_NORM_WITH_QUADRIC 12
+static const unsigned NUMBER_OF_POINTS_FOR_NORM_WITH_QUADRIC = 6;
 
 ccNormalVectors* ccNormalVectors::GetUniqueInstance()
 {
@@ -53,15 +55,12 @@ void ccNormalVectors::ReleaseUniqueInstance()
 }
 
 ccNormalVectors::ccNormalVectors()
-	: m_theNormalHSVColors(0)
 {
-	init(ccNormalCompressor::QUANTIZE_LEVEL);
+	init();
 }
 
 ccNormalVectors::~ccNormalVectors()
 {
-	if (m_theNormalHSVColors)
-		delete[] m_theNormalHSVColors;
 }
 
 CompressedNormType ccNormalVectors::GetNormIndex(const PointCoordinateType N[])
@@ -73,8 +72,10 @@ CompressedNormType ccNormalVectors::GetNormIndex(const PointCoordinateType N[])
 
 bool ccNormalVectors::enableNormalHSVColorsArray()
 {
-	if (m_theNormalHSVColors)
+	if (!m_theNormalHSVColors.empty())
+	{
 		return true;
+	}
 
 	if (m_theNormalVectors.empty())
 	{
@@ -82,41 +83,33 @@ bool ccNormalVectors::enableNormalHSVColorsArray()
 		return false;
 	}
 
-	m_theNormalHSVColors = new ColorCompType[m_theNormalVectors.size()*3];
-	if (!m_theNormalHSVColors)
+	try
+	{
+		m_theNormalHSVColors.resize(m_theNormalVectors.size());
+	}
+	catch (const std::bad_alloc&)
 	{
 		//not enough memory
 		return false;
 	}
 
-	ColorCompType* rgb = m_theNormalHSVColors;
-	for (size_t i=0; i<m_theNormalVectors.size(); ++i, rgb+=3)
+	for (size_t i = 0; i < m_theNormalVectors.size(); ++i)
 	{
-		ccColor::Rgb col = ccNormalVectors::ConvertNormalToRGB(m_theNormalVectors[i]);
-		rgb[0] = col.r;
-		rgb[1] = col.g;
-		rgb[2] = col.b;
+		m_theNormalHSVColors[i] = ccNormalVectors::ConvertNormalToRGB(m_theNormalVectors[i]);
 	}
 
-	return (m_theNormalHSVColors != 0);
+	return true;
 }
 
-const ColorCompType* ccNormalVectors::getNormalHSVColor(unsigned index) const
+const ccColor::Rgb& ccNormalVectors::getNormalHSVColor(unsigned index) const
 {
-	assert(m_theNormalHSVColors);
 	assert(index < m_theNormalVectors.size());
-	return m_theNormalHSVColors+3*index;
+	return m_theNormalHSVColors[index];
 }
 
-const ColorCompType* ccNormalVectors::getNormalHSVColorArray() const
+bool ccNormalVectors::init()
 {
-	assert(m_theNormalHSVColors);
-	return m_theNormalHSVColors;
-}
-
-bool ccNormalVectors::init(unsigned char quantizeLevel)
-{
-	unsigned numberOfVectors = (1<<(quantizeLevel*2+3));
+	unsigned numberOfVectors = ccNormalCompressor::NULL_NORM_CODE + 1;
 	try
 	{
 		m_theNormalVectors.resize(numberOfVectors);
@@ -127,9 +120,9 @@ bool ccNormalVectors::init(unsigned char quantizeLevel)
 		return false;
 	}
 
-	for (unsigned i=0; i<numberOfVectors; ++i)
+	for (unsigned i = 0; i < numberOfVectors; ++i)
 	{
-		ccNormalCompressor::Decompress(i, m_theNormalVectors[i].u, quantizeLevel);
+		ccNormalCompressor::Decompress(i, m_theNormalVectors[i].u);
 		m_theNormalVectors[i].normalize();
 	}
 
@@ -167,7 +160,7 @@ bool ccNormalVectors::UpdateNormalOrientations(	ccGenericPointCloud* theCloud,
 	case PLUS_BARYCENTER:
 	case MINUS_BARYCENTER:
 		{
-			barycenter = CCLib::GeometricalAnalysisTools::computeGravityCenter(theCloud);
+			barycenter = CCLib::GeometricalAnalysisTools::ComputeGravityCenter(theCloud);
 			ccLog::Print(QString("[UpdateNormalOrientations] Barycenter: (%1,%2,%3)").arg(barycenter.x).arg(barycenter.y).arg(barycenter.z));
 			useBarycenter = true;
 			positiveSign = (preferredOrientation == 6);
@@ -199,7 +192,7 @@ bool ccNormalVectors::UpdateNormalOrientations(	ccGenericPointCloud* theCloud,
 	}
 
 	//we check each normal orientation
-	for (unsigned i=0; i<theNormsCodes.currentSize(); i++)
+	for (unsigned i = 0; i < theNormsCodes.currentSize(); i++)
 	{
 		const CompressedNormType& code = theNormsCodes.getValue(i);
 		CCVector3 N = GetNormal(code);
@@ -225,7 +218,7 @@ bool ccNormalVectors::UpdateNormalOrientations(	ccGenericPointCloud* theCloud,
 		{
 			//inverse normal and re-compress it
 			N *= -1;
-			theNormsCodes.setValue(i,ccNormalVectors::GetNormIndex(N.u));
+			theNormsCodes.setValue(i, ccNormalVectors::GetNormIndex(N.u));
 		}
 	}
 
@@ -287,20 +280,19 @@ PointCoordinateType ccNormalVectors::GuessBestRadius(	ccGenericPointCloud* cloud
 		static const int s_minPop = 6;
 		static const double s_minAboveMinRatio = 0.97;
 
-		const unsigned sampleCount = std::min<unsigned>(200,cloud->size()/10);
+		const unsigned sampleCount = std::min<unsigned>(200, cloud->size() / 10);
 
 		double aimedPop = s_aimedPop;
 		PointCoordinateType radius = bestRadius;
 		PointCoordinateType lastRadius = radius;
-		double bestMeanPop = 0;
 		double lastMeanPop = 0;
 
 		std::random_device rd;   // non-deterministic generator
 		std::mt19937 gen(rd());  // to seed mersenne twister.
-		std::uniform_int_distribution<unsigned> dist(0, cloud->size()-1);
+		std::uniform_int_distribution<unsigned> dist(0, cloud->size() - 1);
 
 		//we may have to do this several times
-		for (size_t attempt=0; attempt<10; ++attempt)
+		for (size_t attempt = 0; attempt < 10; ++attempt)
 		{
 			int totalCount = 0;
 			int totalSquareCount = 0;
@@ -310,7 +302,7 @@ PointCoordinateType ccNormalVectors::GuessBestRadius(	ccGenericPointCloud* cloud
 
 			unsigned char octreeLevel = octree->findBestLevelForAGivenNeighbourhoodSizeExtraction(radius);
 
-			for (size_t i=0; i<sampleCount; ++i)
+			for (size_t i = 0; i < sampleCount; ++i)
 			{
 				unsigned randomIndex = dist(gen);
 				assert(randomIndex < cloud->size());
@@ -357,7 +349,6 @@ PointCoordinateType ccNormalVectors::GuessBestRadius(	ccGenericPointCloud* cloud
 			{
 				//we have found a correct radius
 				bestRadius = radius;
-				bestMeanPop = meanPop;
 
 				if (aboveMinPopRatio < s_minAboveMinRatio)
 				{
@@ -379,9 +370,8 @@ PointCoordinateType ccNormalVectors::GuessBestRadius(	ccGenericPointCloud* cloud
 			{
 				//this is our best (only) guess for the moment
 				bestRadius = radius;
-				bestMeanPop = meanPop;
 
-				newRadius = radius * sqrt(aimedPop/meanPop);
+				newRadius = radius * sqrt(aimedPop / meanPop);
 			}
 			else
 			{
@@ -389,7 +379,6 @@ PointCoordinateType ccNormalVectors::GuessBestRadius(	ccGenericPointCloud* cloud
 				if (fabs(meanPop - aimedPop) < fabs(bestRadius - aimedPop))
 				{
 					bestRadius = radius;
-					bestMeanPop = meanPop;
 				}
 
 				double slope = (radius*radius - lastRadius*lastRadius) / (meanPop - lastMeanPop);
@@ -451,7 +440,7 @@ bool ccNormalVectors::ComputeCloudNormals(	ccGenericPointCloud* theCloud,
 	//reserve some memory to store the (compressed) normals
 	if (!theNormsCodes.isAllocated() || theNormsCodes.currentSize() < pointCount)
 	{
-		if (!theNormsCodes.resize(pointCount))
+		if (!theNormsCodes.resizeSafe(pointCount))
 		{
 			if (theOctree && !inputOctree)
 				delete theOctree;
@@ -461,10 +450,10 @@ bool ccNormalVectors::ComputeCloudNormals(	ccGenericPointCloud* theCloud,
 
 	//we instantiate 3D normal vectors
 	NormsTableType* theNorms = new NormsTableType;
-	CCVector3 blankN(0,0,0);
-	if (!theNorms->resize(pointCount,true,blankN.u))
+	static const CCVector3 blankN(0, 0, 0);
+	if (!theNorms->resizeSafe(pointCount, true, &blankN))
 	{
-		theNormsCodes.clear();
+		theNormsCodes.resize(0);
 		if (theOctree && !inputOctree)
 			delete theOctree;
 		return false;
@@ -493,8 +482,8 @@ bool ccNormalVectors::ComputeCloudNormals(	ccGenericPointCloud* theCloud,
 			processedCells = theOctree->executeFunctionForAllCellsStartingAtLevel(	level,
 																					&(ComputeNormsAtLevelWithTri),
 																					additionalParameters,
-																					NUMBER_OF_POINTS_FOR_NORM_WITH_TRI/2,
-																					NUMBER_OF_POINTS_FOR_NORM_WITH_TRI*3,
+																					NUMBER_OF_POINTS_FOR_NORM_WITH_TRI / 2,
+																					NUMBER_OF_POINTS_FOR_NORM_WITH_TRI * 3,
 																					true,
 																					progressCb,
 																					"Normals Computation[TRI]");
@@ -519,19 +508,17 @@ bool ccNormalVectors::ComputeCloudNormals(	ccGenericPointCloud* theCloud,
 	//error or canceled by user?
 	if (processedCells == 0 || (progressCb && progressCb->isCancelRequested()))
 	{
-		theNormsCodes.clear();
+		theNormsCodes.resize(0);
 		return false;
 	}
 
 	//we 'compress' each normal
-	theNormsCodes.fill(0);
-	theNorms->placeIteratorAtBegining();
-	for (unsigned i=0; i<pointCount; i++)
+	std::fill(theNormsCodes.begin(), theNormsCodes.end(), 0);
+	for (unsigned i = 0; i < pointCount; i++)
 	{
-		const PointCoordinateType* N = theNorms->getCurrentValue();
+		const CCVector3& N = theNorms->at(i);
 		CompressedNormType nCode = GetNormIndex(N);
-		theNormsCodes.setValue(i,nCode);
-		theNorms->forwardIterator();
+		theNormsCodes.setValue(i, nCode);
 	}
 
 	theNorms->release();
@@ -540,7 +527,7 @@ bool ccNormalVectors::ComputeCloudNormals(	ccGenericPointCloud* theCloud,
 	//preferred orientation
 	if (preferredOrientation != UNDEFINED)
 	{
-		UpdateNormalOrientations(theCloud,theNormsCodes,preferredOrientation);
+		UpdateNormalOrientations(theCloud, theNormsCodes, preferredOrientation);
 	}
 
 	if (theOctree && !inputOctree)
@@ -641,7 +628,7 @@ bool ccNormalVectors::ComputeNormalWithTri(CCLib::GenericIndexedCloudPersist* po
 	unsigned triCount = theMesh->size();
 
 	//for all triangles
-	theMesh->placeIteratorAtBegining();
+	theMesh->placeIteratorAtBeginning();
 	for (unsigned j = 0; j < triCount; ++j)
 	{
 		//we can't use getNextTriangleVertIndexes (which is faster on mesh groups but not multi-thread compatible) but anyway we'll never get mesh groups here!
@@ -700,14 +687,20 @@ bool ccNormalVectors::ComputeNormsAtLevelWithQuadric(	const CCLib::DgmOctree::oc
 
 		//warning: there may be more points at the end of nNSS.pointsInNeighbourhood than the actual nearest neighbors (k)!
 		unsigned k = cell.parentOctree->findNeighborsInASphereStartingFromCell(nNSS, radius, false);
-		if (k >= NUMBER_OF_POINTS_FOR_NORM_WITH_LS)
+		float cur_radius = radius;
+		while (k < NUMBER_OF_POINTS_FOR_NORM_WITH_QUADRIC && cur_radius < 16*radius)
+		{
+			cur_radius *= 1.189207115f;
+			k = cell.parentOctree->findNeighborsInASphereStartingFromCell(nNSS, cur_radius, false);
+		}
+		if (k >= NUMBER_OF_POINTS_FOR_NORM_WITH_QUADRIC)
 		{
 			CCLib::DgmOctreeReferenceCloud neighbours(&nNSS.pointsInNeighbourhood, k);
 
 			CCVector3 N;
 			if (ComputeNormalWithQuadric(&neighbours, nNSS.queryPoint, N))
 			{
-				theNorms->setValue(cell.points->getPointGlobalIndex(i), N.u);
+				theNorms->setValue(cell.points->getPointGlobalIndex(i), N);
 			}
 		}
 
@@ -751,19 +744,27 @@ bool ccNormalVectors::ComputeNormsAtLevelWithLS(const CCLib::DgmOctree::octreeCe
 
 		//warning: there may be more points at the end of nNSS.pointsInNeighbourhood than the actual nearest neighbors (k)!
 		unsigned k = cell.parentOctree->findNeighborsInASphereStartingFromCell(nNSS, radius, false);
-		if (k >= NUMBER_OF_POINTS_FOR_NORM_WITH_QUADRIC)
+		float cur_radius = radius;
+		while (k < NUMBER_OF_POINTS_FOR_NORM_WITH_LS && cur_radius < 16*radius)
+		{
+			cur_radius *= 1.189207115f;
+			k = cell.parentOctree->findNeighborsInASphereStartingFromCell(nNSS, cur_radius, false);
+		}
+		if (k >= NUMBER_OF_POINTS_FOR_NORM_WITH_LS)
 		{
 			CCLib::DgmOctreeReferenceCloud neighbours(&nNSS.pointsInNeighbourhood, k);
 
 			CCVector3 N;
 			if (ComputeNormalWithLS(&neighbours, N))
 			{
-				theNorms->setValue(cell.points->getPointGlobalIndex(i), N.u);
+				theNorms->setValue(cell.points->getPointGlobalIndex(i), N);
 			}
 		}
 
 		if (nProgress && !nProgress->oneStep())
+		{
 			return false;
+		}
 	}
 
 	return true;
@@ -809,7 +810,7 @@ bool ccNormalVectors::ComputeNormsAtLevelWithTri(	const CCLib::DgmOctree::octree
 			CCVector3 N;
 			if (ComputeNormalWithTri(&neighbours, N))
 			{
-				theNorms->setValue(cell.points->getPointGlobalIndex(i), N.u);
+				theNorms->setValue(cell.points->getPointGlobalIndex(i), N);
 			}
 		}
 
@@ -833,50 +834,93 @@ QString ccNormalVectors::ConvertDipAndDipDirToString(PointCoordinateType dip_deg
 	int iDipDir = static_cast<int>(dipDir_deg);
 	int iDip = static_cast<int>(dip_deg);
 
-	return QString("Dip direction: %1 deg. - Dip angle: %2 deg.").arg(iDipDir, 3, 10, QChar('0')).arg(iDip, 3, 10, QChar('0'));
+	return QString("Dip: %1 deg. - Dip direction: %2 deg.").arg(iDip, 3, 10, QChar('0')).arg(iDipDir, 3, 10, QChar('0'));
 }
 
-void ccNormalVectors::ConvertNormalToStrikeAndDip(const CCVector3& N, double& strike_deg, double& dip_deg)
+void ccNormalVectors::ConvertNormalToStrikeAndDip(const CCVector3& N, PointCoordinateType& strike_deg, PointCoordinateType& dip_deg)
 {
 	// Adapted from Andy Michael's 'stridip.c':
 	// Finds strike and dip of plane given normal vector having components n, e, and u
 	// output is in degrees north of east and then
 	// uses a right hand rule for the dip of the plane
-	strike_deg = 180.0 - atan2(N.y, N.x)*CC_RAD_TO_DEG;		//atan2 output is between -180 and 180! So strike is always positive here
-	PointCoordinateType x = sqrt(N.x*N.x + N.y*N.y);		//x is the horizontal magnitude
-	dip_deg = atan2(x, N.z)*CC_RAD_TO_DEG;
+	if (N.norm2() > std::numeric_limits<PointCoordinateType>::epsilon())
+	{
+		strike_deg = 180.0 - atan2(N.y, N.x)*CC_RAD_TO_DEG;		//atan2 output is between -180 and 180! So strike is always positive here
+		PointCoordinateType x = sqrt(N.x*N.x + N.y*N.y);		//x is the horizontal magnitude
+		dip_deg = atan2(x, N.z)*CC_RAD_TO_DEG;
+	}
+	else
+	{
+		strike_deg = dip_deg = std::numeric_limits<PointCoordinateType>::quiet_NaN();
+	}
 }
 
 void ccNormalVectors::ConvertNormalToDipAndDipDir(const CCVector3& N, PointCoordinateType& dip_deg, PointCoordinateType& dipDir_deg)
 {
 	//http://en.wikipedia.org/wiki/Structural_geology#Geometries
 
-	// The dip direction must be the same for parallel facets, regardless
-	// of whether their normals point upwards or downwards.
-	//
-	// The formula using atan2() with the swapped N.x and N.y already
-	// gives the correct results for facets with the normal pointing
-	// upwards, so just use the sign of N.z to invert the normals if they
-	// point downwards.
-	double Nsign = N.z < 0 ? -1.0 : 1.0; //DGM: copysign is not available on VS2012
-
-	//"Dip direction is measured in 360 degrees, generally clockwise from North"
-	double dipDir_rad = atan2(Nsign * N.x, Nsign * N.y); //result in [-pi,+pi]
-	if (dipDir_rad < 0)
+	if (N.norm2d() > std::numeric_limits<PointCoordinateType>::epsilon())
 	{
-		dipDir_rad += 2 * M_PI;
+		// The dip direction must be the same for parallel facets, regardless
+		// of whether their normals point upwards or downwards.
+		//
+		// The formula using atan2() with the swapped N.x and N.y already
+		// gives the correct results for facets with the normal pointing
+		// upwards, so just use the sign of N.z to invert the normals if they
+		// point downwards.
+		double Nsign = N.z < 0 ? -1.0 : 1.0; //DGM: copysign is not available on VS2012
+
+		//"Dip direction is measured in 360 degrees, generally clockwise from North"
+		double dipDir_rad = atan2(Nsign * N.x, Nsign * N.y); //result in [-pi,+pi]
+		if (dipDir_rad < 0)
+		{
+			dipDir_rad += 2 * M_PI;
+		}
+
+		// Dip angle
+		//
+		// acos() returns values in [0, pi] but using fabs() all the normals
+		// are considered pointing upwards, so the actual result will be in
+		// [0, pi/2] as required by the definition of dip.
+		// We skip the division by r because the normal is a unit vector.
+		double dip_rad = acos(fabs(N.z));
+
+		dipDir_deg = static_cast<PointCoordinateType>(dipDir_rad * CC_RAD_TO_DEG);
+		dip_deg = static_cast<PointCoordinateType>(dip_rad * CC_RAD_TO_DEG);
 	}
+	else
+	{
+		dipDir_deg = dip_deg = std::numeric_limits<PointCoordinateType>::quiet_NaN();
+	}
+}
 
-	// Dip angle
-	//
-	// acos() returns values in [0, pi] but using fabs() all the normals
-	// are considered pointing upwards, so the actual result will be in
-	// [0, pi/2] as required by the definition of dip.
-	// We skip the division by r because the normal is a unit vector.
-	double dip_rad = acos(fabs(N.z));
+CCVector3 ccNormalVectors::ConvertDipAndDipDirToNormal(PointCoordinateType dip_deg, PointCoordinateType dipDir_deg, bool upward/*=true*/)
+{
+	//specific case
+	if (std::isnan(dip_deg) || std::isnan(dipDir_deg))
+	{
+		return CCVector3(0, 0, 0);
+	}
+	
+	double Nz = cos(dip_deg * CC_DEG_TO_RAD);
+	double Nxy = sqrt(1.0 - Nz * Nz);
+	double dipDir_rad = dipDir_deg * CC_DEG_TO_RAD;
+	CCVector3 N(	static_cast<PointCoordinateType>(Nxy * sin(dipDir_rad)),
+					static_cast<PointCoordinateType>(Nxy * cos(dipDir_rad)),
+					static_cast<PointCoordinateType>(Nz) );
 
-	dipDir_deg = static_cast<PointCoordinateType>(dipDir_rad * CC_RAD_TO_DEG);
-	dip_deg = static_cast<PointCoordinateType>(dip_rad * CC_RAD_TO_DEG);
+#ifdef _DEBUG
+	//internal consistency test
+	PointCoordinateType dip2, dipDir2;
+	ConvertNormalToDipAndDipDir(N, dip2, dipDir2);
+	assert(fabs(dip2 - dip_deg) < 1.0e-3 && (dip2 == 0 || fabs(dipDir2 - dipDir_deg) < 1.0e-3));
+#endif
+
+	if (!upward)
+	{
+		N = -N;
+	}
+	return N;
 }
 
 void ccNormalVectors::ConvertNormalToHSV(const CCVector3& N, float& H, float& S, float& V)

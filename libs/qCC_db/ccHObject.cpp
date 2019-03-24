@@ -21,33 +21,35 @@
 #include "ccIncludeGL.h"
 
 //Objects handled by factory
-#include "ccSubMesh.h"
-#include "ccMeshGroup.h"
-#include "ccFacet.h"
-#include "ccMaterialSet.h"
-#include "ccImage.h"
-#include "ccGBLSensor.h"
-#include "ccCameraSensor.h"
 #include "cc2DLabel.h"
 #include "cc2DViewportLabel.h"
-#include "ccPlane.h"
-#include "ccSphere.h"
-#include "ccTorus.h"
-#include "ccCylinder.h"
 #include "ccBox.h"
-#include "ccDish.h"
-#include "ccExtru.h"
-#include "ccQuadric.h"
+#include "ccCameraSensor.h"
 #include "ccCustomObject.h"
+#include "ccCylinder.h"
+#include "ccDish.h"
 #include "ccExternalFactory.h"
+#include "ccExtru.h"
+#include "ccFacet.h"
+#include "ccGBLSensor.h"
+#include "ccImage.h"
+#include "ccMaterialSet.h"
+#include "ccMeshGroup.h"
+#include "ccPlane.h"
+#include "ccPointCloud.h"
+#include "ccPolyline.h"
+#include "ccQuadric.h"
+#include "ccSphere.h"
+#include "ccSubMesh.h"
+#include "ccTorus.h"
 
 //Qt
 #include <QIcon>
 
-ccHObject::ccHObject(QString name/*=QString()*/)
+ccHObject::ccHObject(const QString& name)
 	: ccObject(name)
 	, ccDrawableObject()
-	, m_parent(0)
+	, m_parent(nullptr)
 	, m_selectionBehavior(SELECTION_AA_BBOX)
 	, m_isDeleting(false)
 {
@@ -60,7 +62,7 @@ ccHObject::ccHObject(QString name/*=QString()*/)
 ccHObject::ccHObject(const ccHObject& object)
 	: ccObject(object)
 	, ccDrawableObject(object)
-	, m_parent(0)
+	, m_parent(nullptr)
 	, m_selectionBehavior(object.m_selectionBehavior)
 	, m_isDeleting(false)
 {
@@ -72,7 +74,7 @@ ccHObject::~ccHObject()
 	m_isDeleting = true;
 
 	//process dependencies
-	for (std::map<ccHObject*,int>::const_iterator it=m_dependencies.begin(); it!=m_dependencies.end(); ++it)
+	for (std::map<ccHObject*, int>::const_iterator it = m_dependencies.begin(); it != m_dependencies.end(); ++it)
 	{
 		assert(it->first);
 		//notify deletion to other object?
@@ -101,10 +103,13 @@ void ccHObject::notifyGeometryUpdate()
 {
 	//the associated display bounding-box is (potentially) deprecated!!!
 	if (m_currentDisplay)
+	{
 		m_currentDisplay->invalidateViewport();
+		m_currentDisplay->deprecate3DLayer();
+	}
 
 	//process dependencies
-	for (std::map<ccHObject*,int>::const_iterator it=m_dependencies.begin(); it!=m_dependencies.end(); ++it)
+	for (std::map<ccHObject*, int>::const_iterator it = m_dependencies.begin(); it != m_dependencies.end(); ++it)
 	{
 		assert(it->first);
 		//notify deletion to other object?
@@ -125,10 +130,10 @@ ccHObject* ccHObject::New(CC_CLASS_ENUM objectType, const char* name/*=0*/)
 		return new ccPointCloud(name);
 	case CC_TYPES::MESH:
 		//warning: no associated vertices --> retrieved later
-		return new ccMesh(0);
+		return new ccMesh(nullptr);
 	case CC_TYPES::SUB_MESH:
 		//warning: no associated mesh --> retrieved later
-		return new ccSubMesh(0);
+		return new ccSubMesh(nullptr);
 	case CC_TYPES::MESH_GROUP:
 		//warning: deprecated
 		ccLog::Warning("[ccHObject::New] Mesh groups are deprecated!");
@@ -136,7 +141,7 @@ ccHObject* ccHObject::New(CC_CLASS_ENUM objectType, const char* name/*=0*/)
 		return new ccMeshGroup();
 	case CC_TYPES::POLY_LINE:
 		//warning: no associated vertices --> retrieved later
-		return new ccPolyline(0);
+		return new ccPolyline(nullptr);
 	case CC_TYPES::FACET:
 		return new ccFacet();
 	case CC_TYPES::MATERIAL_SET:
@@ -152,7 +157,7 @@ ccHObject* ccHObject::New(CC_CLASS_ENUM objectType, const char* name/*=0*/)
 	case CC_TYPES::IMAGE:
 		return new ccImage();
 	case CC_TYPES::CALIBRATED_IMAGE:
-		return 0; //deprecated
+		return nullptr; //deprecated
 	case CC_TYPES::GBL_SENSOR:
 		//warning: default sensor type set in constructor (see CCLib::GroundBasedLidarSensor::setRotationOrder)
 		return new ccGBLSensor();
@@ -200,26 +205,30 @@ ccHObject* ccHObject::New(CC_CLASS_ENUM objectType, const char* name/*=0*/)
 		break;
 	}
 
-	return 0;
+	return nullptr;
 }
 
-ccHObject* ccHObject::New(QString pluginId, QString classId, const char* name)
+ccHObject* ccHObject::New(const QString& pluginId, const QString& classId, const char* name)
 {
 	ccExternalFactory::Container::Shared externalFactories = ccExternalFactory::Container::GetUniqueInstance();
 	if (!externalFactories)
-		return 0;
-
+	{
+		return nullptr;
+	}
+	
 	ccExternalFactory* factory = externalFactories->getFactoryByName(pluginId);
 	if (!factory)
-		return 0;
-
+	{
+		return nullptr;
+	}
+	
 	ccHObject* obj = factory->buildObject(classId);
 
-	if (!obj)
-		return 0;
-
-	if (name)
+	if (name && obj)
+	{
 		obj->setName(name);
+	}
+	
 	return obj;
 }
 
@@ -261,12 +270,12 @@ void ccHObject::addDependency(ccHObject* otherObject, int flags, bool additive/*
 	//whenever we add a dependency, we must be sure to be notified
 	//by the other object when its deleted! Otherwise we'll keep
 	//bad pointers in the dependency list...
-	otherObject->addDependency(this,DP_NOTIFY_OTHER_ON_DELETE);
+	otherObject->addDependency(this, DP_NOTIFY_OTHER_ON_DELETE);
 }
 
-int ccHObject::getDependencyFlagsWith(const ccHObject* otherObject)
+int ccHObject::getDependencyFlagsWith(const ccHObject* otherObject) const
 {
-	std::map<ccHObject*,int>::const_iterator it = m_dependencies.find(const_cast<ccHObject*>(otherObject)); //DGM: not sure why erase won't accept a const pointer?! We try to modify the map here, not the pointer object!
+	std::map<ccHObject*, int>::const_iterator it = m_dependencies.find(const_cast<ccHObject*>(otherObject)); //DGM: not sure why erase won't accept a const pointer?! We try to modify the map here, not the pointer object!
 
 	return (it != m_dependencies.end() ? it->second : 0);
 }
@@ -275,7 +284,7 @@ void ccHObject::removeDependencyWith(ccHObject* otherObject)
 {
 	m_dependencies.erase(const_cast<ccHObject*>(otherObject)); //DGM: not sure why erase won't accept a const pointer?! We try to modify the map here, not the pointer object!
 	if (!otherObject->m_isDeleting)
-		otherObject->removeDependencyFlag(this,DP_NOTIFY_OTHER_ON_DELETE);
+		otherObject->removeDependencyFlag(this, DP_NOTIFY_OTHER_ON_DELETE);
 }
 
 void ccHObject::removeDependencyFlag(ccHObject* otherObject, DEPENDENCY_FLAGS flag)
@@ -304,7 +313,7 @@ void ccHObject::onDeletionOf(const ccHObject* obj)
 	if (pos >= 0)
 	{
 		//we can't swap children as we want to keep the order!
-		m_children.erase(m_children.begin()+pos);
+		m_children.erase(m_children.begin() + pos);
 	}
 }
 
@@ -315,7 +324,7 @@ bool ccHObject::addChild(ccHObject* child, int dependencyFlags/*=DP_PARENT_OF_OT
 		assert(false);
 		return false;
 	}
-	if (std::find(m_children.begin(),m_children.end(),child) != m_children.end())
+	if (std::find(m_children.begin(), m_children.end(), child) != m_children.end())
 	{
 		ccLog::ErrorDebug("[ccHObject::addChild] Object is already a child!");
 		return false;
@@ -333,7 +342,7 @@ bool ccHObject::addChild(ccHObject* child, int dependencyFlags/*=DP_PARENT_OF_OT
 		if (insertIndex < 0 || static_cast<size_t>(insertIndex) >= m_children.size())
 			m_children.push_back(child);
 		else
-			m_children.insert(m_children.begin()+insertIndex,child);
+			m_children.insert(m_children.begin() + insertIndex, child);
 	}
 	catch (const std::bad_alloc&)
 	{
@@ -342,11 +351,11 @@ bool ccHObject::addChild(ccHObject* child, int dependencyFlags/*=DP_PARENT_OF_OT
 	}
 
 	//we want to be notified whenever this child is deleted!
-	child->addDependency(this,DP_NOTIFY_OTHER_ON_DELETE); //DGM: potentially redundant with calls to 'addDependency' but we can't miss that ;)
+	child->addDependency(this, DP_NOTIFY_OTHER_ON_DELETE); //DGM: potentially redundant with calls to 'addDependency' but we can't miss that ;)
 
 	if (dependencyFlags != 0)
 	{
-		addDependency(child,dependencyFlags);
+		addDependency(child, dependencyFlags);
 	}
 
 	//the strongest link: between a parent and a child ;)
@@ -362,21 +371,37 @@ bool ccHObject::addChild(ccHObject* child, int dependencyFlags/*=DP_PARENT_OF_OT
 	return true;
 }
 
-ccHObject* ccHObject::find(unsigned uniqueID)
+unsigned int ccHObject::getChildCountRecursive() const
+{
+	unsigned int	count = static_cast<unsigned>(m_children.size());
+	
+	for ( auto child : m_children )
+	{
+		count += child->getChildCountRecursive();
+	}
+	
+	return count;
+}
+
+ccHObject* ccHObject::find(unsigned uniqueID) const
 {
 	//found the right item?
 	if (getUniqueID() == uniqueID)
-		return this;
-
+	{
+		return const_cast<ccHObject *>(this);
+	}
+	
 	//otherwise we are going to test all children recursively
 	for (unsigned i=0; i<getChildrenNumber(); ++i)
 	{
 		ccHObject* match = getChild(i)->find(uniqueID);
 		if (match)
+		{
 			return match;
+		}
 	}
 
-	return 0;
+	return nullptr;
 }
 
 unsigned ccHObject::filterChildren(	Container& filteredChildren,
@@ -385,24 +410,24 @@ unsigned ccHObject::filterChildren(	Container& filteredChildren,
 									bool strict/*=false*/,
 									ccGenericGLDisplay* inDisplay/*=0*/) const
 {
-	for (Container::const_iterator it = m_children.begin(); it != m_children.end(); ++it)
+	for (auto child : m_children)
 	{
-		if (	(!strict && (*it)->isKindOf(filter))
-			||	( strict && (*it)->isA(filter)))
+		if (	(!strict && child->isKindOf(filter))
+			||	( strict && child->isA(filter)))
 		{
-			if (!inDisplay || (*it)->getDisplay() == inDisplay)
+			if (!inDisplay || child->getDisplay() == inDisplay)
 			{
 				//warning: we have to handle unicity as a sibling may be in the same container as its parent!
-				if (std::find(filteredChildren.begin(), filteredChildren.end(), *it) == filteredChildren.end()) //not yet in output vector?
+				if (std::find(filteredChildren.begin(), filteredChildren.end(), child) == filteredChildren.end()) //not yet in output vector?
 				{
-					filteredChildren.push_back(*it);
+					filteredChildren.push_back(child);
 				}
 			}
 		}
 
 		if (recursive)
 		{
-			(*it)->filterChildren(filteredChildren, true, filter, strict, inDisplay);
+			child->filterChildren(filteredChildren, true, filter, strict, inDisplay);
 		}
 	}
 
@@ -432,19 +457,18 @@ void ccHObject::transferChild(ccHObject* child, ccHObject& newParent)
 	child->addDependency(&newParent,childDependencyFlags);
 
 	//after a successful transfer, either the parent is 'newParent' or a null pointer
-	assert(child->getParent() == &newParent || child->getParent() == 0);
+	assert(child->getParent() == &newParent || child->getParent() == nullptr);
 }
 
 void ccHObject::transferChildren(ccHObject& newParent, bool forceFatherDependent/*=false*/)
 {
-	for (Container::iterator it = m_children.begin(); it != m_children.end(); ++it)
+	for (auto child : m_children)
 	{
-		ccHObject* child = *it;
 		//remove link from old parent
 		int childDependencyFlags = child->getDependencyFlagsWith(this);
 		int fatherDependencyFlags = getDependencyFlagsWith(child);
 	
-		//we must explicitely remove any depedency with the child as we don't call 'detachChild'
+		//we must explicitely remove any dependency with the child as we don't call 'detachChild'
 		removeDependencyWith(child);
 		child->removeDependencyWith(this);
 
@@ -452,7 +476,7 @@ void ccHObject::transferChildren(ccHObject& newParent, bool forceFatherDependent
 		child->addDependency(&newParent,childDependencyFlags);
 
 		//after a successful transfer, either the parent is 'newParent' or a null pointer
-		assert(child->getParent() == &newParent || child->getParent() == 0);
+		assert(child->getParent() == &newParent || child->getParent() == nullptr);
 	}
 	m_children.clear();
 }
@@ -512,10 +536,12 @@ ccBBox ccHObject::getBB_recursive(bool withGLFeatures/*=false*/, bool onlyEnable
 {
 	ccBBox box = getOwnBB(withGLFeatures);
 
-	for (Container::iterator it = m_children.begin(); it != m_children.end(); ++it)
+	for (auto child : m_children)
 	{
-		if (!onlyEnabledChildren || (*it)->isEnabled())
-			box += (*it)->getBB_recursive(withGLFeatures,onlyEnabledChildren);
+		if (!onlyEnabledChildren || child->isEnabled())
+		{
+			box += child->getBB_recursive(withGLFeatures,onlyEnabledChildren);
+		}
 	}
 
 	return box;
@@ -528,14 +554,14 @@ ccBBox ccHObject::getDisplayBB_recursive(bool relative, const ccGenericGLDisplay
 	if (!display || display == m_currentDisplay)
 		box = getOwnBB(true);
 
-	for (Container::iterator it = m_children.begin(); it != m_children.end(); ++it)
+	for (auto child : m_children)
 	{
-		if ((*it)->isEnabled())
+		if (child->isEnabled())
 		{
-			ccBBox childBox = (*it)->getDisplayBB_recursive(true, display);
-			if ((*it)->isGLTransEnabled())
+			ccBBox childBox = child->getDisplayBB_recursive(true, display);
+			if (child->isGLTransEnabled())
 			{
-				childBox = childBox * (*it)->getGLTransformation();
+				childBox = childBox * child->getGLTransformation();
 			}
 			box += childBox;
 		}
@@ -554,7 +580,12 @@ ccBBox ccHObject::getDisplayBB_recursive(bool relative, const ccGenericGLDisplay
 
 bool ccHObject::isDisplayed() const
 {
-	return isVisible() && (getDisplay() != 0) && isBranchEnabled();
+	return (getDisplay() != nullptr) && isVisible() && isBranchEnabled();
+}
+
+bool ccHObject::isDisplayedIn(const ccGenericGLDisplay* display) const
+{
+	return (getDisplay() == display) && isVisible() && isBranchEnabled();
 }
 
 bool ccHObject::isBranchEnabled() const
@@ -570,6 +601,15 @@ bool ccHObject::isBranchEnabled() const
 
 void ccHObject::drawBB(CC_DRAW_CONTEXT& context, const ccColor::Rgb& col)
 {
+	QOpenGLFunctions_2_1 *glFunc = context.glFunctions<QOpenGLFunctions_2_1>();
+	assert(glFunc != nullptr);
+
+	if (glFunc == nullptr)
+		return;
+
+	glFunc->glPushAttrib(GL_LINE_BIT);
+	glFunc->glLineWidth(1.0f);
+
 	switch (m_selectionBehavior)
 	{
 	case SELECTION_AA_BBOX:
@@ -604,6 +644,8 @@ void ccHObject::drawBB(CC_DRAW_CONTEXT& context, const ccColor::Rgb& col)
 	default:
 		assert(false);
 	}
+
+	glFunc->glPopAttrib(); //GL_LINE_BIT
 }
 
 void ccHObject::drawNameIn3D(CC_DRAW_CONTEXT& context)
@@ -612,27 +654,28 @@ void ccHObject::drawNameIn3D(CC_DRAW_CONTEXT& context)
 		return;
 
 	//we display it in the 2D layer in fact!
-	ccBBox bBox = getOwnBB();
-	if (!bBox.isValid())
-		return;
+	//ccBBox bBox = getBB_recursive();
+	//if (!bBox.isValid())
+	//	return;
 	
-	ccGLMatrix trans;
-	getAbsoluteGLTransformation(trans);
+	//ccGLMatrix trans;
+	//getAbsoluteGLTransformation(trans);
 
-	ccGLCameraParameters camera;
-	context.display->getGLCameraParameters(camera);
+	//ccGLCameraParameters camera;
+	//context.display->getGLCameraParameters(camera);
 
-	CCVector3 C = bBox.getCenter();
-	CCVector3d Q2D;
-	camera.project(C, Q2D);
+	//CCVector3 C = bBox.getCenter();
+	//CCVector3d Q2D;
+	//camera.project(C, Q2D);
 
+	
 	QFont font = context.display->getTextDisplayFont(); //takes rendering zoom into account!
 	context.display->displayText(	getName(),
-									static_cast<int>(Q2D.x),
-									static_cast<int>(Q2D.y),
+									static_cast<int>(m_nameIn3DPos.x),
+									static_cast<int>(m_nameIn3DPos.y),
 									ccGenericGLDisplay::ALIGN_HMIDDLE | ccGenericGLDisplay::ALIGN_VMIDDLE,
 									0.75f,
-									0,
+									nullptr,
 									&font);
 }
 
@@ -696,17 +739,40 @@ void ccHObject::draw(CC_DRAW_CONTEXT& context)
 			{
 				toggleClipPlanes(context, false);
 			}
+		}
+	}
 
-			//draw name in 3D (we display it in the 2D foreground layer in fact!)
-			if (m_showNameIn3D && MACRO_Draw2D(context) && MACRO_Foreground(context) && !MACRO_DrawEntityNames(context))
-				drawNameIn3D(context);
+	//draw name - container objects are not visible but can still show a name
+	if (m_currentDisplay == context.display && m_showNameIn3D && !MACRO_DrawEntityNames(context))
+	{
+		if (MACRO_Draw3D(context))
+		{
+			//we have to comute the 2D position during the 3D pass!
+			ccBBox bBox = getBB_recursive();
+			if (bBox.isValid())
+			{
+				ccGLCameraParameters camera;
+				glFunc->glGetIntegerv(GL_VIEWPORT, camera.viewport);
+				glFunc->glGetDoublev(GL_PROJECTION_MATRIX, camera.projectionMat.data());
+				glFunc->glGetDoublev(GL_MODELVIEW_MATRIX, camera.modelViewMat.data());
+
+				CCVector3 C = bBox.getCenter();
+				camera.project(C, m_nameIn3DPos);
+			}
+		}
+		else if (MACRO_Draw2D(context) && MACRO_Foreground(context))
+		{
+			//then we can display the name during the 2D pass
+			drawNameIn3D(context);
 		}
 	}
 
 	//draw entity's children
-	for (Container::iterator it = m_children.begin(); it != m_children.end(); ++it)
-		(*it)->draw(context);
-
+	for (auto child : m_children)
+	{
+		child->draw(context);
+	}
+	
 	//if the entity is currently selected, we draw its bounding-box
 	if (m_selected && draw3D && drawInThisContext && !MACRO_DrawEntityNames(context) && context.currentLODLevel == 0)
 	{
@@ -722,7 +788,7 @@ void ccHObject::applyGLTransformation(const ccGLMatrix& trans)
 	m_glTransHistory = trans * m_glTransHistory;
 }
 
-void ccHObject::applyGLTransformation_recursive(const ccGLMatrix* transInput/*=NULL*/)
+void ccHObject::applyGLTransformation_recursive(const ccGLMatrix* transInput/*=nullptr*/)
 {
 	ccGLMatrix transTemp;
 	const ccGLMatrix* transToApply = transInput;
@@ -748,8 +814,8 @@ void ccHObject::applyGLTransformation_recursive(const ccGLMatrix* transInput/*=N
 		notifyGeometryUpdate();
 	}
 
-	for (Container::iterator it = m_children.begin(); it!=m_children.end(); ++it)
-		(*it)->applyGLTransformation_recursive(transToApply);
+	for (auto child : m_children)
+		child->applyGLTransformation_recursive(transToApply);
 
 	if (m_glTransEnabled)
 		resetGLTransformation();
@@ -759,11 +825,13 @@ unsigned ccHObject::findMaxUniqueID_recursive() const
 {
 	unsigned id = getUniqueID();
 
-	for (Container::const_iterator it = m_children.begin(); it!=m_children.end(); ++it)
+	for (auto child : m_children)
 	{
-		unsigned childMaxID = (*it)->findMaxUniqueID_recursive();
+		unsigned childMaxID = child->findMaxUniqueID_recursive();
 		if (id < childMaxID)
+		{
 			id = childMaxID;
+		}
 	}
 
 	return id;
@@ -782,8 +850,10 @@ void ccHObject::detachChild(ccHObject* child)
 	child->removeDependencyWith(this);
 
 	if (child->getParent() == this)
-		child->setParent(0);
-
+	{
+		child->setParent(nullptr);
+	}
+	
 	int pos = getChildIndex(child);
 	if (pos >= 0)
 	{
@@ -794,16 +864,16 @@ void ccHObject::detachChild(ccHObject* child)
 
 void ccHObject::detatchAllChildren()
 {
-	for (Container::iterator it=m_children.begin(); it!=m_children.end(); ++it)
+	for (auto child : m_children)
 	{
-		ccHObject* child = *it;
-
 		//remove any dependency (bilateral)
 		removeDependencyWith(child);
 		child->removeDependencyWith(this);
 
 		if (child->getParent() == this)
-			child->setParent(0);
+		{
+			child->setParent(nullptr);
+		}
 	}
 	m_children.clear();
 }
@@ -812,7 +882,9 @@ void ccHObject::removeChild(ccHObject* child)
 {
 	int pos = getChildIndex(child);
 	if (pos >= 0)
+	{
 		removeChild(pos);
+	}
 }
 
 void ccHObject::removeChild(int pos)
@@ -828,7 +900,7 @@ void ccHObject::removeChild(int pos)
 	//we can't swap as we want to keep the order!
 	//(DGM: do this BEFORE deleting the object (otherwise
 	//the dependency mechanism can 'backfire' ;)
-	m_children.erase(m_children.begin()+pos);
+	m_children.erase(m_children.begin() + pos);
 
 	//backup dependency flags
 	int flags = getDependencyFlagsWith(child);
@@ -847,7 +919,7 @@ void ccHObject::removeChild(int pos)
 	}
 	else if (child->getParent() == this)
 	{
-		child->setParent(0);
+		child->setParent(nullptr);
 	}
 }
 
@@ -887,27 +959,35 @@ bool ccHObject::toFile(QFile& out) const
 	if (!toFile_MeOnly(out))
 		return false;
 
-	//(serializable) child count (dataVersion>=20)
+	//(serializable) child count (dataVersion >= 20)
 	uint32_t serializableCount = 0;
-	for (unsigned i=0;i<m_children.size();++i)
-		if (m_children[i]->isSerializable())
+	for (auto child : m_children)
+	{
+		if (child->isSerializable())
+		{
 			++serializableCount;
-	if (out.write((const char*)&serializableCount,sizeof(uint32_t)) < 0)
+		}
+	}
+	
+	if (out.write(reinterpret_cast<const char*>(&serializableCount), sizeof(uint32_t)) < 0)
 		return WriteError();
 
 	//write serializable children (if any)
-	for (unsigned i=0;i<m_children.size();++i)
+	for (auto child : m_children)
 	{
-		if (m_children[i]->isSerializable())
+		if (child->isSerializable())
 		{
-			if (!m_children[i]->toFile(out))
+			if (!child->toFile(out))
 				return false;
 		}
 	}
 
-	//write current selection behavior (dataVersion>=23)
-	if (out.write((const char*)&m_selectionBehavior,sizeof(SelectionBehavior)) < 0)
+	//write current selection behavior (dataVersion >= 23)
+	if (out.write(reinterpret_cast<const char*>(&m_selectionBehavior), sizeof(SelectionBehavior)) < 0)
 		return WriteError();
+
+	//write transformation history (dataVersion >= 45)
+	m_glTransHistory.toFile(out);
 
 	return true;
 }
@@ -919,22 +999,34 @@ bool ccHObject::fromFile(QFile& in, short dataVersion, int flags)
 
 	//(serializable) child count (dataVersion>=20)
 	uint32_t serializableCount = 0;
-	if (in.read((char*)&serializableCount,4) < 0)
+	if (in.read(reinterpret_cast<char*>(&serializableCount), 4) < 0)
 		return ReadError();
 
 	//read serializable children (if any)
-	for (uint32_t i=0; i<serializableCount; ++i)
+	for (uint32_t i = 0; i < serializableCount; ++i)
 	{
 		//read children class ID
 		CC_CLASS_ENUM classID = ReadClassIDFromFile(in, dataVersion);
 		if (classID == CC_TYPES::OBJECT)
 			return false;
 
+		if (dataVersion >= 35 && dataVersion <= 47 && ((classID & CC_CUSTOM_BIT) != 0))
+		{
+			//bug fix: for a long time the CC_CAMERA_BIT and CC_QUADRIC_BIT were wrongly defined
+			//with two bits instead of one! The additional and wrongly defined bit was the CC_CUSTOM_BIT :(
+			if (	(classID & CC_TYPES::CAMERA_SENSOR) == CC_TYPES::CAMERA_SENSOR
+				||	(classID & CC_TYPES::QUADRIC) == CC_TYPES::QUADRIC
+				)
+			{
+				classID &= (~CC_CUSTOM_BIT);
+			}
+		}
+
 		//create corresponding child object
 		ccHObject* child = New(classID);
 
 		//specifc case of custom objects (defined by plugins)
-		if (classID == CC_TYPES::CUSTOM_H_OBJECT)
+		if ((classID & CC_TYPES::CUSTOM_H_OBJECT) == CC_TYPES::CUSTOM_H_OBJECT)
 		{
 			//store current position
 			size_t originalFilePos = in.pos();
@@ -948,7 +1040,7 @@ bool ccHObject::fromFile(QFile& in, short dataVersion, int flags)
 			QString pluginId = child->getMetaData(ccCustomHObject::DefautMetaDataPluginName()).toString();
 			//dont' need this instance anymore
 			delete child;
-			child = 0;
+			child = nullptr;
 
 			// try to get a new object from external factories
 			ccHObject* newChild = ccHObject::New(pluginId, classId);
@@ -958,7 +1050,7 @@ bool ccHObject::fromFile(QFile& in, short dataVersion, int flags)
 			}
 			else
 			{
-				ccLog::Warning(QString("[ccHObject::fromFile] Couldn't found any plugin able to deserialize custom object '%1' (class_ID = %2 / plugin_ID = %3").arg(childName).arg(classID).arg(pluginId));
+				ccLog::Warning(QString("[ccHObject::fromFile] Couldn't find a plugin able to deserialize custom object '%1' (class_ID = %2 / plugin_ID = %3)").arg(childName).arg(classID).arg(pluginId));
 				return false; // FIXME: for now simply return false. We may want to skip it but I'm not sure if there is a simple way of doing that
 			}
 		}
@@ -987,12 +1079,23 @@ bool ccHObject::fromFile(QFile& in, short dataVersion, int flags)
 	//read the selection behavior (dataVersion>=23)
 	if (dataVersion >= 23)
 	{
-		if (in.read((char*)&m_selectionBehavior,sizeof(SelectionBehavior)) < 0)
+		if (in.read(reinterpret_cast<char*>(&m_selectionBehavior), sizeof(SelectionBehavior)) < 0)
+		{
 			return ReadError();
+		}
 	}
 	else
 	{
 		m_selectionBehavior = SELECTION_AA_BBOX;
+	}
+
+	//read transformation history (dataVersion >= 45)
+	if (dataVersion >= 45)
+	{
+		if (!m_glTransHistory.fromFile(in, dataVersion, flags))
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -1017,38 +1120,44 @@ bool ccHObject::toFile_MeOnly(QFile& out) const
 	/*** ccHObject takes in charge the ccDrawableObject properties (which is not a ccSerializableObject) ***/
 
 	//'visible' state (dataVersion>=20)
-	if (out.write((const char*)&m_visible,sizeof(bool)) < 0)
+	if (out.write(reinterpret_cast<const char*>(&m_visible), sizeof(bool)) < 0)
 		return WriteError();
 	//'lockedVisibility' state (dataVersion>=20)
-	if (out.write((const char*)&m_lockedVisibility,sizeof(bool)) < 0)
+	if (out.write(reinterpret_cast<const char*>(&m_lockedVisibility), sizeof(bool)) < 0)
 		return WriteError();
 	//'colorsDisplayed' state (dataVersion>=20)
-	if (out.write((const char*)&m_colorsDisplayed,sizeof(bool)) < 0)
+	if (out.write(reinterpret_cast<const char*>(&m_colorsDisplayed), sizeof(bool)) < 0)
 		return WriteError();
 	//'normalsDisplayed' state (dataVersion>=20)
-	if (out.write((const char*)&m_normalsDisplayed,sizeof(bool)) < 0)
+	if (out.write(reinterpret_cast<const char*>(&m_normalsDisplayed), sizeof(bool)) < 0)
 		return WriteError();
 	//'sfDisplayed' state (dataVersion>=20)
-	if (out.write((const char*)&m_sfDisplayed,sizeof(bool)) < 0)
+	if (out.write(reinterpret_cast<const char*>(&m_sfDisplayed), sizeof(bool)) < 0)
 		return WriteError();
 	//'colorIsOverriden' state (dataVersion>=20)
-	if (out.write((const char*)&m_colorIsOverriden,sizeof(bool)) < 0)
+	if (out.write(reinterpret_cast<const char*>(&m_colorIsOverriden), sizeof(bool)) < 0)
 		return WriteError();
 	if (m_colorIsOverriden)
 	{
 		//'tempColor' (dataVersion>=20)
-		if (out.write((const char*)m_tempColor.rgb,sizeof(ColorCompType)*3) < 0)
+		if (out.write(reinterpret_cast<const char*>(m_tempColor.rgb), sizeof(ColorCompType)*3) < 0)
+		{
 			return WriteError();
+		}
 	}
 	//'glTransEnabled' state (dataVersion>=20)
-	if (out.write((const char*)&m_glTransEnabled,sizeof(bool)) < 0)
+	if (out.write(reinterpret_cast<const char*>(&m_glTransEnabled), sizeof(bool)) < 0)
 		return WriteError();
 	if (m_glTransEnabled)
+	{
 		if (!m_glTrans.toFile(out))
+		{
 			return false;
+		}
+	}
 
 	//'showNameIn3D' state (dataVersion>=24)
-	if (out.write((const char*)&m_showNameIn3D,sizeof(bool)) < 0)
+	if (out.write(reinterpret_cast<const char*>(&m_showNameIn3D), sizeof(bool)) < 0)
 		return WriteError();
 
 	return true;
@@ -1061,41 +1170,47 @@ bool ccHObject::fromFile_MeOnly(QFile& in, short dataVersion, int flags)
 	/*** ccHObject takes in charge the ccDrawableObject properties (which is not a ccSerializableObject) ***/
 
 	//'visible' state (dataVersion>=20)
-	if (in.read((char*)&m_visible,sizeof(bool)) < 0)
+	if (in.read(reinterpret_cast<char*>(&m_visible), sizeof(bool)) < 0)
 		return ReadError();
 	//'lockedVisibility' state (dataVersion>=20)
-	if (in.read((char*)&m_lockedVisibility,sizeof(bool)) < 0)
+	if (in.read(reinterpret_cast<char*>(&m_lockedVisibility), sizeof(bool)) < 0)
 		return ReadError();
 	//'colorsDisplayed' state (dataVersion>=20)
-	if (in.read((char*)&m_colorsDisplayed,sizeof(bool)) < 0)
+	if (in.read(reinterpret_cast<char*>(&m_colorsDisplayed), sizeof(bool)) < 0)
 		return ReadError();
 	//'normalsDisplayed' state (dataVersion>=20)
-	if (in.read((char*)&m_normalsDisplayed,sizeof(bool)) < 0)
+	if (in.read(reinterpret_cast<char*>(&m_normalsDisplayed), sizeof(bool)) < 0)
 		return ReadError();
 	//'sfDisplayed' state (dataVersion>=20)
-	if (in.read((char*)&m_sfDisplayed,sizeof(bool)) < 0)
+	if (in.read(reinterpret_cast<char*>(&m_sfDisplayed), sizeof(bool)) < 0)
 		return ReadError();
 	//'colorIsOverriden' state (dataVersion>=20)
-	if (in.read((char*)&m_colorIsOverriden,sizeof(bool)) < 0)
+	if (in.read(reinterpret_cast<char*>(&m_colorIsOverriden), sizeof(bool)) < 0)
 		return ReadError();
 	if (m_colorIsOverriden)
 	{
 		//'tempColor' (dataVersion>=20)
-		if (in.read((char*)m_tempColor.rgb,sizeof(ColorCompType)*3) < 0)
+		if (in.read(reinterpret_cast<char*>(m_tempColor.rgb), sizeof(ColorCompType)*3) < 0)
 			return ReadError();
 	}
 	//'glTransEnabled' state (dataVersion>=20)
-	if (in.read((char*)&m_glTransEnabled,sizeof(bool)) < 0)
+	if (in.read(reinterpret_cast<char*>(&m_glTransEnabled), sizeof(bool)) < 0)
 		return ReadError();
 	if (m_glTransEnabled)
+	{
 		if (!m_glTrans.fromFile(in, dataVersion, flags))
+		{
 			return false;
+		}
+	}
 
 	//'showNameIn3D' state (dataVersion>=24)
 	if (dataVersion >= 24)
 	{
-		if (in.read((char*)&m_showNameIn3D,sizeof(bool)) < 0)
+		if (in.read(reinterpret_cast<char*>(&m_showNameIn3D), sizeof(bool)) < 0)
+		{
 			return WriteError();
+		}
 	}
 	else
 	{

@@ -33,12 +33,20 @@ public:
 	//! Default constructor
 	explicit ccUnrollDlg(QWidget* parent = 0);
 
-	int getType();
-	int getAxisDimension();
-	bool isAxisPositionAuto();
-	CCVector3 getAxisPosition();
-	double getRadius();
-	double getAngle();
+	//! Projection type
+	enum Type { CYLINDER, CONE, STRAIGHTENED_CONE };
+
+	Type getType() const;
+	int getAxisDimension() const;
+	bool isAxisPositionAuto() const;
+	CCVector3 getAxisPosition() const;
+	void getAngleRange(double& start_deg, double& stop_deg) const;
+	double getRadius() const;
+	double getConeHalfAngle() const;
+	bool exportDeviationSF() const;
+
+	void toPersistentSettings() const;
+	void fromPersistentSettings();
 
 protected slots:
 	void shapeTypeChanged(int index);

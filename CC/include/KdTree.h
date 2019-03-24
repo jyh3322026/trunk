@@ -44,7 +44,7 @@ public:
 		\param progressCb the client method can get some notification of the process progress through this callback mechanism (see GenericProgressCallback)
 		\return success
 	**/
-	bool buildFromCloud(GenericIndexedCloud *cloud, GenericProgressCallback *progressCb = 0);
+	bool buildFromCloud(GenericIndexedCloud *cloud, GenericProgressCallback *progressCb = nullptr);
 
 	//! Gets the point cloud from which the tree has been build
 	/** \return associated cloud
@@ -89,9 +89,9 @@ protected:
 		KdCell()
 			: cuttingDim(0)
 			, cuttingCoordinate(0)
-			, leSon(0)
-			, gSon(0)
-			, father(0)
+			, leSon(nullptr)
+			, gSon(nullptr)
+			, father(nullptr)
 			, startingPointIndex(0)
 			, nbPoints(0)
 			, boundsMask(0)
@@ -162,7 +162,7 @@ protected:
 		\param progressCb the client method can get some notification of the process progress through this callback mechanism (see GenericProgressCallback)
 		\return sub tree (cell)
 	**/
-	KdCell* buildSubTree(unsigned first, unsigned last, KdCell *father, unsigned &nbBuildCell, GenericProgressCallback *progressCb = 0);
+	KdCell* buildSubTree(unsigned first, unsigned last, KdCell *father, unsigned &nbBuildCell, GenericProgressCallback *progressCb = nullptr);
 
 	//! Deletes a sub tree
 	void deleteSubTree(KdCell *cell);
@@ -176,7 +176,7 @@ protected:
 	//! Computes the distance between a point and a cell inside bounding box
 	/** \param queryPoint queryPoint coordinates
 		\param cell the cell from which we want to compute the distance
-		\return 0 if the point is inside the cell, the suare of the distance bewteen the two elements if the point is outside
+		\return 0 if the point is inside the cell, the suare of the distance between the two elements if the point is outside
 	**/
 	ScalarType pointToCellSquareDistance(const PointCoordinateType *queryPoint, KdCell *cell);
 
@@ -195,15 +195,15 @@ protected:
 	**/
 	void pointToCellDistances(const PointCoordinateType *queryPoint, KdCell *cell, ScalarType &min, ScalarType &max);
 
-	//! Checks if there is a point in KdCell that is less than minDist-appart from the query point, starting from cell cell
+	//! Checks if there is a point in KdCell that is less than minDist-apart from the query point, starting from cell cell
 	/** \param queryPoint the query Point coordinates
 		\param maxSqrDist square of the maximal distance from querypoint
 		\param cell kdtree-cell from which to start the research
-		\return -1 if there is no nearer point from querypoint. The nearest point index found in cell if there is one that is at most maxdist appart from querypoint
+		\return -1 if there is no nearer point from querypoint. The nearest point index found in cell if there is one that is at most maxdist apart from querypoint
 	**/
 	int checkNearerPointInSubTree(const PointCoordinateType *queryPoint, ScalarType& maxSqrDist, KdCell *cell);
 
-	//! Checks if there is a point in KdCell that is less than minDist-appart from the query point, starting from cell cell
+	//! Checks if there is a point in KdCell that is less than minDist-apart from the query point, starting from cell cell
 	/** Optimiszed version of CheckNearerPointInSubTree since we don't want to find the nearest point, but only check if there is a point that is close enough
 		\param queryPoint the query Point coordinates
 		\param maxSqrDist square of the maximal distance from querypoint

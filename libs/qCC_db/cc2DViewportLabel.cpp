@@ -25,6 +25,7 @@
 
 //Qt
 #include <QDataStream>
+#include <QFontMetrics>
 
 //system
 #include <string.h>
@@ -143,8 +144,8 @@ void cc2DViewportLabel::drawMeOnly(CC_DRAW_CONTEXT& context)
 	glFunc->glLineStipple(1, 0xAAAA);
 	glFunc->glEnable(GL_LINE_STIPPLE);
 
-	const unsigned char* defaultColor = m_selected ? ccColor::red.rgba : context.textDefaultCol.rgb;
-	glFunc->glColor3ubv(defaultColor);
+	const ccColor::Rgb* defaultColor = m_selected ? &ccColor::red : &context.textDefaultCol;
+	glFunc->glColor3ubv(defaultColor->rgb);
 
 	glFunc->glBegin(GL_LINE_LOOP);
 	glFunc->glVertex2f(dx + m_roi[0] * relativeZoom, dy + m_roi[1] * relativeZoom);
@@ -164,9 +165,9 @@ void cc2DViewportLabel::drawMeOnly(CC_DRAW_CONTEXT& context)
 		QFontMetrics titleFontMetrics(titleFont);
 		int titleHeight = titleFontMetrics.height();
 
-		int xStart = (int)(dx + 0.5f*(float)context.glW + std::min<float>(m_roi[0], m_roi[2])*relativeZoom);
-		int yStart = (int)(dy + 0.5f*(float)context.glH + std::min<float>(m_roi[1], m_roi[3])*relativeZoom);
+		int xStart = static_cast<int>(dx + 0.5f * context.glW + std::min<float>(m_roi[0], m_roi[2]) * relativeZoom);
+		int yStart = static_cast<int>(dy + 0.5f * context.glH + std::min<float>(m_roi[1], m_roi[3]) * relativeZoom);
 
-		context.display->displayText(title, xStart, yStart - 5 - titleHeight, ccGenericGLDisplay::ALIGN_DEFAULT, 0, defaultColor, &titleFont);
+		context.display->displayText(title, xStart, yStart - 5 - titleHeight, ccGenericGLDisplay::ALIGN_DEFAULT, 0, defaultColor->rgb, &titleFont);
 	}
 }

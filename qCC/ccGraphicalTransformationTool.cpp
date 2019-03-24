@@ -16,15 +16,15 @@
 //##########################################################################
 
 #include "ccGraphicalTransformationTool.h"
-
-#include "ccMesh.h"
-
-#include "ccGLWindow.h"
 #include "mainwindow.h"
+
+#include <ccGLUtils.h>
+#include <ccGLWindow.h>
 
 //qCC_db
 #include <ccLog.h>
-#include <ccGLUtils.h>
+#include <ccMesh.h>
+
 
 ccGraphicalTransformationTool::ccGraphicalTransformationTool(QWidget* parent)
 	: ccOverlayDialog(parent)
@@ -33,16 +33,16 @@ ccGraphicalTransformationTool::ccGraphicalTransformationTool(QWidget* parent)
 {
 	setupUi(this);
 
-	connect(pauseButton,	SIGNAL(toggled(bool)),	this, SLOT(pause(bool)));
-	connect(okButton,		SIGNAL(clicked()),		this, SLOT(apply()));
-	connect(razButton,		SIGNAL(clicked()),		this, SLOT(reset()));
-	connect(cancelButton,	SIGNAL(clicked()),		this, SLOT(cancel()));
+	connect(pauseButton,    &QAbstractButton::toggled,	this, &ccGraphicalTransformationTool::pause);
+	connect(okButton,       &QAbstractButton::clicked,	this, &ccGraphicalTransformationTool::apply);
+	connect(razButton,	  &QAbstractButton::clicked,	this, &ccGraphicalTransformationTool::reset);
+	connect(cancelButton,   &QAbstractButton::clicked,	this, &ccGraphicalTransformationTool::cancel);
 
 	//add shortcuts
 	addOverridenShortcut(Qt::Key_Space); //space bar for the "pause" button
 	addOverridenShortcut(Qt::Key_Escape); //escape key for the "cancel" button
 	addOverridenShortcut(Qt::Key_Return); //return key for the "ok" button
-	connect(this, SIGNAL(shortcutTriggered(int)), this, SLOT(onShortcutTriggered(int)));
+	connect(this, &ccOverlayDialog::shortcutTriggered, this, &ccGraphicalTransformationTool::onShortcutTriggered);
 }
 
 ccGraphicalTransformationTool::~ccGraphicalTransformationTool()
@@ -119,14 +119,14 @@ bool ccGraphicalTransformationTool::addEntity(ccHObject* entity)
 		return false;
 	}
 
-	//we can't tranform locked entities
+	//we can't transform locked entities
 	if (entity->isLocked())
 	{
 		ccLog::Warning(QString("[Graphical Transformation Tool] Can't transform entity '%1' cause it's locked!").arg(entity->getName()));
 		return false;
 	}
 
-	//we can't tranform child meshes
+	//we can't transform child meshes
 	if (entity->isA(CC_TYPES::MESH) && entity->getParent() && entity->getParent()->isKindOf(CC_TYPES::MESH))
 	{
 		ccLog::Warning(QString("[Graphical Transformation Tool] Entity '%1' can't be modified as it is part of a mesh group. You should 'clone' it first.").arg(entity->getName()));
@@ -200,8 +200,8 @@ bool ccGraphicalTransformationTool::start()
 	m_associatedWin->setPickingMode(ccGLWindow::NO_PICKING);
 	//the user must not close this window!
 	m_associatedWin->setUnclosable(true);
-	connect(m_associatedWin, SIGNAL(rotation(const ccGLMatrixd&)),		this, SLOT(glRotate(const ccGLMatrixd&)));
-	connect(m_associatedWin, SIGNAL(translation(const CCVector3d&)),	this, SLOT(glTranslate(const CCVector3d&)));
+	connect(m_associatedWin, &ccGLWindow::rotation, this, &ccGraphicalTransformationTool::glRotate);
+	connect(m_associatedWin, &ccGLWindow::translation, this, &ccGraphicalTransformationTool::glTranslate);
 	m_associatedWin->displayNewMessage(QString(),ccGLWindow::UPPER_CENTER_MESSAGE); //clear the area
 	m_associatedWin->displayNewMessage("[Rotation/Translation mode]",ccGLWindow::UPPER_CENTER_MESSAGE,false,3600,ccGLWindow::MANUAL_TRANSFORMATION_MESSAGE);
 	m_associatedWin->redraw(true, false);
@@ -262,7 +262,7 @@ void ccGraphicalTransformationTool::glRotate(const ccGLMatrixd& rotMat)
 void ccGraphicalTransformationTool::reset()
 {
 	m_rotation.toIdentity();
-	m_translation = CCVector3d(0,0,0);
+	m_translation = CCVector3d(0, 0, 0);
 
 	updateAllGLTransformations();
 }
@@ -282,11 +282,12 @@ void ccGraphicalTransformationTool::updateAllGLTransformations()
 	newTrans += m_rotationCenter + m_translation - m_rotation * m_rotationCenter;
 
 	ccGLMatrix newTransf(newTrans.data());
-	for (unsigned i=0; i<m_toTransform.getChildrenNumber(); ++i)
+	for (unsigned i = 0; i < m_toTransform.getChildrenNumber(); ++i)
 	{
 		ccHObject* child = m_toTransform.getChild(i);
 		child->setGLTransformation(newTransf);
 		child->prepareDisplayForRefresh_recursive();
+
 	}
 
 	MainWindow::RefreshAllGLWindow(false);
@@ -304,7 +305,7 @@ void ccGraphicalTransformationTool::apply()
 	{
 		//convert matrix back and forth so as to be sure to get a 'true' rotation matrix
 		//DGM: we use Euler angles, as the axis/angle method (formerly used) is not robust
-		//enough! Shifts could be percieved by the user.
+		//enough! Shifts could be perceived by the user.
 		double phi_rad,theta_rad,psi_rad;
 		CCVector3d t3D;
 		finalTrans.getParameters(phi_rad,theta_rad,psi_rad,t3D);
@@ -346,7 +347,7 @@ void ccGraphicalTransformationTool::apply()
 		toTransform->prepareDisplayForRefresh_recursive();
 		MainWindow::TheInstance()->putObjectBackIntoDBTree(toTransform,objContext);
 
-		//specif case: if the object is a mesh vertices set, we may have to update the mesh normals!
+		//special case: if the object is a mesh vertices set, we may have to update the mesh normals!
 		if (toTransform->isA(CC_TYPES::POINT_CLOUD) && toTransform->getParent() && toTransform->getParent()->isKindOf(CC_TYPES::MESH))
 		{
 			ccMesh* mesh = static_cast<ccMesh*>(toTransform->getParent());

@@ -19,27 +19,30 @@
 
 //local
 #include "ccColorScaleEditorWidget.h"
-#include "ccQtHelpers.h"
 #include "ccPersistentSettings.h"
+
+//common
 #include <ccMainAppInterface.h>
+#include <ccQtHelpers.h>
 
 //qCC_db
 #include <ccColorScalesManager.h>
-#include <ccScalarField.h>
+#include <ccFileUtils.h>
 #include <ccPointCloud.h>
+#include <ccScalarField.h>
 
 //Qt
-#include <QHBoxLayout>
 #include <QColorDialog>
-#include <QMessageBox>
-#include <QInputDialog>
 #include <QFileDialog>
+#include <QHBoxLayout>
+#include <QInputDialog>
+#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QSettings>
 #include <QUuid>
 
 //System
-#include <assert.h>
+#include <cassert>
 
 static char s_defaultEmptyCustomListText[] = "(auto)";
 
@@ -52,7 +55,7 @@ ccColorScaleEditorDialog::ccColorScaleEditorDialog(	ccColorScalesManager* manage
 	, m_manager(manager)
 	, m_colorScale(currentScale)
 	, m_scaleWidget(new ccColorScaleEditorWidget(this,Qt::Horizontal))
-	, m_associatedSF(0)
+	, m_associatedSF(nullptr)
 	, m_modified(false)
 	, m_minAbsoluteVal(0.0)
 	, m_maxAbsoluteVal(1.0)
@@ -108,10 +111,6 @@ ccColorScaleEditorDialog::ccColorScaleEditorDialog(	ccColorScalesManager* manage
 	setActiveScale(m_colorScale);
 }
 
-ccColorScaleEditorDialog::~ccColorScaleEditorDialog()
-{
-}
-
 void ccColorScaleEditorDialog::setAssociatedScalarField(ccScalarField* sf)
 {
 	m_associatedSF = sf;
@@ -135,7 +134,7 @@ void ccColorScaleEditorDialog::updateMainComboBox()
 
 	//populate combo box with scale names (and UUID)
 	assert(m_manager);
-	for (ccColorScalesManager::ScalesMap::const_iterator it = m_manager->map().begin(); it != m_manager->map().end(); ++it)
+	for (ccColorScalesManager::ScalesMap::const_iterator it = m_manager->map().constBegin(); it != m_manager->map().constEnd(); ++it)
 		rampComboBox->addItem((*it)->getName(),(*it)->getUuid());
 
 	//find the currently selected scale in the new 'list'
@@ -144,7 +143,7 @@ void ccColorScaleEditorDialog::updateMainComboBox()
 	{
 		pos = rampComboBox->findData(m_colorScale->getUuid());
 		if (pos < 0) //the current color scale has disappeared?!
-			m_colorScale = ccColorScale::Shared(0);
+			m_colorScale = ccColorScale::Shared(nullptr);
 	}
 	rampComboBox->setCurrentIndex(pos);
 
@@ -651,7 +650,7 @@ bool ccColorScaleEditorDialog::saveCurrentScale()
 				if (sf->getColorScale() == m_colorScale)
 				{
 					//trick: we unlink then re-link the color scale to update everything automatically
-					sf->setColorScale(ccColorScale::Shared(0));
+					sf->setColorScale(ccColorScale::Shared(nullptr));
 					sf->setColorScale(m_colorScale);
 
 					if (cloud->getCurrentDisplayedScalarField() == sf)
@@ -792,7 +791,7 @@ void ccColorScaleEditorDialog::exportCurrentScale()
 	//persistent settings
 	QSettings settings;
 	settings.beginGroup(ccPS::SaveFile());
-	QString currentPath = settings.value(ccPS::CurrentPath(),QApplication::applicationDirPath()).toString();
+	QString currentPath = settings.value(ccPS::CurrentPath(), ccFileUtils::defaultDocPath()).toString();
 
 	//ask for a filename
 	QString filename = QFileDialog::getSaveFileName(this,"Select output file",currentPath,"*.xml");
@@ -809,7 +808,7 @@ void ccColorScaleEditorDialog::exportCurrentScale()
 	//try to save the file
 	if (m_colorScale->saveAsXML(filename))
 	{
-		ccLog::Print(QString("[ColorScale] Scale '%1' sucessfully exported in '%2'").arg(m_colorScale->getName()).arg(filename));
+		ccLog::Print(QString("[ColorScale] Scale '%1' successfully exported in '%2'").arg(m_colorScale->getName(),filename));
 	}
 }
 
@@ -818,7 +817,7 @@ void ccColorScaleEditorDialog::importScale()
 	//persistent settings
 	QSettings settings;
 	settings.beginGroup(ccPS::LoadFile());
-	QString currentPath = settings.value(ccPS::CurrentPath(),QApplication::applicationDirPath()).toString();
+	QString currentPath = settings.value(ccPS::CurrentPath(), ccFileUtils::defaultDocPath()).toString();
 
 	//ask for a filename
 	QString filename = QFileDialog::getOpenFileName(this,"Select color scale file",currentPath,"*.xml");

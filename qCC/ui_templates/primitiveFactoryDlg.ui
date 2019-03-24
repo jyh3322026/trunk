@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>615</width>
-    <height>300</height>
+    <width>689</width>
+    <height>353</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -33,7 +33,7 @@
          <item row="0" column="0">
           <widget class="QLabel" name="label">
            <property name="text">
-            <string>dx</string>
+            <string notr="true">dx</string>
            </property>
           </widget>
          </item>
@@ -56,7 +56,7 @@
          <item row="1" column="0">
           <widget class="QLabel" name="label_2">
            <property name="text">
-            <string>dy</string>
+            <string notr="true">dy</string>
            </property>
           </widget>
          </item>
@@ -120,7 +120,7 @@
          <item row="0" column="0">
           <widget class="QLabel" name="label_3">
            <property name="text">
-            <string>dx</string>
+            <string notr="true">dx</string>
            </property>
           </widget>
          </item>
@@ -143,7 +143,7 @@
          <item row="1" column="0">
           <widget class="QLabel" name="label_4">
            <property name="text">
-            <string>dy</string>
+            <string notr="true">dy</string>
            </property>
           </widget>
          </item>
@@ -166,7 +166,7 @@
          <item row="2" column="0">
           <widget class="QLabel" name="label_5">
            <property name="text">
-            <string>dz</string>
+            <string notr="true">dz</string>
            </property>
           </widget>
          </item>
@@ -265,7 +265,7 @@
          </property>
         </spacer>
        </item>
-       <item row="1" column="0">
+       <item row="3" column="0">
         <spacer name="verticalSpacer_3">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -277,6 +277,105 @@
           </size>
          </property>
         </spacer>
+       </item>
+       <item row="1" column="0">
+        <widget class="QGroupBox" name="groupBox">
+         <property name="title">
+          <string>Position</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_7">
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_21">
+            <property name="text">
+             <string notr="true">y</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="spherePosXDoubleSpinBox">
+            <property name="decimals">
+             <number>6</number>
+            </property>
+            <property name="minimum">
+             <double>-1000000000.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>1000000000.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QDoubleSpinBox" name="spherePosYDoubleSpinBox">
+            <property name="decimals">
+             <number>6</number>
+            </property>
+            <property name="minimum">
+             <double>-1000000000.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>1000000000.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QDoubleSpinBox" name="spherePosZDoubleSpinBox">
+            <property name="decimals">
+             <number>6</number>
+            </property>
+            <property name="minimum">
+             <double>-1000000000.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>1000000000.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="label_22">
+            <property name="text">
+             <string notr="true">z</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_20">
+            <property name="text">
+             <string notr="true">x</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0" colspan="2">
+           <layout class="QHBoxLayout" name="horizontalLayout_3">
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QPushButton" name="spherePosToOriginButton">
+              <property name="toolTip">
+               <string>Set position to origin</string>
+              </property>
+              <property name="text">
+               <string>clear</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="spherePosFromClipboardButton">
+              <property name="toolTip">
+               <string>Try to interpret clipboard contents as position (&quot;x y z&quot;)</string>
+              </property>
+              <property name="text">
+               <string>clipboard</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
        </item>
       </layout>
      </widget>

@@ -44,11 +44,61 @@ public:
 	~ccVolumeCalcTool();
 
 	//Inherited from cc2Point5DimEditor
-	virtual double getGridStep() const;
-	virtual unsigned char getProjectionDimension() const;
-	virtual ProjectionType getTypeOfProjection() const;
+	virtual double getGridStep() const override;
+	virtual unsigned char getProjectionDimension() const override;
+	virtual ccRasterGrid::ProjectionType getTypeOfProjection() const override;
 
-protected slots:
+	//! Report info
+	struct ReportInfo
+	{
+		ReportInfo()
+			: volume(0)
+			, addedVolume(0)
+			, removedVolume(0)
+			, surface(0)
+			, matchingPrecent(0)
+			, ceilNonMatchingPercent(0)
+			, groundNonMatchingPercent(0)
+			, averageNeighborsPerCell(0)
+		{}
+
+		QString toText(int precision = 6) const;
+
+		double volume;
+		double addedVolume;
+		double removedVolume;
+		double surface;
+		float matchingPrecent;
+		float ceilNonMatchingPercent;
+		float groundNonMatchingPercent;
+		double averageNeighborsPerCell;
+	};
+
+	//! Static accessor
+	static bool ComputeVolume(	ccRasterGrid& grid,
+								ccGenericPointCloud* ground,
+								ccGenericPointCloud* ceil,
+								const ccBBox& gridBox,
+								unsigned char vertDim,
+								double gridStep,
+								unsigned gridWidth,
+								unsigned gridHeight,
+								ccRasterGrid::ProjectionType projectionType,
+								ccRasterGrid::EmptyCellFillOption groundEmptyCellFillStrategy,
+								ccRasterGrid::EmptyCellFillOption ceilEmptyCellFillStrategy,
+								ccVolumeCalcTool::ReportInfo& reportInfo,
+								double groundHeight,
+								double ceilHeight,
+								QWidget* parentWidget = 0);
+
+	//! Converts a (volume) grid to a point cloud
+	static ccPointCloud* ConvertGridToCloud(	ccRasterGrid& grid,
+												const ccBBox& gridBox,
+												unsigned char vertDim,
+												bool exportToOriginalCS);
+
+	
+	protected slots:
 
 	//! Accepts the dialog and save settings
 	void saveSettingsAndAccept();
@@ -63,7 +113,7 @@ protected slots:
 	void sfProjectionTypeChanged(int);
 
 	//Inherited from cc2Point5DimEditor
-	virtual bool showGridBoxEditor();
+	virtual bool showGridBoxEditor() override;
 
 	//! Called when the (ground) empty cell filling strategy changes
 	void groundFillEmptyCellStrategyChanged(int);
@@ -99,7 +149,7 @@ protected slots:
 protected: //standard methods
 
 	//Inherited from cc2Point5DimEditor
-	virtual void gridIsUpToDate(bool state);
+	virtual void gridIsUpToDate(bool state) override;
 
 	//! Load persistent settings
 	void loadSettings();
@@ -109,30 +159,6 @@ protected: //standard methods
 
 	//! Converts the grid to a point cloud
 	ccPointCloud* convertGridToCloud(bool exportToOriginalCS) const;
-
-	//! Report info
-	struct ReportInfo
-	{
-		ReportInfo()
-			: volume(0)
-			, addedVolume(0)
-			, removedVolume(0)
-			, surface(0)
-			, matchingPrecent(0)
-			, ceilNonMatchingPercent(0)
-			, groundNonMatchingPercent(0)
-			, averageNeighborsPerCell(0)
-		{}
-
-		double volume;
-		double addedVolume;
-		double removedVolume;
-		double surface;
-		float matchingPrecent;
-		float ceilNonMatchingPercent;
-		float groundNonMatchingPercent;
-		double averageNeighborsPerCell;
-	};
 
 	//! Outputs the report
 	void outputReport(const ReportInfo& info);

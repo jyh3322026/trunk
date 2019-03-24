@@ -19,24 +19,15 @@
 #include "GenericProgressCallback.h"
 
 //system
-#include <assert.h>
-#include <math.h>
+#include <cassert>
 
 #ifdef USE_QT
 
 //we use Qt for the atomic counter
 #include <QAtomicInt>
 
-//! Qt 4/5 compatible QAtomicInt
 class AtomicCounter : public QAtomicInt
 {
-public:
-	AtomicCounter() : QAtomicInt(0) {}
-
-#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
-	inline int load() { return *this; }
-	inline void store(int value) { *static_cast<QAtomicInt*>(this) = value; }
-#endif
 };
 
 #else

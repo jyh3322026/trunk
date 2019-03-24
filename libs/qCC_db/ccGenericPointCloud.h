@@ -18,16 +18,20 @@
 #ifndef CC_GENERIC_POINT_CLOUD_HEADER
 #define CC_GENERIC_POINT_CLOUD_HEADER
 
-//CCLib
-#include <GenericProgressCallback.h>
-#include <ReferenceCloud.h>
-
 //Local
-#include "ccGenericGLDisplay.h"
-#include "ccShiftedObject.h"
 #include "ccAdvancedTypes.h"
 #include "ccOctree.h"
+#include "ccShiftedObject.h"
 
+//System
+#include <vector>
+
+namespace CCLib
+{
+	class GenericProgressCallback;
+	class ReferenceCloud;
+}
+	
 class ccOctreeProxy;
 
 /***************************************************
@@ -48,7 +52,7 @@ class ccOctreeProxy;
 	- an octree strucutre
 	- visibility information per point (to hide/display subsets of points)
 **/
-class QCC_DB_LIB_API ccGenericPointCloud : public ccShiftedObject,  virtual public CCLib::GenericIndexedCloudPersist
+class QCC_DB_LIB_API ccGenericPointCloud : public ccShiftedObject,  public CCLib::GenericIndexedCloudPersist
 {
 	friend class ccMesh;
 
@@ -61,9 +65,9 @@ public:
 	ccGenericPointCloud(const ccGenericPointCloud& cloud);
 
 	//! Default destructor
-	virtual ~ccGenericPointCloud();
-
-
+	~ccGenericPointCloud() override;
+	
+	
 	/***************************************************
 						Clone/Copy
 	***************************************************/
@@ -75,9 +79,9 @@ public:
 		\param ignoreChildren [optional] whether to ignore the cloud's children or not (in which case they will be cloned as well)
 		\return a copy of this entity
 	**/
-	virtual ccGenericPointCloud* clone(ccGenericPointCloud* destCloud = 0, bool ignoreChildren = false) = 0;
-
-
+	virtual ccGenericPointCloud* clone(ccGenericPointCloud* destCloud = nullptr, bool ignoreChildren = false) = 0;
+	
+	
 	/***************************************************
 				Features deletion/clearing
 	***************************************************/
@@ -101,8 +105,8 @@ public:
 		\param autoAddChild whether to automatically add the computed octree as child of this cloud or not
 		\return the computed octree
 	**/
-	virtual ccOctree::Shared computeOctree(CCLib::GenericProgressCallback* progressCb = 0, bool autoAddChild = true);
-
+	virtual ccOctree::Shared computeOctree(CCLib::GenericProgressCallback* progressCb = nullptr, bool autoAddChild = true);
+	
 	//! Returns the associated octree (if any)
 	virtual ccOctree::Shared getOctree() const;
 	//! Sets the associated octree
@@ -123,14 +127,14 @@ public:
 		It may even be 0 if the value shouldn't be displayed.
 		WARNING: scalar field must be enabled! (see ccDrawableObject::hasDisplayedScalarField)
 	**/
-	virtual const ColorCompType* geScalarValueColor(ScalarType d) const = 0;
+	virtual const ccColor::Rgb* geScalarValueColor(ScalarType d) const = 0;
 
 	//! Returns color corresponding to a given point associated scalar value
 	/** The returned value depends on the current scalar field display parameters.
 		It may even be 0 if the value shouldn't be displayed.
 		WARNING: scalar field must be enabled! (see ccDrawableObject::hasDisplayedScalarField)
 	**/
-	virtual const ColorCompType* getPointScalarValueColor(unsigned pointIndex) const = 0;
+	virtual const ccColor::Rgb* getPointScalarValueColor(unsigned pointIndex) const = 0;
 
 	//! Returns scalar value associated to a given point
 	/** The returned value is taken from the current displayed scalar field
@@ -139,17 +143,17 @@ public:
 	virtual ScalarType getPointDisplayedDistance(unsigned pointIndex) const = 0;
 
 	//! Returns color corresponding to a given point
-	/** WARNING: color array must be enabled! (see ccDrawableObject::hasDisplayedScalarField)
+	/** WARNING: color array must be enabled! (see ccDrawableObject::hasColors)
 	**/
-	virtual const ColorCompType* getPointColor(unsigned pointIndex) const = 0;
+	virtual const ccColor::Rgb& getPointColor(unsigned pointIndex) const = 0;
 
 	//! Returns compressed normal corresponding to a given point
-	/** WARNING: normals array must be enabled! (see ccDrawableObject::hasDisplayedScalarField)
+	/** WARNING: normals array must be enabled! (see ccDrawableObject::hasNormals)
 	**/
 	virtual const CompressedNormType& getPointNormalIndex(unsigned pointIndex) const = 0;
 
 	//! Returns normal corresponding to a given point
-	/** WARNING: normals array must be enabled! (see ccDrawableObject::hasDisplayedScalarField)
+	/** WARNING: normals array must be enabled! (see ccDrawableObject::hasNormals)
 	**/
 	virtual const CCVector3& getPointNormal(unsigned pointIndex) const = 0;
 
@@ -161,17 +165,21 @@ public:
 	//! Array of "visibility" information for each point
 	/** See <CCConst.h>
 	**/
-	typedef GenericChunkedArray<1,unsigned char> VisibilityTableType;
-
+	using VisibilityTableType = std::vector<unsigned char>;
+	
 	//! Returns associated visiblity array
-	virtual inline VisibilityTableType* getTheVisibilityArray() { return m_pointsVisibility; }
+	virtual inline VisibilityTableType& getTheVisibilityArray() { return m_pointsVisibility; }
+
+	//! Returns associated visiblity array (const version)
+	virtual inline const VisibilityTableType& getTheVisibilityArray() const { return m_pointsVisibility; }
 
 	//! Returns a ReferenceCloud equivalent to the visiblity array
 	/** \param visTable visibility table (optional, otherwise the cloud's default one will be used)
+		\param silent don't issue warnings if no visible point is present
 		\return the visible points as a ReferenceCloud
 	**/
-	virtual CCLib::ReferenceCloud* getTheVisiblePoints(VisibilityTableType* visTable = 0) const;
-
+	virtual CCLib::ReferenceCloud* getTheVisiblePoints(const VisibilityTableType* visTable = nullptr, bool silent = false) const;
+	
 	//! Returns whether the visiblity array is allocated or not
 	virtual bool isVisibilityTableInstantiated() const;
 
@@ -186,26 +194,25 @@ public:
 	//! Erases the points visibility information
 	virtual void unallocateVisibilityArray();
 
+
 	/***************************************************
 					Other methods
 	***************************************************/
 
-	//Inherited from GenericCloud
-	virtual unsigned char testVisibility(const CCVector3& P) const override;
-
 	//Inherited from ccHObject
-	virtual ccBBox getOwnBB(bool withGLFeatures = false) override;
-
+	ccBBox getOwnBB(bool withGLFeatures = false) override;
+	
 	//! Forces bounding-box update
 	virtual void refreshBB() = 0;
 
 	//! Creates a new point cloud with only the 'visible' points (as defined by the visibility array)
 	/** \param removeSelectedPoints if true, exported point are also removed from the current point cloud
 		\param visTable visibility table (optional, otherwise the cloud's default one will be used)
+		\param silent don't issue a warning message if there's no point to keep
 		\return new point cloud with selected points
 	**/
-	virtual ccGenericPointCloud* createNewCloudFromVisibilitySelection(bool removeSelectedPoints = false, VisibilityTableType* visTable = 0) = 0;
-
+	virtual ccGenericPointCloud* createNewCloudFromVisibilitySelection(bool removeSelectedPoints = false, VisibilityTableType* visTable = nullptr, bool silent = false) = 0;
+	
 	//! Applies a rigid transformation (rotation + translation)
 	virtual void applyRigidTransformation(const ccGLMatrix& trans) = 0;
 
@@ -220,15 +227,15 @@ public:
 	//! Multiplies all coordinates by constant factors (one per dimension)
 	/** WARNING: attached octree may be deleted.
 		\param fx multiplication factor along the X dimension
-        \param fy multiplication factor along the Y dimension
-        \param fz multiplication factor along the Z dimension
+		\param fy multiplication factor along the Y dimension
+		\param fz multiplication factor along the Z dimension
 		\param center scaling center (0,0,0) by default
-    **/
-	virtual void scale(PointCoordinateType fx, PointCoordinateType fy, PointCoordinateType fz, CCVector3 center = CCVector3(0,0,0)) = 0;
+	**/
+	virtual void scale(PointCoordinateType fx, PointCoordinateType fy, PointCoordinateType fz, CCVector3 center = CCVector3(0, 0, 0)) = 0;
 
 	//inherited from ccSerializableObject
-	virtual bool isSerializable() const override { return true; }
-
+	bool isSerializable() const override { return true; }
+	
 	//! Sets point size
 	/** Overrides default value one if superior than 0
 		(see glPointSize).
@@ -258,16 +265,15 @@ public:
 						bool autoComputeOctree = false);
 
 protected:
-
 	//inherited from ccHObject
-	virtual bool toFile_MeOnly(QFile& out) const override;
-	virtual bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
-
+	bool toFile_MeOnly(QFile& out) const override;
+	bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
+	
 	//! Per-point visibility table
 	/** If this table is allocated, only values set to POINT_VISIBLE
 		will be considered as visible/selected.
 	**/
-	VisibilityTableType* m_pointsVisibility;
+	VisibilityTableType m_pointsVisibility;
 
 	//! Point size (won't be applied if 0)
 	unsigned char m_pointSize;

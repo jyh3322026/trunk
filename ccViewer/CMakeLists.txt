@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project( ccViewer VERSION 1.36.0 )
+project( ccViewer VERSION 1.38.0 )
 
 include_directories( ${CC_FBO_LIB_SOURCE_DIR}/include )
 include_directories( ${CC_CORE_LIB_SOURCE_DIR}/include )
@@ -10,29 +10,30 @@ if( MSVC )
 endif()
 include_directories( ${QCC_IO_LIB_SOURCE_DIR} )
 include_directories( ${QCC_GL_LIB_SOURCE_DIR} )
-
 include_directories( ${CloudComparePlugins_SOURCE_DIR} )
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR} )
+include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/../common )
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/../qCC )
 include_directories( ${CMAKE_CURRENT_BINARY_DIR} )
 
-set( QCC_HEADERS ../qCC/ccOverlayDialog.h ../qCC/ccCameraParamEditDlg.h ../qCC/ccDisplayOptionsDlg.h ../qCC/ccMouse3DContextMenu.h ../qCC/ccStereoModeDlg.h )
-set( QCC_SOURCES ../qCC/ccOverlayDialog.cpp ../qCC/ccCameraParamEditDlg.cpp ../qCC/ccDisplayOptionsDlg.cpp ../qCC/ccMouse3DContextMenu.cpp ../qCC/ccStereoModeDlg.cpp )
-set( QCC_DIALOGS ../qCC/ui_templates/cameraParamDlg.ui ../qCC/ui_templates/displayOptionsDlg.ui ../qCC/ui_templates/stereoModeDlg.ui )
+file( GLOB header_list *.h )
+file( GLOB source_list *.cpp )
 
-file( GLOB header_list *.h ${QCC_HEADERS} )
-file( GLOB source_list *.cpp ${QCC_SOURCES} )
-file( GLOB ui_list ui_templates/*.ui ${QCC_DIALOGS} )
+file( GLOB ui_list ui_templates/*.ui )
 file( GLOB qrc_list ../qCC/*.qrc )
 file( GLOB rc_list ../qCC/*.rc )
 
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../common ${CMAKE_CURRENT_BINARY_DIR}/common)
+
 # 3DX support (3dConnexion devices)
 if ( ${OPTION_SUPPORT_3DCONNEXION_DEVICES} )
-	file( GLOB 3DX_header_list ../qCC/devices/3dConnexion/*.h )
-	file( GLOB 3DX_source_list ../qCC/devices/3dConnexion/*.cpp )
-	list( APPEND header_list ${3DX_header_list} )
-	list( APPEND source_list ${3DX_source_list} )
-endif()	
+	add_subdirectory( ../qCC/devices/3dConnexion devices/3dConnexion )
+endif()
+
+# Gamepad support (requires Qt 5.7+)
+if ( ${OPTION_SUPPORT_GAMEPADS} )
+	add_subdirectory( ../qCC/devices/gamepad devices/gamepad )
+endif()
 
 qt5_wrap_ui( generated_ui_list ${ui_list} )
 qt5_add_resources( generated_qrc_list ${qrc_list} )
@@ -56,7 +57,7 @@ target_link_libraries( ${PROJECT_NAME} QCC_IO_LIB )
 target_link_libraries( ${PROJECT_NAME} QCC_GL_LIB )
 
 # Qt
-qt5_use_modules(${PROJECT_NAME} Core Gui Widgets OpenGL)
+target_link_libraries(${PROJECT_NAME} Qt5::Core Qt5::Gui Qt5::Widgets Qt5::OpenGL)
 if (WIN32)
 	target_link_libraries( ${PROJECT_NAME} Qt5::WinMain )
 endif()
@@ -65,7 +66,7 @@ endif()
 if ( APPLE )
 	target_link_contrib( ${PROJECT_NAME} ${CLOUDCOMPARE_MAC_FRAMEWORK_DIR} )
 elseif( UNIX )
-  target_link_contrib( ${PROJECT_NAME} lib/cloudcompare )
+	target_link_contrib( ${PROJECT_NAME} ${CMAKE_INSTALL_LIBDIR}/cloudcompare )
 else()
 	target_link_contrib( ${PROJECT_NAME} ${CCVIEWER_DEST_FOLDER} )
 endif()
@@ -73,6 +74,11 @@ endif()
 # 3dConnexion devices support
 if ( ${OPTION_SUPPORT_3DCONNEXION_DEVICES} )
 	target_link_3DXWARE( ${PROJECT_NAME} )
+endif()
+
+# Gamepad support (requires Qt 5.7+)
+if ( ${OPTION_SUPPORT_GAMEPADS} )
+	target_link_GAMEPADS( ${PROJECT_NAME} )
 endif()
 
 # Add custom preprocessor definitions
@@ -102,7 +108,7 @@ set( auxFiles bin_other/license.txt )
 
 if( WIN32 )
 	# Export Qt dlls
-	install_Qt_Dlls( ${CCVIEWER_DEST_FOLDER} )
+	install_Qt_Dlls( ${CCVIEWER_DEST_FOLDER} ${OPTION_SUPPORT_GAMEPADS} )
 	install_Qt5_plugins( ${CCVIEWER_DEST_FOLDER} )
 
 	# Additional auxiliary file(s)
@@ -111,28 +117,28 @@ endif()
 
 # Install auxiliary files
 if(APPLE OR WIN32) # For Linux it's already installed in by qCC
-foreach( filename ${auxFiles} )
-	install_ext( FILES ${filename} ${CCVIEWER_DEST_FOLDER} )
-endforeach()
+	foreach( filename ${auxFiles} )
+		install_ext( FILES ${filename} ${CCVIEWER_DEST_FOLDER} )
+	endforeach()
 endif()
 
 # Put together our App bundle on Mac OS X
 if( APPLE )
-   set_target_properties( ${PROJECT_NAME} PROPERTIES
-       INSTALL_RPATH "@loader_path/../Frameworks"
-       MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Mac/ccViewer.plist )
+	set_target_properties( ${PROJECT_NAME} PROPERTIES
+		INSTALL_RPATH "@executable_path/../Frameworks"
+		MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Mac/ccViewer.plist )
 
-   set( MACOSX_BUNDLE_ICON_FILE cc_viewer_icon.icns )
-   set( MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}" )
-   set( MACOSX_BUNDLE_LONG_VERSION_STRING "${PROJECT_VERSION}" )
-   set( MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}" )
+	set( MACOSX_BUNDLE_ICON_FILE cc_viewer_icon.icns )
+	set( MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}" )
+	set( MACOSX_BUNDLE_LONG_VERSION_STRING "${PROJECT_VERSION}" )
+	set( MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}" )
 
-   add_subdirectory( Mac )
+	add_subdirectory( Mac )
 endif( APPLE )
 
 # Export common shader files to all install destinations
 if( APPLE )
-   install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/../qCC/shaders/ColorRamp/color_ramp.frag DESTINATION ${CCVIEWER_MAC_BASE_DIR}/Contents/Shaders/ColorRamp )
+	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/../qCC/shaders/ColorRamp/color_ramp.frag DESTINATION ${CCVIEWER_MAC_BASE_DIR}/Contents/Shaders/ColorRamp )
 elseif( WIN32 ) # For Linux it's already installed in by qCC
-   install_ext( FILES ${CMAKE_CURRENT_SOURCE_DIR}/../qCC/shaders/ColorRamp/color_ramp.frag ${CCVIEWER_DEST_FOLDER} /shaders/ColorRamp )
+	install_ext( FILES ${CMAKE_CURRENT_SOURCE_DIR}/../qCC/shaders/ColorRamp/color_ramp.frag ${CCVIEWER_DEST_FOLDER} /shaders/ColorRamp )
 endif()

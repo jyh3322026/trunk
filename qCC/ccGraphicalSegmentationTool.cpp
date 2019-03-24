@@ -19,7 +19,7 @@
 
 //Local
 #include "mainwindow.h"
-#include "ccEntityPickerDlg.h"
+#include "ccItemSelectionDlg.h"
 
 //CCLib
 #include <ManualSegmentationTools.h>
@@ -235,7 +235,7 @@ void ccGraphicalSegmentationTool::removeAllEntities(bool unallocateVisibilityArr
 {
 	if (unallocateVisibilityArrays)
 	{
-		for (QSet<ccHObject*>::const_iterator p = m_toSegment.begin(); p != m_toSegment.end(); ++p)
+		for (QSet<ccHObject*>::const_iterator p = m_toSegment.constBegin(); p != m_toSegment.constEnd(); ++p)
 		{
 			ccHObjectCaster::ToGenericPointCloud(*p)->unallocateVisibilityArray();
 		}
@@ -269,7 +269,7 @@ void ccGraphicalSegmentationTool::reset()
 {
 	if (m_somethingHasChanged)
 	{
-		for (QSet<ccHObject*>::const_iterator p = m_toSegment.begin(); p != m_toSegment.end(); ++p)
+		for (QSet<ccHObject*>::const_iterator p = m_toSegment.constBegin(); p != m_toSegment.constEnd(); ++p)
 		{
 			ccHObjectCaster::ToGenericPointCloud(*p)->resetVisibilityArray();
 		}
@@ -291,12 +291,7 @@ bool ccGraphicalSegmentationTool::addEntity(ccHObject* entity)
 	/*if (entity->isLocked())
 		ccLog::Warning(QString("Can't use entity [%1] cause it's locked!").arg(entity->getName()));
 	else */
-	if (entity->getDisplay() != m_associatedWin)
-	{
-		ccLog::Warning(QString("[Graphical Segmentation Tool] Can't use entity [%1] cause it's not displayed in the active 3D view!").arg(entity->getName()));
-		return false;
-	}
-	if (!entity->isVisible() || !entity->isBranchEnabled())
+	if (!entity->isDisplayedIn(m_associatedWin))
 	{
 		ccLog::Warning(QString("[Graphical Segmentation Tool] Entity [%1] is not visible in the active 3D view!").arg(entity->getName()));
 	}
@@ -350,7 +345,7 @@ bool ccGraphicalSegmentationTool::addEntity(ccHObject* entity)
 			ccGenericMesh* mesh = ccHObjectCaster::ToGenericMesh(entity);
 
 			//first, we must check that there's no mesh and at least one of its sub-mesh mixed in the current selection!
-			for (QSet<ccHObject*>::const_iterator p = m_toSegment.begin(); p != m_toSegment.end(); ++p)
+			for (QSet<ccHObject*>::const_iterator p = m_toSegment.constBegin(); p != m_toSegment.constEnd(); ++p)
 			{
 				if ((*p)->isKindOf(CC_TYPES::MESH))
 				{
@@ -406,8 +401,9 @@ void ccGraphicalSegmentationTool::updatePolyLine(int x, int y, Qt::MouseButtons 
 	unsigned vertCount = m_polyVertices->size();
 
 	//new point (expressed relatively to the screen center)
-	CCVector3 P(static_cast<PointCoordinateType>(x - m_associatedWin->width()/2),
-				static_cast<PointCoordinateType>(m_associatedWin->height()/2 - y),
+	QPointF pos2D = m_associatedWin->toCenteredGLCoordinates(x, y);
+	CCVector3 P(static_cast<PointCoordinateType>(pos2D.x()),
+				static_cast<PointCoordinateType>(pos2D.y()),
 				0);
 
 	if (m_state & RECTANGLE)
@@ -469,8 +465,9 @@ void ccGraphicalSegmentationTool::addPointToPolyline(int x, int y)
 		return;
 
 	//new point
-	CCVector3 P(static_cast<PointCoordinateType>(x - m_associatedWin->width()/2),
-				static_cast<PointCoordinateType>(m_associatedWin->height()/2 - y),
+	QPointF pos2D = m_associatedWin->toCenteredGLCoordinates(x, y);
+	CCVector3 P(static_cast<PointCoordinateType>(pos2D.x()),
+				static_cast<PointCoordinateType>(pos2D.y()),
 				0);
 
 	//CTRL key pressed at the same time?
@@ -633,13 +630,13 @@ void ccGraphicalSegmentationTool::segment(bool keepPointsInside)
 	const double half_h = camera.viewport[3] / 2.0;
 
 	//for each selected entity
-	for (QSet<ccHObject*>::const_iterator p = m_toSegment.begin(); p != m_toSegment.end(); ++p)
+	for (QSet<ccHObject*>::const_iterator p = m_toSegment.constBegin(); p != m_toSegment.constEnd(); ++p)
 	{
 		ccGenericPointCloud* cloud = ccHObjectCaster::ToGenericPointCloud(*p);
 		assert(cloud);
 
-		ccGenericPointCloud::VisibilityTableType* visibilityArray = cloud->getTheVisibilityArray();
-		assert(visibilityArray);
+		ccGenericPointCloud::VisibilityTableType& visibilityArray = cloud->getTheVisibilityArray();
+		assert(!visibilityArray.empty());
 
 		unsigned cloudSize = cloud->size();
 
@@ -647,9 +644,9 @@ void ccGraphicalSegmentationTool::segment(bool keepPointsInside)
 #if defined(_OPENMP)
 #pragma omp parallel for
 #endif
-		for (int i=0; i<static_cast<int>(cloudSize); ++i)
+		for (int i = 0; i < static_cast<int>(cloudSize); ++i)
 		{
-			if (visibilityArray->getValue(i) == POINT_VISIBLE)
+			if (visibilityArray[i] == POINT_VISIBLE)
 			{
 				const CCVector3* P3D = cloud->getPoint(i);
 
@@ -661,7 +658,7 @@ void ccGraphicalSegmentationTool::segment(bool keepPointsInside)
 				
 				bool pointInside = CCLib::ManualSegmentationTools::isPointInsidePoly(P2D, m_segmentationPoly);
 
-				visibilityArray->setValue(i, keepPointsInside != pointInside ? POINT_HIDDEN : POINT_VISIBLE );
+				visibilityArray[i] = (keepPointsInside != pointInside ? POINT_HIDDEN : POINT_VISIBLE);
 			}
 		}
 	}
@@ -775,16 +772,14 @@ void ccGraphicalSegmentationTool::doActionUseExistingPolyline()
 
 		if (!polylines.empty())
 		{
-			ccEntityPickerDlg epDlg(polylines, false, 0, this);
-			if (!epDlg.exec())
+			int index = ccItemSelectionDlg::SelectEntity(polylines, 0, this);
+			if (index < 0)
 				return;
-
-			int index = epDlg.getSelectedIndex();
 			assert(index >= 0 && index < static_cast<int>(polylines.size()));
 			assert(polylines[index]->isA(CC_TYPES::POLY_LINE));
 			ccPolyline* poly = static_cast<ccPolyline*>(polylines[index]);
 
-			//look for an asociated viewport
+			//look for an associated viewport
 			ccHObject::Container viewports;
 			if (poly->filterChildren(viewports, false, CC_TYPES::VIEWPORT_2D_OBJECT, true) == 1)
 			{
@@ -819,7 +814,7 @@ void ccGraphicalSegmentationTool::doActionUseExistingPolyline()
 			if (	m_polyVertices->reserve(vertices->size() + (poly->isClosed() ? 0 : 1))
 				&&	m_segmentationPoly->reserve(poly->size() + (poly->isClosed() ? 0 : 1)))
 			{
-				for (unsigned i=0; i<vertices->size(); ++i)
+				for (unsigned i = 0; i < vertices->size(); ++i)
 				{
 					CCVector3 P = *vertices->getPoint(i);
 					if (mode3D)
@@ -928,6 +923,36 @@ void ccGraphicalSegmentationTool::doExportSegmentationPolyline()
 				assert(false);
 				ccLog::Warning("[Segmentation] Failed to convert 2D polyline to 3D! (internal inconsistency)");
 				mode2D = false;
+			}
+
+			//export Global Shift & Scale info (if any)
+			bool hasGlobalShift = false;
+			CCVector3d globalShift(0, 0, 0);
+			double globalScale = 1.0;
+			{
+				for (QSet<ccHObject*>::const_iterator it = m_toSegment.constBegin(); it != m_toSegment.constEnd(); ++it)
+				{
+					ccShiftedObject* shifted = ccHObjectCaster::ToShifted(*it);
+					bool isShifted = (shifted && shifted->isShifted());
+					if (isShifted)
+					{
+						globalShift = shifted->getGlobalShift();
+						globalScale = shifted->getGlobalScale();
+						hasGlobalShift = true;
+						break;
+					}
+				}
+			}
+
+			if (hasGlobalShift && m_toSegment.size() != 1)
+			{
+				hasGlobalShift = (QMessageBox::question(MainWindow::TheInstance(), "Apply Global Shift", "At least one of the segmented entity has been shifted. Apply the same shift to the polyline?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes);
+			}
+
+			if (hasGlobalShift)
+			{
+				poly->setGlobalShift(globalShift);
+				poly->setGlobalScale(globalScale);
 			}
 		}
 		

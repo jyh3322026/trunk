@@ -15,40 +15,38 @@
 //#                                                                        #
 //##########################################################################
 
-#include "ccCommon.h"
-
 #include "ccAboutDialog.h"
+#include "ccApplication.h"
 
 #include "ui_aboutDlg.h"
 
-
-ccAboutDialog::ccAboutDialog( QWidget *parent )
-	: QDialog( parent )
-	, mUI( new Ui::AboutDialog )
+ccAboutDialog::ccAboutDialog(QWidget *parent)
+	: QDialog(parent)
+	, mUI(new Ui::AboutDialog)
 {
-	setAttribute( Qt::WA_DeleteOnClose );
-	
+	setAttribute(Qt::WA_DeleteOnClose);
+
 	mUI->setupUi(this);
-	
+
 	QString compilationInfo;
 
-	compilationInfo = ccCommon::GetCCVersion();
-	compilationInfo += QString("<br><i>Compiled with");
+	compilationInfo = ccApp->versionLongStr(true);
+	compilationInfo += QStringLiteral("<br><i>Compiled with");
 
 #if defined(_MSC_VER)
-	compilationInfo += QString(" MSVC %1 and").arg(_MSC_VER);
+	compilationInfo += QStringLiteral(" MSVC %1 and").arg(_MSC_VER);
 #endif
 
-	compilationInfo += QString(" Qt %1").arg(QT_VERSION_STR);
-	compilationInfo += QString("</i>");
-	
-	QString htmlText = mUI->textEdit->toHtml();
+	compilationInfo += QStringLiteral(" Qt %1").arg(QT_VERSION_STR);
+	compilationInfo += QStringLiteral("</i>");
+
+	QString htmlText = mUI->labelText->text();
 	QString enrichedHtmlText = htmlText.arg(compilationInfo);
-	
-	mUI->textEdit->setHtml(enrichedHtmlText);
+
+	mUI->labelText->setText(enrichedHtmlText);
 }
 
 ccAboutDialog::~ccAboutDialog()
-{	
+{
 	delete mUI;
 }

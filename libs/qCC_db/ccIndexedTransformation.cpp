@@ -22,9 +22,8 @@
 #include <QTextStream>
 
 //System
-#include <math.h>
-#include <string.h>
 #include <assert.h>
+#include <string>
 
 ccIndexedTransformation::ccIndexedTransformation()
 	: ccGLMatrix()
@@ -57,6 +56,7 @@ bool ccIndexedTransformation::toAsciiFile(QString filename, int precision/*=12*/
 		return false;
 
 	QTextStream stream(&fp);
+	stream.setRealNumberNotation(QTextStream::FixedNotation);
 	stream.setRealNumberPrecision(precision);
 
 	//save transformation first (so that it can be loaded as a ccGLMatrix!)
@@ -153,7 +153,7 @@ ccIndexedTransformation ccIndexedTransformation::Interpolate(	double index,
 																const ccIndexedTransformation& trans2)
 {
 	double dt = trans2.getIndex() - trans1.getIndex();
-	if (dt == 0)
+	if (dt == 0.0)
 	{
 		assert(index == trans1.getIndex());
 		return trans1;

@@ -26,7 +26,7 @@
 #endif
 
 //System
-#include <stdint.h>
+#include <cstdint>
 
 /** Versions:
 	V1.0 = prior to 05/04/2012 = old version
@@ -55,8 +55,12 @@
 	v4.2 - 10/07/2015 - Global shift added to the ccScalarField structure
 	v4.3 - 01/07/2016 - Additional intrinsic parameters of a camera sensor (optical center)
 	v4.4 - 07/07/2016 - Full WaveForm data added to point clouds
+	v4.5 - 10/06/2016 - Transformation history is now saved
+	v4.6 - 11/03/2016 - Null normal vector code added
+	v4.7 - 12/22/2016 - Return index added to ccWaveform
+	v4.8 - 10/19/2018 - The CC_CAMERA_BIT and CC_QUADRIC_BIT were wrongly defined
 **/
-const unsigned c_currentDBVersion = 44; //4.4
+const unsigned c_currentDBVersion = 48; //4.8
 
 //! Default unique ID generator (using the system persistent settings as we did previously proved to be not reliable)
 static ccUniqueIDGenerator::Shared s_uniqueIDGenerator(new ccUniqueIDGenerator);
@@ -96,7 +100,7 @@ unsigned ccObject::GetLastUniqueID()
 	return s_uniqueIDGenerator ? s_uniqueIDGenerator->getLast() : 0;
 }
 
-ccObject::ccObject(QString name)
+ccObject::ccObject(const QString& name)
 	: m_name(name.isEmpty() ? "unnamed" : name)
 	, m_flags(CC_ENABLED)
 	, m_uniqueID(GetNextUniqueID())
@@ -138,7 +142,7 @@ bool ccObject::toFile(QFile& out) const
 		return WriteError();
 
 	//unique ID (dataVersion>=20)
-	//DGM: this ID will be usefull to recreate dynamic links between entities!
+	//DGM: this ID will be useful to recreate dynamic links between entities!
 	uint32_t uniqueID = (uint32_t)m_uniqueID;
 	if (out.write((const char*)&uniqueID,4) < 0)
 		return WriteError();
@@ -156,17 +160,30 @@ bool ccObject::toFile(QFile& out) const
 
 	//meta data (dataVersion>=30)
 	{
+		//check for valid pieces of meta-data
+		//DGM: some pieces of meta-data can't be properly streamed (the ones relying on 'Q_DECLARE_METATYPE' calls typically)
+		uint32_t validMetaDataCount = 0;
+		for (QVariantMap::const_iterator it = m_metaData.begin(); it != m_metaData.end(); ++it)
+		{
+			if (!it.key().contains(".nosave"))
+			{
+				++validMetaDataCount;
+			}
+		}
+
 		//count
-		uint32_t metaDataCount = (uint32_t)m_metaData.size();
-		if (out.write((const char*)&metaDataCount,4) < 0)
+		if (out.write((const char*)&validMetaDataCount, 4) < 0)
 			return WriteError();
 
 		//"key + value" pairs
 		QDataStream outStream(&out);
 		for (QVariantMap::const_iterator it = m_metaData.begin(); it != m_metaData.end(); ++it)
 		{
-			outStream << it.key();
-			outStream << it.value();
+			if (!it.key().contains(".nosave"))
+			{
+				outStream << it.key();
+				outStream << it.value();
+			}
 		}
 	}
 
@@ -197,17 +214,17 @@ CC_CLASS_ENUM ccObject::ReadClassIDFromFile(QFile& in, short dataVersion)
 	return classID;
 }
 
-QVariant ccObject::getMetaData(QString key) const
+QVariant ccObject::getMetaData(const QString& key) const
 {
 	return m_metaData.value(key,QVariant());
 }
 
-bool ccObject::removeMetaData(QString key)
+bool ccObject::removeMetaData(const QString& key)
 {
 	return m_metaData.remove(key) != 0;
 }
 
-void ccObject::setMetaData(QString key, QVariant data)
+void ccObject::setMetaData(const QString& key, const QVariant& data)
 {
 	m_metaData.insert(key,data);
 }
@@ -223,7 +240,7 @@ void ccObject::setMetaData(const QVariantMap& dataset, bool overwrite/*=false*/)
 	}
 }
 
-bool ccObject::hasMetaData(QString key) const
+bool ccObject::hasMetaData(const QString& key) const
 {
 	return m_metaData.contains(key);
 }
@@ -243,7 +260,7 @@ bool ccObject::fromFile(QFile& in, short dataVersion, int flags)
 	//	return ReadError();
 
 	//unique ID (dataVersion>=20)
-	//DGM: this ID will be usefull to recreate dynamic links between entities!
+	//DGM: this ID will be useful to recreate dynamic links between entities!
 	uint32_t uniqueID = 0;
 	if (in.read((char*)&uniqueID,4) < 0)
 		return ReadError();

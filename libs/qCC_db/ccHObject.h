@@ -32,12 +32,12 @@ public: //construction
 	//! Default constructor
 	/** \param name object name (optional)
 	**/
-	ccHObject(QString name = QString());
+	ccHObject(const QString& name = QString());
 	//! Copy constructor
 	ccHObject(const ccHObject& object);
 
 	//! Default destructor
-	virtual ~ccHObject();
+	~ccHObject() override;
 
 	//! Static factory
 	/** Warning: objects depending on other structures (such as meshes 
@@ -47,23 +47,26 @@ public: //construction
 		\param name object name (optional)
 		\return instantiated object (if type is valid) or 0
 	**/
-	static ccHObject* New(CC_CLASS_ENUM objectType, const char* name = 0);
+	static ccHObject* New(CC_CLASS_ENUM objectType, const char* name = nullptr);
 
 	//! Static factory (version to be used by external plugin factories)
 	/** Two strings are used as keys, one for the plugin name and one for the class name.
 		Those strings will typically be saved as metadata of a custom object
 	**/
-	static ccHObject* New(QString pluginId, QString classId, const char* name = 0);
+	static ccHObject* New(const QString& pluginId, const QString& classId, const char* name = nullptr);
 
 public: //base members access
 
 	//! Returns class ID
 	/** \return class unique ID
 	**/
-	inline virtual CC_CLASS_ENUM getClassID() const override { return CC_TYPES::HIERARCHY_OBJECT; }
+	inline CC_CLASS_ENUM getClassID() const override { return CC_TYPES::HIERARCHY_OBJECT; }
+
+	//! Returns whether the instance is a group
+	inline bool isGroup() const { return getClassID() == static_cast<CC_CLASS_ENUM>(CC_TYPES::HIERARCHY_OBJECT); }
 
 	//! Returns parent object
-	/** \return parent object (NULL if no parent)
+	/** \return parent object (nullptr if no parent)
 	**/
 	inline ccHObject* getParent() const { return m_parent; }
 
@@ -95,7 +98,7 @@ public: //dependencies management
 	//! Returns the dependency flags with a given object
 	/** \param otherObject other object
 	**/
-	int getDependencyFlagsWith(const ccHObject* otherObject);
+	int getDependencyFlagsWith(const ccHObject* otherObject) const;
 
 	//! Removes any dependency flags with a given object
 	/** \param otherObject other object
@@ -125,27 +128,32 @@ public: //children management
 	/** \return children number
 	**/
 	inline unsigned getChildrenNumber() const { return static_cast<unsigned>(m_children.size()); }
+	
+	//! Returns the total number of children under this object recursively
+	/** \return Number of children
+	**/
+	unsigned int getChildCountRecursive() const;
 
 	//! Returns the ith child
 	/** \param childPos child position
-		\return child object (or NULL if wrong position)
+		\return child object (or nullptr if wrong position)
 	**/
-	inline ccHObject* getChild(unsigned childPos) const { return (childPos < getChildrenNumber() ? m_children[childPos] : 0); }
+	inline ccHObject* getChild(unsigned childPos) const { return (childPos < getChildrenNumber() ? m_children[childPos] : nullptr); }
 
 	//! Finds an entity in this object hierarchy
 	/** \param uniqueID child unique ID
-		\return child (or NULL if not found)
+		\return child (or nullptr if not found)
 	**/
-	ccHObject* find(unsigned uniqueID);
+	ccHObject* find(unsigned uniqueID) const;
 
 	//! Standard instances container (for children, etc.)
-	typedef std::vector<ccHObject*> Container;
+	using Container = std::vector<ccHObject *>;
 
 	//! Shared pointer
-	typedef QSharedPointer<ccHObject> Shared;
+	using Shared = QSharedPointer<ccHObject>;
 
 	//! Shared instances container (for children, etc.)
-	typedef std::vector<Shared> SharedContainer;
+	using SharedContainer = std::vector<Shared>;
 
 	//! Collects the children corresponding to a certain pattern
 	/** \param filteredChildren result container
@@ -159,7 +167,7 @@ public: //children management
 							bool recursive = false,
 							CC_CLASS_ENUM filter = CC_TYPES::OBJECT,
 							bool strict = false,
-							ccGenericGLDisplay* inDisplay = 0) const;
+							ccGenericGLDisplay* inDisplay = nullptr) const;
 
 	//! Detaches a specific child
 	/** This method does not delete the child.
@@ -196,9 +204,9 @@ public: //children management
 	void transferChildren(ccHObject& newParent, bool forceFatherDependent = false);
 
 	//! Shortcut: returns first child
-	ccHObject* getFirstChild() const { return (m_children.empty() ? 0 : m_children.front()); }
+	ccHObject* getFirstChild() const { return (m_children.empty() ? nullptr : m_children.front()); }
 	//! Shortcut: returns last child
-	ccHObject* getLastChild() const { return (m_children.empty() ? 0 : m_children.back()); }
+	ccHObject* getLastChild() const { return (m_children.empty() ? nullptr : m_children.back()); }
 
 	//! Returns true if the current object is an ancestor of the specified one
 	bool isAncestorOf(const ccHObject *anObject) const;
@@ -221,11 +229,11 @@ public: //bounding-box
 
 	//! Returns the bounding-box of this entity and it's children WHEN DISPLAYED
 	/** Children's GL transformation is taken into account (if enabled).
-		\param relative whether the bounding-box is relative (i.e. in the entity's local coordinate sytem) or absolute (in which case the parent's GL transformation will be taken into account)
+		\param relative whether the bounding-box is relative (i.e. in the entity's local coordinate system) or absolute (in which case the parent's GL transformation will be taken into account)
 		\param display if not null, this method will return the bounding-box of this entity (and its children) in the specified 3D view (i.e. potentially not visible)
 		\return bounding-box
 	**/
-	virtual ccBBox getDisplayBB_recursive(bool relative, const ccGenericGLDisplay* display = 0);
+	virtual ccBBox getDisplayBB_recursive(bool relative, const ccGenericGLDisplay* display = nullptr);
 
 	//! Returns best-fit bounding-box (if available)
 	/** \warning Only suitable for leaf objects (i.e. without children)
@@ -259,7 +267,7 @@ public: //bounding-box
 public: //display
 
 	//Inherited from ccDrawableObject
-	virtual void draw(CC_DRAW_CONTEXT& context) override;
+	void draw(CC_DRAW_CONTEXT& context) override;
 
 	//! Returns the absolute transformation (i.e. the actual displayed GL transforamtion) of an entity
 	/** \param[out] trans absolute transformation
@@ -269,6 +277,9 @@ public: //display
 
 	//! Returns whether the object is actually displayed (visible) or not
 	virtual bool isDisplayed() const;
+
+	//! Returns whether the object is actually displayed (visible) in a given display or not
+	virtual bool isDisplayedIn(const ccGenericGLDisplay* display) const;
 
 	//! Returns whether the object and all its ancestors are enabled
 	virtual bool isBranchEnabled() const;
@@ -316,9 +327,9 @@ public: //display
 			setDisplay(newDisplay);
 		}
 	
-		for (Container::iterator it = m_children.begin(); it != m_children.end(); ++it)
+		for (auto child : m_children)
 		{
-			(*it)->transferDisplay(oldDisplay, newDisplay);
+			child->transferDisplay(oldDisplay, newDisplay);
 		}
 	} 
 
@@ -330,15 +341,15 @@ public: //display
 		a pre-transformation.
 		\param trans a ccGLMatrix structure (reference to)
 	**/
-	void applyGLTransformation_recursive(const ccGLMatrix* trans = 0);
+	void applyGLTransformation_recursive(const ccGLMatrix* trans = nullptr);
 
 	//! Notifies all dependent entities that the geometry of this entity has changed
 	virtual void notifyGeometryUpdate();
 
 	//inherited from ccSerializableObject
-	virtual bool isSerializable() const override;
-	virtual bool toFile(QFile& out) const override;
-	virtual bool fromFile(QFile& in, short dataVersion, int flags) override;
+	bool isSerializable() const override;
+	bool toFile(QFile& out) const override;
+	bool fromFile(QFile& in, short dataVersion, int flags) override;
 
 	//! Custom version of ccSerializableObject::fromFile
 	/** This is used to load only the object's part of a stream (and not its children)
@@ -437,7 +448,7 @@ protected:
 	/** First parameter: other object
 		Second parameter: dependency flags (see DEPENDENCY_FLAGS)
 	**/
-	std::map<ccHObject*,int> m_dependencies;
+	std::map<ccHObject*, int> m_dependencies;
 
 	//! Cumulative GL transformation
 	/** History of all the applied transformations since the creation of the object
@@ -460,11 +471,11 @@ protected:
 inline void ConvertToGroup(const ccHObject::Container& origin, ccHObject& dest, int dependencyFlags = ccHObject::DP_NONE)
 {
 	size_t count = origin.size();
-	for (size_t i=0; i<count; ++i)
+	for (size_t i = 0; i < count; ++i)
 	{
 		//we don't take objects that are siblings of others
 		bool isSiblingOfAnotherOne = false;
-		for (size_t j=0; j<count; ++j)
+		for (size_t j = 0; j < count; ++j)
 		{
 			if (i != j && origin[j]->isAncestorOf(origin[i]))
 			{

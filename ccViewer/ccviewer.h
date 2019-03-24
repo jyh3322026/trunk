@@ -22,6 +22,7 @@
 
 //Qt
 #include <QMainWindow>
+#include <QStringList>
 
 //GUIs
 #include <ui_ccviewer.h>

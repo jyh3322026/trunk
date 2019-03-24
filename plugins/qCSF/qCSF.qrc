@@ -1,9 +1,0 @@
-<RCC>
-    <qresource prefix="/CC/plugin/qCSF" >
-        <file>icon.png</file>
-        <file>hun.png</file>
-        <file>gun.png</file>
-        <file>ft.png</file>
-        <file>pp.png</file>
-    </qresource>
-</RCC>

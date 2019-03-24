@@ -20,12 +20,16 @@
 
 //CCLib
 #include <GenericIndexedMesh.h>
-#include <ReferenceCloud.h>
-#include <GenericProgressCallback.h>
 
 //Local
-#include "ccGenericGLDisplay.h"
 #include "ccAdvancedTypes.h"
+#include "ccGenericGLDisplay.h"
+
+namespace CCLib
+{
+	class GenericProgressCallback;
+	class ReferenceCloud;
+}
 
 class ccGenericPointCloud;
 class ccPointCloud;
@@ -43,13 +47,13 @@ public:
 	ccGenericMesh(QString name = QString());
 
 	//! Destructor
-	virtual ~ccGenericMesh() {}
+	~ccGenericMesh() override = default;
 
 	//inherited methods (ccDrawableObject)
-	virtual void showNormals(bool state) override;
+	void showNormals(bool state) override;
 
 	//inherited methods (ccHObject)
-	virtual bool isSerializable() const override { return true; }
+	bool isSerializable() const override { return true; }
 
 	//! Returns the vertices cloud
 	virtual ccGenericPointCloud* getAssociatedCloud() const = 0;
@@ -76,7 +80,7 @@ public:
 	virtual TextureCoordsContainer* getTexCoordinatesTable() const = 0;
 
 	//! Returns per-triangle texture coordinates (pointer to)
-	virtual void getTriangleTexCoordinates(unsigned triIndex, float* &tx1, float* &tx2, float* &tx3) const = 0;
+	virtual void getTriangleTexCoordinates(unsigned triIndex, TexCoords2D* &tx1, TexCoords2D* &tx2, TexCoords2D* &tx3) const = 0;
 
 	//! Returns whether this mesh as per-triangle triplets of tex coords indexes
 	virtual bool hasPerTriangleTexCoordIndexes() const = 0;
@@ -175,7 +179,7 @@ public:
 								bool withNormals,
 								bool withRGB,
 								bool withTexture,
-								CCLib::GenericProgressCallback* pDlg = 0);
+								CCLib::GenericProgressCallback* pDlg = nullptr);
 
 	//! Imports the parameters from another mesh
 	/** Only the specific parameters are imported.
@@ -183,22 +187,22 @@ public:
 	void importParametersFrom(const ccGenericMesh* mesh);
 
 	//! Brute force triangle picking
-	bool trianglePicking(	const CCVector2d& clickPos,
-							const ccGLCameraParameters& camera,
-							int& nearestTriIndex,
-							double& nearestSquareDist,
-							CCVector3d& nearestPoint);
+	virtual bool trianglePicking(	const CCVector2d& clickPos,
+									const ccGLCameraParameters& camera,
+									int& nearestTriIndex,
+									double& nearestSquareDist,
+									CCVector3d& nearestPoint);
 
 protected:
 
 	//inherited from ccHObject
-	virtual bool toFile_MeOnly(QFile& out) const override;
-	virtual bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
+	bool toFile_MeOnly(QFile& out) const override;
+	bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
 
 	//Static arrays for OpenGL drawing
-	static PointCoordinateType* GetVertexBuffer();
-	static PointCoordinateType* GetNormalsBuffer();
-	static ColorCompType* GetColorsBuffer();
+	static CCVector3* GetVertexBuffer();
+	static CCVector3* GetNormalsBuffer();
+	static ccColor::Rgb* GetColorsBuffer();
 
 	//! Returns a pre-initialized array of vertex indexes for wired display
 	/** Array size is MAX_NUMBER_OF_ELEMENTS_PER_CHUNK*6 by default
@@ -209,7 +213,7 @@ protected:
 	static void EnableGLStippleMask(const QOpenGLContext* context, bool state);
 
 	//inherited from ccHObject
-	virtual void drawMeOnly(CC_DRAW_CONTEXT& context) override;
+	void drawMeOnly(CC_DRAW_CONTEXT& context) override;
 
 	//! Handles the color ramp display
 	void handleColorRamp(CC_DRAW_CONTEXT& context);

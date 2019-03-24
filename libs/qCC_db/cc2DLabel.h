@@ -23,7 +23,7 @@
 #include "ccInteractor.h"
 
 //Qt
-#include <QFontMetrics>
+#include <QRect>
 
 class ccGenericPointCloud;
 
@@ -48,7 +48,7 @@ public:
 	/** \param precision displayed numbers precision
 		\return label body (one string per line)
 	**/
-	QStringList getLabelContent(int precision);
+	QStringList getLabelContent(int precision) const;
 
 	//! Returns the (3D) label title
 	/** \param precision displayed numbers precision
@@ -146,7 +146,7 @@ protected:
 		bool hasNormal;
 		CCVector3 normal;
 		bool hasRGB;
-		Vector3Tpl<ColorCompType> rgb;
+		ccColor::Rgb rgb;
 		bool hasSF;
 		ScalarType sfValue;
 		double sfShiftedValue;

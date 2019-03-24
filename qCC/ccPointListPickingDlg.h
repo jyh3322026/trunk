@@ -34,13 +34,12 @@ class cc2DLabel;
 **/
 class ccPointListPickingDlg : public ccPointPickingGenericInterface, public Ui::PointListPickingDlg
 {
-
 	Q_OBJECT
 
 public:
 
 	//! Default constructor
-	explicit ccPointListPickingDlg(QWidget* parent);
+	explicit ccPointListPickingDlg(ccPickingHub* pickingHub, QWidget* parent);
 
 	//! Associates dialog with cloud
 	void linkWithCloud(ccPointCloud* cloud);
@@ -61,6 +60,8 @@ protected slots:
 	inline void exportToASCII_xyz() { return exportToASCII(PLP_ASCII_EXPORT_XYZ); }
 	//! Exports list to an 'ixyz' ASCII file
 	inline void exportToASCII_ixyz() { return exportToASCII(PLP_ASCII_EXPORT_IXYZ); }
+	//! Exports list to an 'gxyz' ASCII file
+	inline void exportToASCII_gxyz() { return exportToASCII(PLP_ASCII_EXPORT_GXYZ); }
 	//! Exports list to an 'lxyz' ASCII file
 	inline void exportToASCII_lxyz() { return exportToASCII(PLP_ASCII_EXPORT_LXYZ); }
 
@@ -74,7 +75,7 @@ protected slots:
 protected:
 
 	//inherited from ccPointPickingGenericInterface
-	void processPickedPoint(ccPointCloud* cloud, unsigned pointIndex, int x, int y);
+	void processPickedPoint(ccPointCloud* cloud, unsigned pointIndex, int x, int y) override;
 
 	//! Gets current (visible) picked points from the associated cloud
 	unsigned getPickedPoints(std::vector<cc2DLabel*>& pickedPoints);
@@ -84,6 +85,7 @@ protected:
 	**/
 	enum ExportFormat {	PLP_ASCII_EXPORT_XYZ,
 						PLP_ASCII_EXPORT_IXYZ,
+						PLP_ASCII_EXPORT_GXYZ,
 						PLP_ASCII_EXPORT_LXYZ
 	};
 

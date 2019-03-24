@@ -19,6 +19,8 @@
 #ifndef GENERIC_MESH_HEADER
 #define GENERIC_MESH_HEADER
 
+#include <functional>
+
 //Local
 #include "CCGeom.h"
 
@@ -33,10 +35,10 @@ class CC_CORE_LIB_API GenericMesh
 public:
 
 	//! Default destructor
-	virtual ~GenericMesh() {}
+	virtual ~GenericMesh() = default;
 
 	//! Generic function to apply to a triangle (used by foreach)
-	typedef void genericTriangleAction(GenericTriangle&);
+	using genericTriangleAction = std::function<void (GenericTriangle &)>;
 
 	//! Returns the number of triangles
 	/**	Virtual method to request the mesh size
@@ -48,7 +50,7 @@ public:
 	/**	Virtual method to apply a function to the whole mesh
 		\param action function to apply (see GenericMesh::genericTriangleAction)
 	**/
-	virtual void forEach(genericTriangleAction& action) = 0;
+	virtual void forEach(genericTriangleAction action) = 0;
 
 	//! Returns the mesh bounding-box
 	/**	Virtual method to request the mesh bounding-box limits. It is equivalent to
@@ -58,10 +60,10 @@ public:
 	**/
 	virtual void getBoundingBox(CCVector3& bbMin, CCVector3& bbMax) = 0;
 
-	//! Places the mesh iterator at the begining
+	//! Places the mesh iterator at the beginning
 	/**	Virtual method to handle the mesh global iterator
 	**/
-	virtual void placeIteratorAtBegining() = 0;
+	virtual void placeIteratorAtBeginning() = 0;
 
 	//! Returns the next triangle (relatively to the global iterator position)
 	/**	Virtual method to handle the mesh global iterator.

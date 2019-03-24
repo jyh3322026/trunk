@@ -16,27 +16,48 @@
 //#                                                                        #
 //##########################################################################
 
-#include "../include/Neighbourhood.h"
+#include <Neighbourhood.h>
 
 //local
-#include "GenericIndexedMesh.h"
-#include "GenericIndexedCloudPersist.h"
-#include "SquareMatrix.h"
-#include "Delaunay2dMesh.h"
-#include "ConjugateGradient.h"
-#include "DistanceComputationTools.h"
-#include "ChunkedPointCloud.h"
-#include "SimpleMesh.h"
-#include "Jacobi.h"
+#include <ConjugateGradient.h>
+#include <Delaunay2dMesh.h>
+#include <DistanceComputationTools.h>
+#include <PointCloud.h>
+#include <SimpleMesh.h>
 
-//system
-#include <string.h>
-#include <assert.h>
+//System
+#include <algorithm>
+
+//Eigenvalues decomposition
+//#define USE_EIGEN
+#ifdef USE_EIGEN
+#include <eigen/Eigen/Eigenvalues>
+#else
+#include <Jacobi.h>
+#endif
 
 using namespace CCLib;
 
+#ifdef USE_EIGEN
+Eigen::MatrixXd ToEigen(const SquareMatrixd& M)
+{
+	unsigned sz = M.size();
+
+	Eigen::MatrixXd A(sz, sz);
+	for (unsigned c = 0; c < sz; ++c)
+	{
+		for (unsigned r = 0; r < sz; ++r)
+		{
+			A(r, c) = M.getValue(r, c);
+		}
+	}
+
+	return A;
+}
+#endif
+
 Neighbourhood::Neighbourhood(GenericIndexedCloudPersist* associatedCloud)
-	: m_quadricEquationDirections(0,1,2)
+	: m_quadricEquationDirections(0, 1, 2)
 	, m_structuresValidity(FLAG_DEPRECATED)
 	, m_associatedCloud(associatedCloud)
 {
@@ -55,7 +76,7 @@ const CCVector3* Neighbourhood::getGravityCenter()
 {
 	if (!(m_structuresValidity & FLAG_GRAVITY_CENTER))
 		computeGravityCenter();
-	return ((m_structuresValidity & FLAG_GRAVITY_CENTER) ? &m_gravityCenter : 0);
+	return ((m_structuresValidity & FLAG_GRAVITY_CENTER) ? &m_gravityCenter : nullptr);
 }
 
 void Neighbourhood::setGravityCenter(const CCVector3& G)
@@ -68,7 +89,7 @@ const PointCoordinateType* Neighbourhood::getLSPlane()
 {
 	if (!(m_structuresValidity & FLAG_LS_PLANE))
 		computeLeastSquareBestFittingPlane();
-	return ((m_structuresValidity & FLAG_LS_PLANE) ? m_lsPlaneEquation : 0);
+	return ((m_structuresValidity & FLAG_LS_PLANE) ? m_lsPlaneEquation : nullptr);
 }
 
 void Neighbourhood::setLSPlane(	const PointCoordinateType eq[4],
@@ -88,21 +109,21 @@ const CCVector3* Neighbourhood::getLSPlaneX()
 {
 	if (!(m_structuresValidity & FLAG_LS_PLANE))
 		computeLeastSquareBestFittingPlane();
-	return ((m_structuresValidity & FLAG_LS_PLANE) ? m_lsPlaneVectors : 0);
+	return ((m_structuresValidity & FLAG_LS_PLANE) ? m_lsPlaneVectors : nullptr);
 }
 
 const CCVector3* Neighbourhood::getLSPlaneY()
 {
 	if (!(m_structuresValidity & FLAG_LS_PLANE))
 		computeLeastSquareBestFittingPlane();
-	return ((m_structuresValidity & FLAG_LS_PLANE) ? m_lsPlaneVectors + 1 : 0);
+	return ((m_structuresValidity & FLAG_LS_PLANE) ? m_lsPlaneVectors + 1 : nullptr);
 }
 
 const CCVector3* Neighbourhood::getLSPlaneNormal()
 {
 	if (!(m_structuresValidity & FLAG_LS_PLANE))
 		computeLeastSquareBestFittingPlane();
-	return ((m_structuresValidity & FLAG_LS_PLANE) ? m_lsPlaneVectors + 2 : 0);
+	return ((m_structuresValidity & FLAG_LS_PLANE) ? m_lsPlaneVectors + 2 : nullptr);
 }
 
 const PointCoordinateType* Neighbourhood::getQuadric(Tuple3ub* dims/*=0*/)
@@ -117,7 +138,7 @@ const PointCoordinateType* Neighbourhood::getQuadric(Tuple3ub* dims/*=0*/)
 		*dims = m_quadricEquationDirections;
 	}
 
-	return ((m_structuresValidity & FLAG_QUADRIC) ? m_quadricEquation : 0);
+	return ((m_structuresValidity & FLAG_QUADRIC) ? m_quadricEquation : nullptr);
 }
 
 void Neighbourhood::computeGravityCenter()
@@ -140,11 +161,11 @@ void Neighbourhood::computeGravityCenter()
 		Psum.z += P->z;
 	}
 
-	CCVector3 G(static_cast<PointCoordinateType>(Psum.x / count),
-				static_cast<PointCoordinateType>(Psum.y / count),
-				static_cast<PointCoordinateType>(Psum.z / count) );
-
-	setGravityCenter(G);
+	setGravityCenter( {
+						  static_cast<PointCoordinateType>(Psum.x / count),
+						  static_cast<PointCoordinateType>(Psum.y / count),
+						  static_cast<PointCoordinateType>(Psum.z / count)
+					  } );
 }
 
 CCLib::SquareMatrixd Neighbourhood::computeCovarianceMatrix()
@@ -166,9 +187,9 @@ CCLib::SquareMatrixd Neighbourhood::computeCovarianceMatrix()
 	double mXZ = 0.0;
 	double mYZ = 0.0;
 
-	for (unsigned i=0; i<count; ++i)
+	for (unsigned i = 0; i < count; ++i)
 	{
-		CCVector3 P = *m_associatedCloud->getPoint(i) - *G;
+		const CCVector3 P = *m_associatedCloud->getPoint(i) - *G;
 
 		mXX += static_cast<double>(P.x)*P.x;
 		mYY += static_cast<double>(P.y)*P.y;
@@ -209,7 +230,7 @@ PointCoordinateType Neighbourhood::computeLargestRadius()
 	for (unsigned i=0; i<pointCount; ++i)
 	{
 		const CCVector3* P = m_associatedCloud->getPoint(i);
-		double d2 = (*P-*G).norm2();
+		const double d2 = (*P-*G).norm2();
 		if (d2 > maxSquareDist)
 			maxSquareDist = d2;
 	}
@@ -226,20 +247,35 @@ bool Neighbourhood::computeLeastSquareBestFittingPlane()
 	unsigned pointCount = (m_associatedCloud ? m_associatedCloud->size() : 0);
 
 	//we need at least 3 points to compute a plane
-	assert(CC_LOCAL_MODEL_MIN_SIZE[LS] >= 3);
+	static_assert(CC_LOCAL_MODEL_MIN_SIZE[LS] >= 3, "Invalid CC_LOCAL_MODEL_MIN_SIZE size");
 	if (pointCount < CC_LOCAL_MODEL_MIN_SIZE[LS])
 	{
 		//not enough points!
 		return false;
 	}
 
-	CCVector3 G(0,0,0);
+	CCVector3 G(0, 0, 0);
 	if (pointCount > 3)
 	{
+		CCLib::SquareMatrixd covMat = computeCovarianceMatrix();
+
+#ifdef USE_EIGEN
+		Eigen::Matrix3d A = ToEigen(covMat);
+		Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> es;
+		es.compute(A);
+
+		//eigen values (and vectors) are sorted in ascending order
+		const auto& eVec = es.eigenvectors();
+		
+		//get normal
+		m_lsPlaneVectors[2] = CCVector3::fromArray(eVec.col(0).data()); //smallest eigenvalue
+		//get also X (Y will be deduced by cross product, see below
+		m_lsPlaneVectors[0] = CCVector3::fromArray(eVec.col(2).data()); //biggest eigenvalue
+#else
 		//we determine plane normal by computing the smallest eigen value of M = 1/n * S[(p-µ)*(p-µ)']
 		CCLib::SquareMatrixd eigVectors;
 		std::vector<double> eigValues;
-		if (!Jacobi<double>::ComputeEigenValuesAndVectors(computeCovarianceMatrix(), eigVectors, eigValues))
+		if (!Jacobi<double>::ComputeEigenValuesAndVectors(covMat, eigVectors, eigValues, true))
 		{
 			//failed to compute the eigen values!
 			return false;
@@ -247,7 +283,7 @@ bool Neighbourhood::computeLeastSquareBestFittingPlane()
 
 		//get normal
 		{
-			CCVector3d vec(0,0,1);
+			CCVector3d vec(0, 0, 1);
 			double minEigValue = 0;
 			//the smallest eigen vector corresponds to the "least square best fitting plane" normal
 			Jacobi<double>::GetMinEigenValueAndVector(eigVectors, eigValues, minEigValue, vec.u);
@@ -261,7 +297,7 @@ bool Neighbourhood::computeLeastSquareBestFittingPlane()
 			Jacobi<double>::GetMaxEigenValueAndVector(eigVectors, eigValues, maxEigValue, vec.u);
 			m_lsPlaneVectors[0] = CCVector3::fromArray(vec.u);
 		}
-
+#endif
 		//get the centroid (should already be up-to-date - see computeCovarianceMatrix)
 		G = *getGravityCenter();
 	}
@@ -273,8 +309,8 @@ bool Neighbourhood::computeLeastSquareBestFittingPlane()
 		const CCVector3* C = m_associatedCloud->getPoint(2);
 
 		//get X (AB by default) and Y (AC - will be updated later) and deduce N = X ^ Y
-		m_lsPlaneVectors[0] = (*B-*A);
-		m_lsPlaneVectors[1] = (*C-*A);
+		m_lsPlaneVectors[0] = (*B - *A);
+		m_lsPlaneVectors[1] = (*C - *A);
 		m_lsPlaneVectors[2] = m_lsPlaneVectors[0].cross(m_lsPlaneVectors[1]);
 
 		//the plane passes through any of the 3 points
@@ -323,7 +359,7 @@ bool Neighbourhood::computeQuadric()
 
 	unsigned count = m_associatedCloud->size();
 	
-	assert(CC_LOCAL_MODEL_MIN_SIZE[QUADRIC] >= 5);
+	static_assert(CC_LOCAL_MODEL_MIN_SIZE[QUADRIC] >= 5, "Invalid CC_LOCAL_MODEL_MIN_SIZE size");
 	if (count < CC_LOCAL_MODEL_MIN_SIZE[QUADRIC])
 		return false;
 
@@ -337,9 +373,9 @@ bool Neighbourhood::computeQuadric()
 
 	//get the best projection axis
 	Tuple3ub idx(0/*x*/,1/*y*/,2/*z*/); //default configuration: z is the "normal" direction, we use (x,y) as the base plane
-	PointCoordinateType nxx = lsPlane[0]*lsPlane[0];
-	PointCoordinateType nyy = lsPlane[1]*lsPlane[1];
-	PointCoordinateType nzz = lsPlane[2]*lsPlane[2];
+	const PointCoordinateType nxx = lsPlane[0]*lsPlane[0];
+	const PointCoordinateType nyy = lsPlane[1]*lsPlane[1];
+	const PointCoordinateType nzz = lsPlane[2]*lsPlane[2];
 	if (nxx > nyy)
 	{
 		if (nxx > nzz)
@@ -358,11 +394,10 @@ bool Neighbourhood::computeQuadric()
 	}
 
 	//compute the A matrix and b vector
-	std::vector<float> A;
-	std::vector<float> b;
+	std::vector<float> A, b;
 	try
 	{
-		A.resize(6*count,0);
+		A.resize(6 * count, 0);
 		b.resize(count, 0);
 	}
 	catch (const std::bad_alloc&)
@@ -375,9 +410,9 @@ bool Neighbourhood::computeQuadric()
 
     //for all points
 	{
-		float* _A = &(A[0]);
-		float* _b = &(b[0]);
-		for (unsigned i=0; i<count; ++i)
+		float* _A = A.data();
+		float* _b = b.data();
+		for (unsigned i = 0; i < count; ++i)
 		{
 			CCVector3 P = *m_associatedCloud->getPoint(i) - *G;
 
@@ -411,7 +446,7 @@ bool Neighbourhood::computeQuadric()
 	//conjugate gradient initialization
 	//we solve tA.A.X=tA.b
 	ConjugateGradient<6,double> cg;
-	CCLib::SquareMatrixd& tAA = cg.A();
+	const CCLib::SquareMatrixd& tAA = cg.A();
 	double* tAb = cg.b();
 
 	//compute tA.A and tA.b
@@ -424,7 +459,7 @@ bool Neighbourhood::computeQuadric()
 				double tmp = 0;
 				float* _Ai = &(A[i]);
 				float* _Aj = &(A[j]);
-				for (unsigned k = 0; k<count; ++k, _Ai += 6, _Aj += 6)
+				for (unsigned k = 0; k < count; ++k, _Ai += 6, _Aj += 6)
 				{
 					//tmp += A[(6*k)+i] * A[(6*k)+j];
 					tmp += static_cast<double>(*_Ai) * static_cast<double>(*_Aj);
@@ -447,7 +482,7 @@ bool Neighbourhood::computeQuadric()
 
 #if 0
 		//trace tA.A and tA.b to a file
-		FILE* f = 0;
+		FILE* f = nullptr;
 		fopen_s(&f, "CG_trace.txt", "wt");
 		if (f)
 		{
@@ -516,7 +551,7 @@ bool Neighbourhood::computeQuadric()
 
 	//conjugate gradient iterations
 	{
-		double convergenceThreshold = lmax2 * 1.0e-8;  //max. error for convergence = 1e-8 of largest cloud dimension (empirical!)
+		const double convergenceThreshold = lmax2 * 1.0e-8;  //max. error for convergence = 1e-8 of largest cloud dimension (empirical!)
 		for (unsigned i=0; i<1500; ++i)
 		{
 			double lastError = cg.iterConjugateGradient(X0);
@@ -575,10 +610,10 @@ bool Neighbourhood::compute3DQuadric(double quadricEquation[10])
 			return false;
 		}
 
-		PointCoordinateType* _M = &(M[0]);
-		for (unsigned i=0; i<count; ++i)
+		PointCoordinateType* _M = M.data();
+		for (unsigned i = 0; i < count; ++i)
 		{
-			CCVector3 P = *m_associatedCloud->getPoint(i) - *G;
+			const CCVector3 P = *m_associatedCloud->getPoint(i) - *G;
 
 			//we fill the ith line
 			(*_M++) = P.x * P.x;
@@ -596,13 +631,13 @@ bool Neighbourhood::compute3DQuadric(double quadricEquation[10])
 
 	//D = tM.M
 	SquareMatrixd D(10);
-	for (unsigned l=0; l<10; ++l)
+	for (unsigned l = 0; l < 10; ++l)
 	{
-		for (unsigned c=0; c<10; ++c)
+		for (unsigned c = 0; c < 10; ++c)
 		{
 			double sum = 0;
-			PointCoordinateType* _M = &(M[0]);
-			for (unsigned i=0; i<count; ++i, _M+=10)
+			const PointCoordinateType* _M = M.data();
+			for (unsigned i = 0; i < count; ++i, _M += 10)
 				sum += static_cast<double>(_M[l] * _M[c]);
 
 			D.m_values[l][c] = sum;
@@ -610,12 +645,26 @@ bool Neighbourhood::compute3DQuadric(double quadricEquation[10])
 	}
 
 	//we don't need M anymore
-	M.clear();
+	M.resize(0);
 
 	//now we compute eigen values and vectors of D
+#ifdef USE_EIGEN
+	Eigen::MatrixXd A = ToEigen(D);
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
+	es.compute(A);
+
+	//eigen values (and vectors) are sorted in ascending order
+	//(we get the eigen vector corresponding to the minimum eigen value)
+	const auto& minEigenVec = es.eigenvectors().col(0);
+
+	for (unsigned i = 0; i < D.size(); ++i)
+	{
+		quadricEquation[i] = minEigenVec[i];
+	}
+#else
 	CCLib::SquareMatrixd eigVectors;
 	std::vector<double> eigValues;
-	if (!Jacobi<double>::ComputeEigenValuesAndVectors(computeCovarianceMatrix(), eigVectors, eigValues))
+	if (!Jacobi<double>::ComputeEigenValuesAndVectors(D, eigVectors, eigValues, true))
 	{
 		//failure
 		return false;
@@ -624,6 +673,7 @@ bool Neighbourhood::compute3DQuadric(double quadricEquation[10])
 	//we get the eigen vector corresponding to the minimum eigen value
 	double minEigValue = 0;
 	Jacobi<double>::GetMinEigenValueAndVector(eigVectors, eigValues, minEigValue, quadricEquation);
+#endif
 
 	return true;
 }
@@ -637,17 +687,17 @@ GenericIndexedMesh* Neighbourhood::triangulateOnPlane(	bool duplicateVertices/*=
 		//can't compute LSF plane with less than 3 points!
 		if (errorStr)
 			strcpy(errorStr,"Not enough points");
-		return 0;
+		return nullptr;
 	}
 
 	//safety check: Triangle lib will crash if the points are all the same!
 	if (computeLargestRadius() < ZERO_TOLERANCE)
 	{
-		return 0;
+		return nullptr;
 	}
 
 	//project the points on this plane
-	GenericIndexedMesh* mesh = 0;
+	GenericIndexedMesh* mesh = nullptr;
 	std::vector<CCVector2> points2D;
 
 	if (projectPointsOn2DPlane<CCVector2>(points2D))
@@ -658,21 +708,21 @@ GenericIndexedMesh* Neighbourhood::triangulateOnPlane(	bool duplicateVertices/*=
 		if (!dm->buildMesh(points2D,0,errorStr))
 		{
 			delete dm;
-			return 0;
+			return nullptr;
 		}
 
 		//change the default mesh's reference
 		if (duplicateVertices)
 		{
-			ChunkedPointCloud* cloud = new ChunkedPointCloud();
-			unsigned count = m_associatedCloud->size();
+			PointCloud* cloud = new PointCloud();
+			const unsigned count = m_associatedCloud->size();
 			if (!cloud->reserve(count))
 			{
 				if (errorStr)
 					strcpy(errorStr,"Not enough memory");
 				delete dm;
 				delete cloud;
-				return 0;
+				return nullptr;
 			}
 			for (unsigned i=0; i<count; ++i)
 				cloud->addPoint(*m_associatedCloud->getPoint(i));
@@ -693,7 +743,7 @@ GenericIndexedMesh* Neighbourhood::triangulateOnPlane(	bool duplicateVertices/*=
 				if (errorStr)
 					strcpy(errorStr,"Not triangle left after pruning");
 				delete dm;
-				dm = 0;
+				dm = nullptr;
 			}
 		}
 		mesh = static_cast<GenericIndexedMesh*>(dm);
@@ -705,12 +755,12 @@ GenericIndexedMesh* Neighbourhood::triangulateOnPlane(	bool duplicateVertices/*=
 GenericIndexedMesh* Neighbourhood::triangulateFromQuadric(unsigned nStepX, unsigned nStepY)
 {
 	if (nStepX<2 || nStepY<2)
-		return 0;
+		return nullptr;
 
 	//qaudric fit
 	const PointCoordinateType* Q = getQuadric(); //Q: Z = a + b.X + c.Y + d.X^2 + e.X.Y + f.Y^2
 	if (!Q)
-		return 0;
+		return nullptr;
 
 	const PointCoordinateType& a = Q[0];
 	const PointCoordinateType& b = Q[1];
@@ -729,37 +779,37 @@ GenericIndexedMesh* Neighbourhood::triangulateFromQuadric(unsigned nStepX, unsig
 
 	//bounding box
 	CCVector3 bbMin, bbMax;
-	m_associatedCloud->getBoundingBox(bbMin,bbMax);
+	m_associatedCloud->getBoundingBox(bbMin, bbMax);
 	CCVector3 bboxDiag = bbMax - bbMin;
 
 	//Sample points on Quadric and triangulate them!
-	PointCoordinateType spanX = bboxDiag.u[X];
-	PointCoordinateType spanY = bboxDiag.u[Y];
-	PointCoordinateType stepX = spanX/(nStepX-1);
-	PointCoordinateType stepY = spanY/(nStepY-1);
+	const PointCoordinateType spanX = bboxDiag.u[X];
+	const PointCoordinateType spanY = bboxDiag.u[Y];
+	const PointCoordinateType stepX = spanX / (nStepX - 1);
+	const PointCoordinateType stepY = spanY / (nStepY - 1);
 
-	ChunkedPointCloud* vertices = new ChunkedPointCloud();
+	PointCloud* vertices = new PointCloud();
 	if (!vertices->reserve(nStepX*nStepY))
 	{
 		delete vertices;
-		return 0;
+		return nullptr;
 	}
 
-	SimpleMesh* quadMesh = new SimpleMesh(vertices,true);
-	if (!quadMesh->reserve((nStepX-1)*(nStepY-1)*2))
+	SimpleMesh* quadMesh = new SimpleMesh(vertices, true);
+	if (!quadMesh->reserve((nStepX - 1)*(nStepY - 1) * 2))
 	{
 		delete quadMesh;
-		return 0;
+		return nullptr;
 	}
 
-	for (unsigned x=0; x<nStepX; ++x)
+	for (unsigned x = 0; x < nStepX; ++x)
 	{
 		CCVector3 P;
 		P.x = bbMin[X] + stepX * x - G->u[X];
-		for (unsigned y=0; y<nStepY; ++y)
+		for (unsigned y = 0; y < nStepY; ++y)
 		{
 			P.y = bbMin[Y] + stepY * y - G->u[Y];
-			P.z = a+b*P.x+c*P.y+d*P.x*P.x+e*P.x*P.y+f*P.y*P.y;
+			P.z = a + b * P.x + c * P.y + d * P.x*P.x + e * P.x*P.y + f * P.y*P.y;
 
 			CCVector3 Pc;
 			Pc.u[X] = P.x;
@@ -771,10 +821,10 @@ GenericIndexedMesh* Neighbourhood::triangulateFromQuadric(unsigned nStepX, unsig
 
 			if (x>0 && y>0)
 			{
-				unsigned iA = (x-1) * nStepY + y-1;
-				unsigned iB = iA+1;
-				unsigned iC = iA+nStepY;
-				unsigned iD = iB+nStepY;
+				const unsigned iA = (x - 1) * nStepY + y - 1;
+				const unsigned iB = iA + 1;
+				const unsigned iC = iA + nStepY;
+				const unsigned iD = iB + nStepY;
 
 				quadMesh->addTriangle(iA,iC,iB);
 				quadMesh->addTriangle(iB,iC,iD);
@@ -785,7 +835,143 @@ GenericIndexedMesh* Neighbourhood::triangulateFromQuadric(unsigned nStepX, unsig
 	return quadMesh;
 }
 
-ScalarType Neighbourhood::computeCurvature(unsigned neighbourIndex, CC_CURVATURE_TYPE cType)
+ScalarType Neighbourhood::computeMomentOrder1(const CCVector3& P)
+{
+	if (!m_associatedCloud || m_associatedCloud->size() < 3)
+	{
+		//not enough points
+		return NAN_VALUE;
+	}
+
+	SquareMatrixd eigVectors;
+	std::vector<double> eigValues;
+	if (!Jacobi<double>::ComputeEigenValuesAndVectors(computeCovarianceMatrix(), eigVectors, eigValues, true))
+	{
+		//failed to compute the eigen values
+		return NAN_VALUE;
+	}
+
+	Jacobi<double>::SortEigenValuesAndVectors(eigVectors, eigValues); //sort the eigenvectors in decreasing order of their associated eigenvalues
+
+	double m1 = 0.0, m2 = 0.0;
+	CCVector3d e2;
+	Jacobi<double>::GetEigenVector(eigVectors, 1, e2.u);
+
+	for (unsigned i = 0; i < m_associatedCloud->size(); ++i)
+	{
+		double dotProd = CCVector3d::fromArray((*m_associatedCloud->getPoint(i) - P).u).dot(e2);
+		m1 += dotProd;
+		m2 += dotProd * dotProd;
+	}
+
+	//see "Contour detection in unstructured 3D point clouds", Hackel et al 2016
+	return (m2 < std::numeric_limits<double>::epsilon() ? NAN_VALUE : static_cast<ScalarType>((m1 * m1) / m2));
+}
+
+double Neighbourhood::computeFeature(GeomFeature feature)
+{
+	if (!m_associatedCloud || m_associatedCloud->size() < 3)
+	{
+		//not enough points
+		return std::numeric_limits<double>::quiet_NaN();
+	}
+	
+	SquareMatrixd eigVectors;
+	std::vector<double> eigValues;
+	if (!Jacobi<double>::ComputeEigenValuesAndVectors(computeCovarianceMatrix(), eigVectors, eigValues, true))
+	{
+		//failed to compute the eigen values
+		return std::numeric_limits<double>::quiet_NaN();
+	}
+
+	Jacobi<double>::SortEigenValuesAndVectors(eigVectors, eigValues); //sort the eigenvectors in decreasing order of their associated eigenvalues
+
+	//shortcuts
+	const double& l1 = eigValues[0];
+	const double& l2 = eigValues[1];
+	const double& l3 = eigValues[2];
+
+	double value = std::numeric_limits<double>::quiet_NaN();
+
+	switch (feature)
+	{
+	case EigenValuesSum:
+		value = l1 + l2 + l3;
+		break;
+	case Omnivariance:
+		value = pow(l1 * l2 * l3, 1.0/3.0);
+		break;
+	case EigenEntropy:
+		value = -(l1 * log(l1) + l2 * log(l2) + l3 * log(l3));
+		break;
+	case Anisotropy:
+		if (std::abs(l1) > std::numeric_limits<double>::epsilon())
+			value = (l1 - l3) / l1;
+		break;
+	case Planarity:
+		if (std::abs(l1) > std::numeric_limits<double>::epsilon())
+			value = (l2 - l3) / l1;
+		break;
+	case Linearity:
+		if (std::abs(l1) > std::numeric_limits<double>::epsilon())
+			value = (l1 - l2) / l1;
+		break;
+	case PCA1:
+		{
+			double sum = l1 + l2 + l3;
+			if (std::abs(sum) > std::numeric_limits<double>::epsilon())
+				value = l1 / sum;
+		}
+		break;
+	case PCA2:
+		{
+			double sum = l1 + l2 + l3;
+			if (std::abs(sum) > std::numeric_limits<double>::epsilon())
+				value = l2 / sum;
+		}
+		break;
+	case SurfaceVariation:
+		{
+			double sum = l1 + l2 + l3;
+			if (std::abs(sum) > std::numeric_limits<double>::epsilon())
+				value = l3 / sum;
+		}
+		break;
+	case Sphericity:
+		if (std::abs(l1) > std::numeric_limits<double>::epsilon())
+			value = l3 / l1;
+		break;
+	case Verticality:
+		{
+			CCVector3d Z(0, 0, 1);
+			CCVector3d e3(Z);
+			Jacobi<double>::GetEigenVector(eigVectors, 2, e3.u);
+
+			value = 1.0 - std::abs(Z.dot(e3));
+		}
+		break;
+	default:
+		assert(false);
+		break;
+	}
+
+	return value;
+}
+
+ScalarType Neighbourhood::computeRoughness(const CCVector3& P)
+{
+	const PointCoordinateType* lsPlane = getLSPlane();
+	if (lsPlane)
+	{
+		return std::abs(DistanceComputationTools::computePoint2PlaneDistance(&P, lsPlane));
+	}
+	else
+	{
+		return NAN_VALUE;
+	}
+}
+
+ScalarType Neighbourhood::computeCurvature(const CCVector3& P, CurvatureType cType)
 {
 	switch (cType)
 	{
@@ -801,7 +987,7 @@ ScalarType Neighbourhood::computeCurvature(unsigned neighbourIndex, CC_CURVATURE
 			const CCVector3* G = getGravityCenter();
 
 			//we compute curvature at the input neighbour position + we recenter it by the way
-			CCVector3 Q = *m_associatedCloud->getPoint(neighbourIndex) - *G;
+			const CCVector3 Q(P - *G);
 
 			const unsigned char X = m_quadricEquationDirections.x;
 			const unsigned char Y = m_quadricEquationDirections.y;
@@ -830,14 +1016,14 @@ ScalarType Neighbourhood::computeCurvature(unsigned neighbourIndex, CC_CURVATURE
 			case GAUSSIAN_CURV:
 				{
 					//to sign the curvature, we need a normal!
-					PointCoordinateType K = fabs( fxx*fyy - fxy*fxy ) / (q*q);
+					const PointCoordinateType K = std::abs(fxx*fyy - fxy * fxy) / (q*q);
 					return static_cast<ScalarType>(K);
 				}
 
 			case MEAN_CURV:
 				{
 					//to sign the curvature, we need a normal!
-					PointCoordinateType H2 = fabs( ((1+fx2)*fyy - 2*fx*fy*fxy + (1+fy2)*fxx) ) / (2*sqrt(q)*q);
+					const PointCoordinateType H2 = std::abs(((1 + fx2)*fyy - 2 * fx*fy*fxy + (1 + fy2)*fxx)) / (2 * sqrt(q)*q);
 					return static_cast<ScalarType>(H2);
 				}
 
@@ -861,26 +1047,40 @@ ScalarType Neighbourhood::computeCurvature(unsigned neighbourIndex, CC_CURVATURE
 			}
 
 			//we determine plane normal by computing the smallest eigen value of M = 1/n * S[(p-µ)*(p-µ)']
+			CCLib::SquareMatrixd covMat = computeCovarianceMatrix();
+			CCVector3d e(0, 0, 0);
+#ifdef USE_EIGEN
+			Eigen::Matrix3d A = ToEigen(covMat);
+			Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> es;
+			es.compute(A);
+
+			//eigen values (and vectors) are sorted in ascending order
+			const auto& eVal = es.eigenvalues();
+
+			//compute curvature as the rate of change of the surface
+			e = CCVector3d::fromArray(eVal.data());
+#else
 			CCLib::SquareMatrixd eigVectors;
 			std::vector<double> eigValues;
-			if (!Jacobi<double>::ComputeEigenValuesAndVectors(computeCovarianceMatrix(), eigVectors, eigValues))
+			if (!Jacobi<double>::ComputeEigenValuesAndVectors(covMat, eigVectors, eigValues, true))
 			{
 				//failure
 				return NAN_VALUE;
 			}
 
 			//compute curvature as the rate of change of the surface
-			double e0 = eigValues[0];
-			double e1 = eigValues[1];
-			double e2 = eigValues[2];
-			double sum = fabs(e0+e1+e2);
+			e.x = eigValues[0];
+			e.y = eigValues[1];
+			e.z = eigValues[2];
+#endif
+			const double sum = e.x + e.y + e.z; //we work with absolute values
 			if (sum < ZERO_TOLERANCE)
 			{
 				return NAN_VALUE;
 			}
 
-			double eMin = std::min(std::min(e0,e1),e2);
-			return static_cast<ScalarType>(fabs(eMin) / sum);
+			const double eMin = std::min(std::min(e.x, e.y), e.z);
+			return static_cast<ScalarType>(eMin / sum);
 		}
 		break;
 

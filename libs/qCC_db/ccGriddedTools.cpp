@@ -22,7 +22,7 @@
 #include "ccLog.h"
 
 //! Association of an angle and the corresponding number of rows/columns
-typedef std::pair<PointCoordinateType,unsigned> AngleAndSpan;
+using AngleAndSpan = std::pair<PointCoordinateType,unsigned>;
 
 bool ccGriddedTools::DetectParameters(	const ccPointCloud* cloud,
 										const ccPointCloud::Grid::Shared grid,
@@ -57,7 +57,7 @@ bool ccGriddedTools::DetectParameters(	const ccPointCloud* cloud,
 			std::vector< AngleAndSpan > anglesShifted;
 
 			//for each ROW we determine the min and max valid grid point (i.e. index >= 0)
-			const int* _indexGrid = &(grid->indexes[0]);
+			const int* _indexGrid = grid->indexes.data();
 			for (unsigned j=0; j<grid->h; ++j)
 			{
 				unsigned minIndex = grid->w;
@@ -85,7 +85,7 @@ bool ccGriddedTools::DetectParameters(	const ccPointCloud* cloud,
 							CCVector3 P = *(cloud->getPoint(static_cast<unsigned>(index)));
 							if (cloudToSensorTrans)
 								cloudToSensorTrans->apply(P);
-							PointCoordinateType p = atan2(P.z,sqrt(P.x*P.x + P.y*P.y)); //see ccGBLSensor::projectPoint
+							PointCoordinateType p = atan2(P.z, sqrt(P.x*P.x + P.y*P.y)); //see ccGBLSensor::projectPoint
 							PointCoordinateType pShifted = (p < 0 ? p + static_cast<PointCoordinateType>(2.0*M_PI) : p);
 							if (k != minIndex)
 							{
@@ -124,10 +124,10 @@ bool ccGriddedTools::DetectParameters(	const ccPointCloud* cloud,
 
 					unsigned span = maxIndex-minIndex+1;
 					ScalarType angle_rad = static_cast<ScalarType>((maxPhiCurrentLine-minPhiCurrentLine) / span);
-					angles.push_back(AngleAndSpan(angle_rad,span));
+					angles.emplace_back(angle_rad, span);
 
 					ScalarType angleShifted_rad = static_cast<ScalarType>((maxPhiCurrentLineShifted-minPhiCurrentLineShifted) / span);
-					anglesShifted.push_back(AngleAndSpan(angleShifted_rad,span));
+					anglesShifted.emplace_back(angleShifted_rad, span);
 				}
 
 				_indexGrid += grid->w;
@@ -206,7 +206,7 @@ bool ccGriddedTools::DetectParameters(	const ccPointCloud* cloud,
 							CCVector3 P = *(cloud->getPoint(static_cast<unsigned>(index)));
 							if (cloudToSensorTrans)
 								cloudToSensorTrans->apply(P);
-							PointCoordinateType t = atan2(P.y,P.x); //see ccGBLSensor::projectPoint
+							PointCoordinateType t = atan2(P.y, P.x); //see ccGBLSensor::projectPoint
 							PointCoordinateType tShifted = (t < 0 ? t + static_cast<PointCoordinateType>(2.0*M_PI) : t);
 							if (k != minIndex)
 							{
@@ -240,10 +240,10 @@ bool ccGriddedTools::DetectParameters(	const ccPointCloud* cloud,
 
 					unsigned span = maxIndex-minIndex;
 					ScalarType angle_rad = static_cast<ScalarType>((maxThetaCurrentCol-minThetaCurrentCol) / span);
-					angles.push_back(AngleAndSpan(angle_rad,span));
+					angles.emplace_back(angle_rad,span);
 
 					ScalarType angleShifted_rad = static_cast<ScalarType>((maxThetaCurrentColShifted-minThetaCurrentColShifted) / span);
-					anglesShifted.push_back(AngleAndSpan(angleShifted_rad,span));
+					anglesShifted.emplace_back(angleShifted_rad,span);
 				}
 			}
 
@@ -298,7 +298,7 @@ ccGBLSensor* ccGriddedTools::ComputeBestSensor(ccPointCloud* cloud, ccPointCloud
 	GridParameters parameters;
 	if (!DetectParameters(cloud, grid, parameters, true, cloudToSensorTrans))
 	{
-		return 0;
+		return nullptr;
 	}
 
 	ccGBLSensor* sensor = new ccGBLSensor(ccGBLSensor::YAW_THEN_PITCH);

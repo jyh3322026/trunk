@@ -19,11 +19,11 @@
 #define CC_INDEXED_TRANSFORMATION_BUFFER_HEADER
 
 //Local
-#include "ccIndexedTransformation.h"
 #include "ccHObject.h"
+#include "ccIndexedTransformation.h"
 
 //system
-#include <float.h>
+#include <cfloat>
 
 //! Indexed Transformation buffer
 class QCC_DB_LIB_API ccIndexedTransformationBuffer : public ccHObject, public std::vector< ccIndexedTransformation >
@@ -31,13 +31,13 @@ class QCC_DB_LIB_API ccIndexedTransformationBuffer : public ccHObject, public st
 public:
 
 	//! Default constructor
-	ccIndexedTransformationBuffer(QString name = QString("Trans. buffer"));
+	ccIndexedTransformationBuffer(const QString& name = QString("Trans. buffer"));
 	//! Copy constructor
 	ccIndexedTransformationBuffer(const ccIndexedTransformationBuffer& buffer);
 
 	//inherited from ccHObject
-	virtual CC_CLASS_ENUM getClassID() const override { return CC_TYPES::TRANS_BUFFER; }
-	virtual bool isSerializable() const override { return true; }
+	CC_CLASS_ENUM getClassID() const override { return CC_TYPES::TRANS_BUFFER; }
+	bool isSerializable() const override { return true; }
 
 	//! Sorts transformations based on their index
 	/** Ascending sort.
@@ -56,12 +56,12 @@ public:
 		\param trans2IndexInBuffer (optional) index of trans2 in buffer
 		\return success
 	**/
-	bool findNearest(	double index,
-						const ccIndexedTransformation* &trans1,
-						const ccIndexedTransformation* &trans2,
-						size_t* trans1IndexInBuffer = 0,
-						size_t* trans2IndexInBuffer = 0) const;
-
+	bool findNearest(double index,
+					 const ccIndexedTransformation* &trans1,
+					 const ccIndexedTransformation* &trans2,
+					 size_t* trans1IndexInBuffer = nullptr,
+					 size_t* trans2IndexInBuffer = nullptr) const;
+	
 	//! Returns the indexed transformation at a given index (interpolates it if necessary)
 	/** \warning Binary search: buffer must be sorted! (see ccIndexedTransformationBuffer::sort)
 
@@ -73,19 +73,19 @@ public:
 	bool getInterpolatedTransformation(	double index,
 										ccIndexedTransformation& trans,
 										double maxIndexDistForInterpolation = DBL_MAX) const;
-
+	
 	//! [Display option] Returns whether trihedrons should be displayed or not (otherwise only points or a polyline)
-	bool triherdonsShown() { return m_showTrihedrons; }
+	bool triherdonsShown() const { return m_showTrihedrons; }
 	//! [Display option] Sets whether trihedrons should be displayed or not (otherwise only points or a polyline)
 	void showTriherdons(bool state) { m_showTrihedrons = state; }
 
 	//! [Display option] Returns trihedron display size
-	float triherdonsDisplayScale() { return m_trihedronsScale; }
+	float triherdonsDisplayScale() const { return m_trihedronsScale; }
 	//! [Display option] Sets trihedron display size
 	void setTriherdonsDisplayScale(float scale) { m_trihedronsScale = scale; }
 
 	//! [Display option] Returns whether the path should be displayed as a polyline or not (otherwise only points)
-	bool isPathShonwAsPolyline() { return m_showAsPolyline; }
+	bool isPathShownAsPolyline() const { return m_showAsPolyline; }
 	//! [Display option] Sets whether the path should be displayed as a polyline or not (otherwise only points)
 	void showPathAsPolyline(bool state) { m_showAsPolyline = state; }
 
@@ -95,14 +95,14 @@ public:
 	void invalidateBoundingBox();
 
 	//Inherited from ccHObject
-	virtual ccBBox getOwnBB(bool withGLFeatures = false) override;
+	ccBBox getOwnBB(bool withGLFeatures = false) override;
 
 protected:
 
 	//inherited from ccHObject
-	virtual bool toFile_MeOnly(QFile& out) const override;
-	virtual bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
-	virtual void drawMeOnly(CC_DRAW_CONTEXT& context) override;
+	bool toFile_MeOnly(QFile& out) const override;
+	bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
+	void drawMeOnly(CC_DRAW_CONTEXT& context) override;
 
 	//! Bounding box
 	ccBBox m_bBox;

@@ -24,7 +24,6 @@
 //Local
 #include "ccShiftedObject.h"
 
-
 class ccPointCloud;
 
 //! Colored polyline
@@ -45,16 +44,20 @@ public:
 	ccPolyline(const ccPolyline& poly);
 
 	//! Destructor
-	virtual ~ccPolyline() {}
+	virtual ~ccPolyline() override = default;
 
 	//! Returns class ID
-	virtual CC_CLASS_ENUM getClassID() const {return CC_TYPES::POLY_LINE;}
+	virtual CC_CLASS_ENUM getClassID() const override {return CC_TYPES::POLY_LINE;}
 
 	//inherited methods (ccHObject)
-	virtual bool isSerializable() const { return true; }
-	virtual bool hasColors() const;
-	virtual void applyGLTransformation(const ccGLMatrix& trans);
-	virtual unsigned getUniqueIDForDisplay() const;
+	virtual bool isSerializable() const override { return true; }
+	virtual bool hasColors() const override;
+	virtual void applyGLTransformation(const ccGLMatrix& trans) override;
+	virtual unsigned getUniqueIDForDisplay() const override;
+
+	//inherited methods (ccShiftedObject)
+	virtual void setGlobalShift(const CCVector3d& shift) override;
+	virtual void setGlobalScale(double scale) override;
 
 	//! Defines if the polyline is considered as 2D or 3D
 	/** \param state if true, the polyline is 2D
@@ -90,8 +93,8 @@ public:
 	inline const ccColor::Rgb& getColor() const { return m_rgbColor; }
 
 	//inherited methods (ccHObject)
-	virtual ccBBox getOwnBB(bool withGLFeatures = false);
-	inline virtual void drawBB(CC_DRAW_CONTEXT& context, const ccColor::Rgb& col)
+	virtual ccBBox getOwnBB(bool withGLFeatures = false) override;
+	inline virtual void drawBB(CC_DRAW_CONTEXT& context, const ccColor::Rgb& col) override
 	{
 		//DGM: only for 3D polylines!
 		if (!is2DMode())
@@ -135,6 +138,14 @@ public:
 	//! Shows an arrow in place of a given vertex
 	void showArrow(bool state, unsigned vertIndex, PointCoordinateType length);
 
+	//! Returns the number of segments
+	unsigned segmentCount() const;
+
+	//! Samples points on the polyline
+	ccPointCloud* samplePoints(	bool densityBased,
+								double samplingParameter,
+								bool withRGB);
+
 public: //meta-data keys
 	
 	//! Meta data key: vertical direction (for 2D polylines, contour plots, etc.)
@@ -161,11 +172,11 @@ public: //meta-data keys
 protected:
 
 	//inherited from ccHObject
-	virtual bool toFile_MeOnly(QFile& out) const;
-	virtual bool fromFile_MeOnly(QFile& in, short dataVersion, int flags);
+	virtual bool toFile_MeOnly(QFile& out) const override;
+	virtual bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
 
 	//inherited methods (ccHObject)
-	virtual void drawMeOnly(CC_DRAW_CONTEXT& context);
+	virtual void drawMeOnly(CC_DRAW_CONTEXT& context) override;
 
 	//! Unique RGB color
 	ccColor::Rgb m_rgbColor;

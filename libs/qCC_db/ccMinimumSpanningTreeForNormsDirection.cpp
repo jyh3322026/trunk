@@ -22,131 +22,145 @@
 
 //local
 #include "ccLog.h"
-#include "ccPointCloud.h"
-#include "ccScalarField.h"
-#include "ccProgressDialog.h"
 #include "ccOctree.h"
+#include "ccPointCloud.h"
+#include "ccProgressDialog.h"
+#include "ccScalarField.h"
 
 //system
-#include <set>
 #include <map>
-#include <vector>
 #include <queue>
+#include <set>
+#include <vector>
 
-//! Weighted graph edge
-class Edge
+namespace 
 {
-public:
-
-	//! Unique edge key type
-	typedef std::pair<size_t, size_t> Key;
-
-	//! Returns the unique key of an edge (no vertex order)
-	inline static Key ConstructKey(size_t v1, size_t v2)
+	//! Weighted graph edge
+	class Edge
 	{
-		return v1 > v2 ? std::make_pair(v2, v1) : std::make_pair(v1, v2);
-	}
-
-	//! Default constructor
-	Edge(size_t v1, size_t v2, double weight)
-		: m_key(ConstructKey(v1, v2))
-		, m_weight(weight)
-	{
-		assert(m_weight >= 0);
-	}
-
-	//! Strict weak ordering operator (required by std::priority_queue)
-	inline bool operator < (const Edge& other) const
-	{
-		return m_weight > other.m_weight;
-	}
-
-	//! Returns first vertex (index)
-	const size_t& v1() const { return m_key.first; }
-	//! Returns second vertex (index)
-	const size_t& v2() const { return m_key.second; }
-
-protected:
-
-	//! Unique key
-	Key m_key;
+	public:
+		
+		//! Unique edge key type
+		using Key = std::pair<unsigned, unsigned>;
+		
+		//! Returns the unique key of an edge (no vertex order)
+		inline static Key ConstructKey(unsigned v1, unsigned v2)
+		{
+			return v1 > v2 ? std::make_pair(v2, v1) : std::make_pair(v1, v2);
+		}
+		
+		//! Default constructor
+		Edge(unsigned v1, unsigned v2, float weight)
+			: m_key(ConstructKey(v1, v2))
+			, m_weight(weight)
+		{
+			assert(m_weight >= 0);
+		}
+		
+		//! Strict weak ordering operator (required by std::priority_queue)
+		inline bool operator < (const Edge& other) const
+		{
+			return m_weight > other.m_weight;
+		}
+		
+		//! Returns first vertex (index)
+		const unsigned& v1() const { return m_key.first; }
+		//! Returns second vertex (index)
+		const unsigned& v2() const { return m_key.second; }
+		
+	protected:
+		
+		//! Unique key
+		Key m_key;
+		
+		//! Associated weight
+		float m_weight;
+	};
 	
-	//! Associated weight
-	double m_weight;
-};
-
-//! Generic graph structure
-class Graph
-{
-public:
-
-	//! Default constructor
-	Graph() {}
-
-	//! Reserves memory for graph
-	/** Must be called before using the structure!
+	//! Generic graph structure
+	class Graph
+	{
+	public:
+		
+		//! Default constructor
+		Graph() = default;
+		
+		//! Set of indexes
+		using IndexSet = std::set<unsigned int>;
+		
+		//! Reserves memory for graph
+		/** Must be called before using the structure!
 		Clears the structure as well.
 	**/
-	bool reserve(size_t vertexCount)
-	{
-		m_edges.clear();
-
-		try
+		bool reserve(unsigned vertexCount)
 		{
-			m_vertexNeighbors.resize(vertexCount, std::set<size_t>());
+			m_edges.clear();
+			
+			try
+			{
+				m_vertexNeighbors.resize(vertexCount, IndexSet());
+			}
+			catch (const std::bad_alloc&)
+			{
+				//not enough memory
+				return false;
+			}
+			
+			return true;
 		}
-		catch (const std::bad_alloc&)
+		
+		//! Returns the number of vertices
+		unsigned vertexCount() const { return static_cast<unsigned>(m_vertexNeighbors.size()); } //the m_vertexNeighbors vector size shouldn't be bigger than a 32 bits integer (see 'reserve')
+		
+		//! Returns the number of edges
+		size_t edgeCount() const { return m_edges.size(); }
+		
+		//! Returns the weight associated to an edge (if it exists - returns -1 otherwise)
+		float weight(unsigned v1, unsigned v2) const
 		{
-			//not enough memory
-			return false;
+			assert(v1 < m_vertexNeighbors.size() && v2 < m_vertexNeighbors.size());
+			
+			// try to find the corresponding edge (otherwise return -1)
+			std::map<Edge::Key, float>::const_iterator it = m_edges.find(Edge::ConstructKey(v1, v2));
+			
+			return (it == m_edges.end() ? -1 : it->second);
 		}
+		
+		//! Adds or updates the edge (v1,v2)
+		void addEdge(unsigned v1, unsigned v2, float weight = 0.0f)
+		{
+			assert(v1 < m_vertexNeighbors.size() && v2 < m_vertexNeighbors.size());
+			
+			m_edges.insert(std::make_pair(Edge::ConstructKey(v1, v2), weight));
+			m_vertexNeighbors[v1].insert(v2);
+			m_vertexNeighbors[v2].insert(v1);
+		}
+		
+		//! Returns the set of edges connected to a given vertex
+		inline const IndexSet& getVertexNeighbors(unsigned index) const
+		{
+			return m_vertexNeighbors[index];
+		}
+		
+	protected:
+		
+		//! Graph edges
+		std::map<Edge::Key, float> m_edges;
+		
+		//! Set of neighbors for each vertex
+		std::vector<IndexSet> m_vertexNeighbors;
+	};
+}
 
-		return true;
-	}
-
-	//! Returns the number of vertices
-	size_t vertexCount() const { return m_vertexNeighbors.size(); }
-
-	//! Returns the number of edges
-	size_t edgeCount() const { return m_edges.size(); }
-
-	//! Returns the weight associated to an edge (if it exists - returns -1 otherwise)
-	double weight(size_t v1, size_t v2) const
-	{
-		assert(v1 < m_vertexNeighbors.size() && v2 < m_vertexNeighbors.size());
-
-		// try to find the corresponding edge (otherwise return -1)
-		std::map<Edge::Key, double>::const_iterator it = m_edges.find(Edge::ConstructKey(v1, v2));
-
-		return it == m_edges.end() ? -1 : it->second;
-	}
-
-	//! Adds or updates the edge (v1,v2)
-	void setEdge(size_t v1, size_t v2, double weight = 0)
-	{
-		assert(v1 < m_vertexNeighbors.size() && v2 < m_vertexNeighbors.size());
-
-		m_edges.insert(std::make_pair(Edge::ConstructKey(v1, v2), weight));
-		m_vertexNeighbors[v1].insert(v2);
-		m_vertexNeighbors[v2].insert(v1);
-	}
-
-	//! Returns the set of edges connected to a given vertex
-	inline const std::set<size_t>& getVertexNeighbors(size_t index) const
-	{
-		return m_vertexNeighbors[index];
-	}
-
-protected:
-
-	//! Graph edges
-	std::map<Edge::Key, double> m_edges;
-
-	//! Set of neighbors for each vertex
-	std::vector<std::set<size_t> > m_vertexNeighbors;
-};
-
-static bool ResolveNormalsWithMST(ccPointCloud* cloud, const Graph& graph, ccProgressDialog* progressCb = 0)
+static bool ResolveNormalsWithMST(	ccPointCloud* cloud,
+#ifdef WITH_GRAPH
+									const Graph& graph,
+#else
+									ccOctree::Shared& octree,
+									unsigned char level,
+									unsigned kNN,
+#endif
+									ccProgressDialog* progressCb = nullptr)
 {
 	assert(cloud && cloud->hasNormals());
 
@@ -169,13 +183,220 @@ static bool ResolveNormalsWithMST(ccPointCloud* cloud, const Graph& graph, ccPro
 	std::priority_queue<Edge> priorityQueue;
 	std::vector<bool> visited;
 	unsigned visitedCount = 0;
-
-	size_t vertexCount = graph.vertexCount();
+#ifdef WITH_GRAPH
+	unsigned vertexCount = graph.vertexCount();
+#else
+	unsigned vertexCount = cloud->size();
+#endif
 
 	//instantiate the 'visited' table
 	try
 	{
-		visited.resize(vertexCount,false);
+		visited.resize(vertexCount, false);
+
+		//progress notification
+		CCLib::NormalizedProgress nProgress(progressCb, vertexCount);
+		if (progressCb)
+		{
+			progressCb->update(0);
+			progressCb->setMethodTitle(QObject::tr("Orient normals (MST)"));
+#ifdef WITH_GRAPH
+			progressCb->setInfo(QObject::tr("Compute Minimum spanning tree\nPoints: %1\nEdges: %2").arg(vertexCount).arg(graph.edgeCount()));
+#else
+			progressCb->setInfo(QObject::tr("Compute Minimum spanning tree\nPoints: %1").arg(vertexCount));
+#endif
+			progressCb->start();
+		}
+
+#ifndef WITH_GRAPH
+		CCLib::DgmOctree::NearestNeighboursSearchStruct nNSS;
+		nNSS.level = level;
+		nNSS.minNumberOfNeighbors = kNN + 1; //+1 because we'll get the query point itself!
+#endif
+
+		//while unvisited vertices remain...
+		unsigned firstUnvisitedIndex = 0;
+		size_t patchCount = 0;
+		size_t inversionCount = 0;
+		while (visitedCount < vertexCount)
+		{
+			//find the first not-yet-visited vertex
+			while (visited[firstUnvisitedIndex])
+			{
+				++firstUnvisitedIndex;
+			}
+
+			//set it as "visited"
+			{
+				visited[firstUnvisitedIndex] = true;
+				++visitedCount;
+				//add its neighbors to the priority queue
+#ifdef WITH_GRAPH
+				const Graph::IndexSet& neighbors = graph.getVertexNeighbors(firstUnvisitedIndex);
+				for (Graph::IndexSet::const_iterator it = neighbors.begin(); it != neighbors.end(); ++it)
+				{
+					priorityQueue.push(Edge(firstUnvisitedIndex, *it, graph.weight(firstUnvisitedIndex, *it)));
+				}
+#else
+				const CCVector3* P = cloud->getPoint(firstUnvisitedIndex);
+				nNSS.queryPoint = *P;
+				octree->getTheCellPosWhichIncludesThePoint(P, nNSS.cellPos, level);
+				octree->computeCellCenter(nNSS.cellPos, level, nNSS.cellCenter);
+				nNSS.pointsInNeighbourhood.clear();
+				nNSS.alreadyVisitedNeighbourhoodSize = 0;
+
+				//look for neighbors in a sphere
+				unsigned neighborCount = octree->findNearestNeighborsStartingFromCell(nNSS, false);
+				neighborCount = std::min(neighborCount, kNN + 1);
+
+				//current point index
+				const CCVector3& N1 = cloud->getPointNormal(firstUnvisitedIndex);
+				for (unsigned j = 0; j < neighborCount; ++j)
+				{
+					//current neighbor index
+					unsigned neighborIndex = nNSS.pointsInNeighbourhood[j].pointIndex;
+					if (	firstUnvisitedIndex != neighborIndex
+						&&	!visited[neighborIndex])
+					{
+						const CCVector3& N2 = cloud->getPointNormal(neighborIndex);
+						//dot product
+						float weight = std::max(0.0f, 1.0f - static_cast<float>(fabs(N1.dot(N2))));
+
+						//distance
+						//float weight = sqrt(nNSS.pointsInNeighbourhood[j].squareDistd);
+
+						//mutual dot product
+						//const CCVector3* P2 = cloud->getPoint(static_cast<unsigned>(neighborIndex));
+						//CCVector3 uAB = *P2 - *P1;
+						//uAB.normalize();
+						//float weight = (fabs(CCVector3::vdot(uAB.u, N1) + fabs(CCVector3::vdot(uAB.u, N2)))) / 2;
+
+						priorityQueue.emplace( firstUnvisitedIndex, neighborIndex, weight );
+					}
+				}
+#endif
+
+				if (progressCb && !nProgress.oneStep())
+				{
+					break;
+				}
+			}
+
+	#ifdef COLOR_PATCHES
+			ccColor::Rgb patchCol = ccColor::Generator::Random();
+			cloud->setPointColor(static_cast<unsigned>(firstUnvisitedIndex), patchCol.rgb);
+			sf->setValue(static_cast<unsigned>(firstUnvisitedIndex),static_cast<ScalarType>(visitedCount));
+	#endif
+
+			while (!priorityQueue.empty() && (visitedCount < vertexCount))
+			{
+				//process next edge (with the lowest 'weight')
+				Edge element = priorityQueue.top();
+				priorityQueue.pop();
+
+				//shall the normal be inverted?
+				const CCVector3& N1 = cloud->getPointNormal(static_cast<unsigned>(element.v1()));
+				const CCVector3& N2 = cloud->getPointNormal(static_cast<unsigned>(element.v2()));
+				bool inverNormal = (N1.dot(N2) < 0);
+				unsigned v = 0;
+				//we should change the vertex that has not been visited yet
+				if (!visited[element.v1()])
+				{
+					v = element.v1();
+					if (inverNormal)
+					{
+						cloud->setPointNormal(static_cast<unsigned>(v), -N1);
+						++inversionCount;
+					}
+				}
+				else if (!visited[element.v2()])
+				{
+					v = element.v2();
+					if (inverNormal)
+					{
+						cloud->setPointNormal(static_cast<unsigned>(v), -N2);
+						++inversionCount;
+					}
+				}
+				else
+				{
+					continue;
+				}
+
+				//set it as "visited"
+				{
+					visited[v] = true;
+					++visitedCount;
+					//add its neighbors to the priority queue
+#ifdef WITH_GRAPH
+					const Graph::IndexSet& neighbors = graph.getVertexNeighbors(v);
+					for (Graph::IndexSet::const_iterator it = neighbors.begin(); it != neighbors.end(); ++it)
+						priorityQueue.push(Edge(v, *it, graph.weight(v,*it)));
+#else
+					const CCVector3* P = cloud->getPoint(v);
+					nNSS.queryPoint = *P;
+					octree->getTheCellPosWhichIncludesThePoint(P, nNSS.cellPos, level);
+					octree->computeCellCenter(nNSS.cellPos, level, nNSS.cellCenter);
+					nNSS.pointsInNeighbourhood.clear();
+					nNSS.alreadyVisitedNeighbourhoodSize = 0;
+
+					//look for neighbors in a sphere
+					unsigned neighborCount = octree->findNearestNeighborsStartingFromCell(nNSS, false);
+					neighborCount = std::min(neighborCount, kNN + 1);
+					//current point index
+					const CCVector3& N1 = cloud->getPointNormal(v);
+					for (unsigned j = 0; j < neighborCount; ++j)
+					{
+						//current neighbor index
+						unsigned neighborIndex = nNSS.pointsInNeighbourhood[j].pointIndex;
+						if (	v != neighborIndex
+							&&	!visited[neighborIndex])
+						{
+							const CCVector3& N2 = cloud->getPointNormal(neighborIndex);
+							//dot product
+							float weight = std::max(0.0f, 1.0f - static_cast<float>(fabs(N1.dot(N2))));
+
+							//distance
+							//float weight = sqrt(nNSS.pointsInNeighbourhood[j].squareDistd);
+
+							//mutual dot product
+							//const CCVector3* P2 = cloud->getPoint(static_cast<unsigned>(neighborIndex));
+							//CCVector3 uAB = *P2 - *P1;
+							//uAB.normalize();
+							//float weight = (fabs(CCVector3::vdot(uAB.u, N1) + fabs(CCVector3::vdot(uAB.u, N2)))) / 2;
+
+							priorityQueue.emplace( v, neighborIndex, weight );
+						}
+					}
+#endif
+				}
+
+	#ifdef COLOR_PATCHES
+				cloud->setPointColor(static_cast<unsigned>(v), patchCol);
+				sf->setValue(static_cast<unsigned>(v),static_cast<ScalarType>(visitedCount));
+	#endif
+				if (progressCb && !nProgress.oneStep())
+				{
+					visitedCount = static_cast<unsigned>(vertexCount); //early stop
+					break;
+				}
+			}
+
+			//new patch
+			++patchCount;
+		}
+
+	#ifdef COLOR_PATCHES
+		sf->computeMinAndMax();
+		cloud->showSF(true);
+	#endif
+
+		if (progressCb)
+		{
+			progressCb->stop();
+		}
+
+		ccLog::Print(QString("[ResolveNormalsWithMST] Patches = %1 / Inversions: %2").arg(patchCount).arg(inversionCount));
 	}
 	catch (const std::bad_alloc&)
 	{
@@ -183,116 +404,10 @@ static bool ResolveNormalsWithMST(ccPointCloud* cloud, const Graph& graph, ccPro
 		return false;
 	}
 
-	//progress notification
-	CCLib::NormalizedProgress nProgress(progressCb, static_cast<unsigned>(vertexCount));
-	if (progressCb)
-	{
-		progressCb->update(0);
-		progressCb->setMethodTitle(QObject::tr("Orient normals (MST)"));
-		progressCb->setInfo(QObject::tr("Compute Minimum spanning tree\nPoints: %1\nEdges: %2").arg(vertexCount).arg(graph.edgeCount()));
-		progressCb->start();
-	}
-
-	//while unvisited vertices remain...
-	size_t firstUnvisitedIndex = 0;
-	size_t patchCount = 0;
-	size_t inversionCount = 0;
-	while (visitedCount < vertexCount)
-	{
-		//find the first not-yet-visited vertex
-		while (visited[firstUnvisitedIndex])
-			++firstUnvisitedIndex;
-
-		//set it as "visited"
-		{
-			visited[firstUnvisitedIndex] = true;
-			++visitedCount;
-			//add its neighbors to the priority queue
-			const std::set<size_t>& neighbors = graph.getVertexNeighbors(firstUnvisitedIndex);
-			for (std::set<size_t>::const_iterator it = neighbors.begin(); it != neighbors.end(); ++it)
-				priorityQueue.push(Edge(firstUnvisitedIndex, *it, graph.weight(firstUnvisitedIndex, *it)));
-
-			if (progressCb && !nProgress.oneStep())
-				break;
-		}
-
-#ifdef COLOR_PATCHES
-		ccColor::Rgb patchCol = ccColor::Generator::Random();
-		cloud->setPointColor(static_cast<unsigned>(firstUnvisitedIndex), patchCol.rgb);
-		sf->setValue(static_cast<unsigned>(firstUnvisitedIndex),static_cast<ScalarType>(visitedCount));
-#endif
-
-		while(!priorityQueue.empty() && visitedCount < vertexCount)
-		{
-			//process next edge (with the lowest 'weight')
-			Edge element = priorityQueue.top();
-			priorityQueue.pop();
-
-			//there should only be (at most) one unvisited vertex in the edge
-			size_t v = 0;
-			if (!visited[element.v1()])
-				v = element.v1();
-			else if (!visited[element.v2()])
-				v = element.v2();
-			else
-				continue;
-
-			//invert normal if necessary (DO THIS BEFORE SETTING THE VERTEX AS 'VISITED'!)
-			const CCVector3& N1 = cloud->getPointNormal(static_cast<unsigned>(element.v1()));
-			const CCVector3& N2 = cloud->getPointNormal(static_cast<unsigned>(element.v2()));
-			if (N1.dot(N2) < 0)
-			{
-				if (!visited[element.v1()])
-				{
-					cloud->setPointNormal(static_cast<unsigned>(v), -N1);
-				}
-				else
-				{
-					cloud->setPointNormal(static_cast<unsigned>(v), -N2);
-				}
-				++inversionCount;
-			}
-
-			//set it as "visited"
-			{
-				visited[v] = true;
-				++visitedCount;
-				//add its neighbors to the priority queue
-				const std::set<size_t>& neighbors = graph.getVertexNeighbors(v);
-				for (std::set<size_t>::const_iterator it = neighbors.begin(); it != neighbors.end(); ++it)
-					priorityQueue.push(Edge(v, *it, graph.weight(v,*it)));
-			}
-
-#ifdef COLOR_PATCHES
-			cloud->setPointColor(static_cast<unsigned>(v), patchCol);
-			sf->setValue(static_cast<unsigned>(v),static_cast<ScalarType>(visitedCount));
-#endif
-			if (progressCb && !nProgress.oneStep())
-			{
-				visitedCount = static_cast<unsigned>(vertexCount); //early stop
-				break;
-			}
-		}
-
-		//new patch
-		++patchCount;
-	}
-
-#ifdef COLOR_PATCHES
-	sf->computeMinAndMax();
-	cloud->showSF(true);
-#endif
-
-	if (progressCb)
-	{
-		progressCb->stop();
-	}
-
-	ccLog::Print(QString("[ResolveNormalsWithMST] Patches = %1 / Inversions: %2").arg(patchCount).arg(inversionCount));
-
 	return true;
 }
 
+#ifdef WITH_GRAPH
 static bool ComputeMSTGraphAtLevel(	const CCLib::DgmOctree::octreeCell& cell,
 									void** additionalParameters,
 									CCLib::NormalizedProgress* nProgress/*=0*/)
@@ -305,9 +420,9 @@ static bool ComputeMSTGraphAtLevel(	const CCLib::DgmOctree::octreeCell& cell,
 	unsigned kNN = *static_cast<unsigned*>(additionalParameters[2]);
 
 	CCLib::DgmOctree::NearestNeighboursSearchStruct nNSS;
-	nNSS.level								= cell.level;
-	nNSS.minNumberOfNeighbors				= kNN+1; //+1 because we'll get the query point itself!
-	cell.parentOctree->getCellPos(cell.truncatedCode,cell.level,nNSS.cellPos,true);
+	nNSS.level				  = cell.level;
+	nNSS.minNumberOfNeighbors = kNN + 1; //+1 because we'll get the query point itself!
+	cell.parentOctree->getCellPos(cell.truncatedCode, cell.level, nNSS.cellPos, true);
 	cell.parentOctree->computeCellCenter(nNSS.cellPos,cell.level,nNSS.cellCenter);
 
 	unsigned n = cell.points->size(); //number of points in the current cell
@@ -324,7 +439,7 @@ static bool ComputeMSTGraphAtLevel(	const CCLib::DgmOctree::octreeCell& cell,
 		}
 
 		CCLib::DgmOctree::NeighboursSet::iterator it = nNSS.pointsInNeighbourhood.begin();
-		for (unsigned i=0; i<n; ++i,++it)
+		for (unsigned i = 0; i < n; ++i, ++it)
 		{
 			it->point = cell.points->getPointPersistentPtr(i);
 			it->pointIndex = cell.points->getPointGlobalIndex(i);
@@ -333,39 +448,38 @@ static bool ComputeMSTGraphAtLevel(	const CCLib::DgmOctree::octreeCell& cell,
 	nNSS.alreadyVisitedNeighbourhoodSize = 1;
 
 	//for each point in the cell
-	for (unsigned i=0; i<n; ++i)
+	for (unsigned i = 0; i < n; ++i)
 	{
-		cell.points->getPoint(i,nNSS.queryPoint);
+		cell.points->getPoint(i, nNSS.queryPoint);
 
 		//look for neighbors in a sphere
-		unsigned neighborCount = cell.parentOctree->findNearestNeighborsStartingFromCell(nNSS,false);
-		neighborCount = std::min(neighborCount,kNN+1);
+		unsigned neighborCount = cell.parentOctree->findNearestNeighborsStartingFromCell(nNSS, false);
+		neighborCount = std::min(neighborCount, kNN + 1);
 
 		//current point index
 		unsigned index = cell.points->getPointGlobalIndex(i);
 		const CCVector3& N1 = cloud->getPointNormal(index);
 		//const CCVector3* P1 = cloud->getPoint(static_cast<unsigned>(index));
-		for (unsigned j=0; j<neighborCount; ++j)
+		for (unsigned j = 0; j < neighborCount; ++j)
 		{
 			//current neighbor index
-			const unsigned& neighborIndex = nNSS.pointsInNeighbourhood[j].pointIndex;
+			unsigned neighborIndex = nNSS.pointsInNeighbourhood[j].pointIndex;
 			if (index != neighborIndex)
 			{
 				const CCVector3& N2 = cloud->getPointNormal(neighborIndex);
-				double weight = 0;
 				//dot product
-				weight = std::max(0.0, 1.0 - fabs(N1.dot(N2)));
-				
+				float weight = std::max(0.0f, 1.0f - static_cast<float>(fabs(N1.dot(N2))));
+
 				//distance
-				//weight = sqrt(nNSS.pointsInNeighbourhood[j].squareDistd);
+				//float weight = sqrt(nNSS.pointsInNeighbourhood[j].squareDistd);
 
 				//mutual dot product
 				//const CCVector3* P2 = cloud->getPoint(static_cast<unsigned>(neighborIndex));
 				//CCVector3 uAB = *P2 - *P1;
 				//uAB.normalize();
-				//weight = (fabs(CCVector3::vdot(uAB.u,N1) + fabs(CCVector3::vdot(uAB.u,N2)))) / 2.0;
+				//float weight = (fabs(CCVector3::vdot(uAB.u, N1) + fabs(CCVector3::vdot(uAB.u, N2)))) / 2;
 
-				graph->setEdge(index,neighborIndex,weight);
+				graph->addEdge(index, neighborIndex, weight);
 			}
 		}
 
@@ -375,6 +489,7 @@ static bool ComputeMSTGraphAtLevel(	const CCLib::DgmOctree::octreeCell& cell,
 
 	return true;
 }
+#endif
 
 bool ccMinimumSpanningTreeForNormsDirection::OrientNormals(	ccPointCloud* cloud,
 															unsigned kNN/*=6*/,
@@ -399,11 +514,12 @@ bool ccMinimumSpanningTreeForNormsDirection::OrientNormals(	ccPointCloud* cloud,
 	ccOctree::Shared octree = cloud->getOctree();
 	assert(octree);
 
-	unsigned char level = octree->findBestLevelForAGivenPopulationPerCell(kNN*2);
+	unsigned char level = octree->findBestLevelForAGivenPopulationPerCell(kNN);
 
 	bool result = true;
 	try
 	{
+#ifdef WITH_GRAPH
 		Graph graph;
 		if (!graph.reserve(cloud->size()))
 		{
@@ -437,6 +553,14 @@ bool ccMinimumSpanningTreeForNormsDirection::OrientNormals(	ccPointCloud* cloud,
 				result = false;
 			}
 		}
+#else
+		if (!ResolveNormalsWithMST(cloud, octree, level, kNN, progressDlg))
+		{
+			//something went wrong
+			ccLog::Warning(QString("Failed to resolve normals orientation with Minimum Spanning Tree on cloud '%1'").arg(cloud->getName()));
+			result = false;
+		}
+#endif
 	}
 	catch (...)
 	{

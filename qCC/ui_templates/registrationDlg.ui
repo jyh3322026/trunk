@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>350</width>
-    <height>400</height>
+    <width>411</width>
+    <height>458</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -28,15 +28,18 @@
      <layout class="QGridLayout" name="gridLayout">
       <item row="0" column="1">
        <widget class="QLabel" name="label_10">
+        <property name="toolTip">
+         <string>'data' entity</string>
+        </property>
         <property name="text">
-         <string>Data:</string>
+         <string>aligned</string>
         </property>
        </widget>
       </item>
       <item row="0" column="2">
        <widget class="QLineEdit" name="dataLineEdit">
         <property name="toolTip">
-         <string>the data cloud is the entity to align with the model cloud : it will be displaced (red cloud)</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;entity to align (will be displaced)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="statusTip">
          <string>the data cloud is the entity to align with the model cloud : it will be displaced (red cloud)</string>
@@ -51,9 +54,6 @@
         <property name="enabled">
          <bool>false</bool>
         </property>
-        <property name="text">
-         <string/>
-        </property>
        </widget>
       </item>
       <item row="0" column="0">
@@ -61,22 +61,22 @@
         <property name="enabled">
          <bool>false</bool>
         </property>
-        <property name="text">
-         <string/>
-        </property>
        </widget>
       </item>
       <item row="1" column="1">
        <widget class="QLabel" name="label_9">
+        <property name="toolTip">
+         <string>'model' entity</string>
+        </property>
         <property name="text">
-         <string>Model:</string>
+         <string>reference</string>
         </property>
        </widget>
       </item>
       <item row="1" column="2">
        <widget class="QLineEdit" name="modelLineEdit">
         <property name="toolTip">
-         <string>the model cloud is the reference : it won't move (yellow cloud)</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;reference entity (won't move)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="statusTip">
          <string>the model cloud is the reference : it won't move (yellow cloud)</string>
@@ -180,7 +180,7 @@
             <enum>Qt::RightToLeft</enum>
            </property>
            <property name="text">
-            <string>1.0e-5</string>
+            <string notr="true">1.0e-5</string>
            </property>
            <property name="alignment">
             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -212,7 +212,7 @@
             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
            </property>
            <property name="suffix">
-            <string>%</string>
+            <string notr="true">%</string>
            </property>
            <property name="minimum">
             <number>1</number>
@@ -249,7 +249,7 @@
           <string>Whether to adjust the scale of the 'data' entity</string>
          </property>
          <property name="text">
-          <string>Adjust scale</string>
+          <string>adjust scale</string>
          </property>
         </widget>
        </item>
@@ -290,7 +290,7 @@
 (CC or your computer might not respond for a while if you use all available cores)</string>
               </property>
               <property name="suffix">
-               <string> / 8</string>
+               <string notr="true"> / 8</string>
               </property>
              </widget>
             </item>
@@ -313,20 +313,6 @@
         </layout>
        </item>
       </layout>
-      <zorder>overlapSpinBox</zorder>
-      <zorder>maxIterationCount</zorder>
-      <zorder>label_4</zorder>
-      <zorder>rmsDifferenceLineEdit</zorder>
-      <zorder>iterationsCriterion</zorder>
-      <zorder>errorCriterion</zorder>
-      <zorder>overlapSpinBox</zorder>
-      <zorder>maxIterationCount</zorder>
-      <zorder>label_4</zorder>
-      <zorder>rmsDifferenceLineEdit</zorder>
-      <zorder>iterationsCriterion</zorder>
-      <zorder>errorCriterion</zorder>
-      <zorder>adjustScaleCheckBox</zorder>
-      <zorder>threadCountFrame</zorder>
      </widget>
      <widget class="QWidget" name="tabResearchParams">
       <attribute name="title">
@@ -390,22 +376,22 @@
            </property>
            <item>
             <property name="text">
-             <string>XYZ</string>
+             <string notr="true">XYZ</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>X</string>
+             <string notr="true">X</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>Y</string>
+             <string notr="true">Y</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>Z</string>
+             <string notr="true">Z</string>
             </property>
            </item>
           </widget>
@@ -450,7 +436,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>Tx</string>
+              <string notr="true">Tx</string>
              </property>
              <property name="checked">
               <bool>true</bool>
@@ -466,7 +452,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>Ty</string>
+              <string notr="true">Ty</string>
              </property>
              <property name="checked">
               <bool>true</bool>
@@ -482,7 +468,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>Tz</string>
+              <string notr="true">Tz</string>
              </property>
              <property name="checked">
               <bool>true</bool>

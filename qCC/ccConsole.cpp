@@ -18,24 +18,28 @@
 #include "ccConsole.h"
 
 //Local
-#include "mainwindow.h"
 #include "ccPersistentSettings.h"
+#include "mainwindow.h"
 
 //qCC_db
 #include <ccSingleton.h>
 
 //Qt
-#include <QListWidget>
-#include <QMessageBox>
 #include <QApplication>
+#include <QClipboard>
 #include <QColor>
-#include <QTime>
-#include <QThread>
-#include <QTextStream>
+#include <QKeyEvent>
+#include <QMessageBox>
 #include <QSettings>
+#include <QTextStream>
+#include <QThread>
+#include <QTime>
 
 //system
-#include <assert.h>
+#include <cassert>
+#ifdef QT_DEBUG
+#include <iostream>
+#endif
 
 /***************
  *** Globals ***
@@ -46,11 +50,40 @@ static ccSingleton<ccConsole> s_console;
 
 bool ccConsole::s_showQtMessagesInConsole = false;
 
-ccConsole* ccConsole::TheInstance()
+// ccCustomQListWidget
+ccCustomQListWidget::ccCustomQListWidget(QWidget *parent)
+	: QListWidget(parent)
 {
-	if (!s_console.instance)
+}
+
+void ccCustomQListWidget::keyPressEvent(QKeyEvent *event)
+{
+	if (event->matches(QKeySequence::Copy))
 	{
-		assert(false); //Init should have already be called!
+		int itemsCount = count();
+		QStringList strings;
+		for (int i = 0; i < itemsCount; ++i)
+		{
+			if (item(i)->isSelected())
+			{
+				strings << item(i)->text();
+			}
+		}
+		
+		QApplication::clipboard()->setText(strings.join("\n"));
+	}
+	else
+	{
+		QListWidget::keyPressEvent(event);
+	}
+}
+
+
+// ccConsole
+ccConsole* ccConsole::TheInstance(bool autoInit/*=true*/)
+{
+	if (!s_console.instance && autoInit)
+	{
 		s_console.instance = new ccConsole;
 		ccLog::RegisterInstance(s_console.instance);
 	}
@@ -58,22 +91,22 @@ ccConsole* ccConsole::TheInstance()
 	return s_console.instance;
 }
 
-void ccConsole::ReleaseInstance()
+void ccConsole::ReleaseInstance(bool flush/*=true*/)
 {
-	if (s_console.instance)
+	if (flush && s_console.instance)
 	{
 		//DGM: just in case some messages are still in the queue
 		s_console.instance->refresh();
 	}
-	ccLog::RegisterInstance(0);
+	ccLog::RegisterInstance(nullptr);
 	s_console.release();
 }
 
 ccConsole::ccConsole()
-	: m_textDisplay(0)
-	, m_parentWidget(0)
-	, m_parentWindow(0)
-	, m_logStream(0)
+	: m_textDisplay(nullptr)
+	, m_parentWidget(nullptr)
+	, m_parentWindow(nullptr)
+	, m_logStream(nullptr)
 {
 }
 
@@ -84,12 +117,12 @@ ccConsole::~ccConsole()
 
 void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
+#ifndef QT_DEBUG
 	if (!ccConsole::QtMessagesEnabled())
 	{
 		return;
 	}
 
-#ifndef QT_DEBUG
 	if (type == QtDebugMsg)
 	{
 		return;
@@ -116,13 +149,30 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
 		message.prepend("[Qt FATAL] ");
 		ccLog::Warning(message);
 		break;
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 5, 0)) //DGM: QtInfoMsg is only defined since version 5.5
 	case QtInfoMsg:
 		message.prepend("[Qt INFO] ");
 		ccLog::Warning(message);
 		break;
-#endif
 	}
+	
+#ifdef QT_DEBUG
+	// Also send the message to the console so we can look at the output when CC has quit
+	//	(in Qt Creator's Application Output for example)
+	switch (type)
+	{
+		case QtDebugMsg:
+		case QtWarningMsg:
+		case QtInfoMsg:
+			std::cout << message.toStdString() << std::endl;
+			break;
+			
+		case QtCriticalMsg:
+		case QtFatalMsg:
+			std::cerr << message.toStdString() << std::endl;
+			break;
+	}
+	
+#endif
 }
 
 void ccConsole::EnableQtMessages(bool state)
@@ -174,13 +224,13 @@ void ccConsole::setAutoRefresh(bool state)
 {
 	if (state)
 	{
-		QObject::connect(&m_timer, SIGNAL(timeout()), this, SLOT(refresh()));
+		connect(&m_timer, &QTimer::timeout, this, &ccConsole::refresh);
 		m_timer.start(1000);
 	}
 	else
 	{
 		m_timer.stop();
-		QObject::disconnect(&m_timer, SIGNAL(timeout()), this, SLOT(refresh()));
+		disconnect(&m_timer, &QTimer::timeout, this, &ccConsole::refresh);
 	}
 }
 
@@ -190,7 +240,7 @@ void ccConsole::refresh()
 	
 	if ((m_textDisplay || m_logStream) && !m_queue.isEmpty())
 	{
-		for (QVector<ConsoleItemType>::const_iterator it=m_queue.begin(); it!=m_queue.end(); ++it)
+		for (QVector<ConsoleItemType>::const_iterator it=m_queue.constBegin(); it!=m_queue.constEnd(); ++it)
 		{
 			 //it->second = message severity
 			bool debugMessage = (it->second & LOG_DEBUG);
@@ -263,7 +313,7 @@ void ccConsole::logMessage(const QString& message, int level)
 	}
 #endif
 
-	QString formatedMessage = QString("[") + QTime::currentTime().toString() + QString("] ") + message;
+	QString formatedMessage = QStringLiteral("[") + QTime::currentTime().toString() + QStringLiteral("] ") + message;
 
 	if (m_textDisplay || m_logStream)
 	{
@@ -313,14 +363,14 @@ void ccConsole::logMessage(const QString& message, int level)
 	}
 }
 
-bool ccConsole::setLogFile(QString filename)
+bool ccConsole::setLogFile(const QString& filename)
 {
 	//close previous stream (if any)
 	if (m_logStream)
 	{
 		m_mutex.lock();
 		delete m_logStream;
-		m_logStream = 0;
+		m_logStream = nullptr;
 		m_mutex.unlock();
 
 		if (m_logFile.isOpen())
@@ -342,7 +392,6 @@ bool ccConsole::setLogFile(QString filename)
 		m_mutex.unlock();
 		setAutoRefresh(true);
 	}
-
 
 	return true;
 }

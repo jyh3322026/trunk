@@ -32,7 +32,7 @@ struct VerticesIndexes
 	{
 		struct
 		{
-			unsigned i1,i2,i3;
+			unsigned i1, i2, i3;
 		};
 		unsigned i[3];
 	};
@@ -60,7 +60,7 @@ class CC_CORE_LIB_API GenericIndexedMesh : public GenericMesh
 public:
 
 	//! Default destructor
-	virtual ~GenericIndexedMesh() {}
+	~GenericIndexedMesh() override = default;
 
 	//! Returns the ith triangle
 	/**	Virtual method to request a triangle with a specific index.
@@ -82,14 +82,12 @@ public:
 		\param[out] B second vertex
 		\param[out] C third vertex
 	**/
-	virtual void getTriangleVertices(unsigned triangleIndex, CCVector3& A, CCVector3& B, CCVector3& C) = 0;
+	virtual void getTriangleVertices(unsigned triangleIndex, CCVector3& A, CCVector3& B, CCVector3& C) const = 0;
 
 	//! Returns the indexes of the vertices of the next triangle (relatively to the global iterator position)
 	/**	\return the triangle indexes (or 0 if the global iterator is out of bounds)
 	**/
 	virtual VerticesIndexes* getNextTriangleVertIndexes() = 0;
-
-protected:
 };
 
 }

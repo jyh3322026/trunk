@@ -18,9 +18,9 @@
 #include "ccIndexedTransformationBuffer.h"
 
 //CCLib
-#include <SortAlgo.h>
+#include <ParallelSort.h>
 
-ccIndexedTransformationBuffer::ccIndexedTransformationBuffer(QString name)
+ccIndexedTransformationBuffer::ccIndexedTransformationBuffer(const QString& name)
 	: ccHObject(name)
 	, m_bBoxValidSize(0)
 	, m_showAsPolyline(false)
@@ -60,7 +60,7 @@ static bool IndexCompOperator(const ccIndexedTransformation& a, double index)
 
 void ccIndexedTransformationBuffer::sort()
 {
-	SortAlgo(begin(), end(), IndexedSortOperator);
+	ParallelSort(begin(), end(), IndexedSortOperator);
 }
 
 bool ccIndexedTransformationBuffer::findNearest(double index,
@@ -75,7 +75,7 @@ bool ccIndexedTransformationBuffer::findNearest(double index,
 		return false;
 	}
 
-	trans1 = trans2 = 0;
+	trans1 = trans2 = nullptr;
 	if (trans1IndexInBuffer)
 		*trans1IndexInBuffer = 0;
 	if (trans2IndexInBuffer)
@@ -161,7 +161,8 @@ bool ccIndexedTransformationBuffer::getInterpolatedTransformation(	double index,
 																	ccIndexedTransformation& trans,
 																	double maxIndexDistForInterpolation/*=DBL_MAX*/) const
 {
-	const ccIndexedTransformation *t1=0, *t2=0;
+	const ccIndexedTransformation *t1 = nullptr;
+	const ccIndexedTransformation *t2 = nullptr;
 
 	if (!findNearest(index, t1, t2))
 		return false;
@@ -299,7 +300,7 @@ void ccIndexedTransformationBuffer::drawMeOnly(CC_DRAW_CONTEXT& context)
 
 	//show path
 	{
-		ccGL::Color3v(glFunc, ccColor::green.rgba);
+		ccGL::Color3v(glFunc, ccColor::green.rgb);
 		glFunc->glBegin(count > 1 && m_showAsPolyline ? GL_LINE_STRIP : GL_POINTS); //show path as a polyline or points?
 		for (ccIndexedTransformationBuffer::const_iterator it=begin(); it!=end(); ++it)
 			glFunc->glVertex3fv(it->getTranslation());
@@ -315,6 +316,10 @@ void ccIndexedTransformationBuffer::drawMeOnly(CC_DRAW_CONTEXT& context)
 			glFunc->glPushMatrix();
 			glFunc->glMultMatrixf(it->data());
 
+			//force line width
+			glFunc->glPushAttrib(GL_LINE_BIT);
+			glFunc->glLineWidth(2.0f);
+
 			glFunc->glBegin(GL_LINES);
 			glFunc->glColor3f(1.0f,0.0f,0.0f);
 			glFunc->glVertex3f(0.0f,0.0f,0.0f);
@@ -326,6 +331,8 @@ void ccIndexedTransformationBuffer::drawMeOnly(CC_DRAW_CONTEXT& context)
 			glFunc->glVertex3f(0.0f,0.0f,0.0f);
 			glFunc->glVertex3f(0.0f,0.0f,m_trihedronsScale);
 			glFunc->glEnd();
+
+			glFunc->glPopAttrib(); //GL_LINE_BIT
 
 			glFunc->glPopMatrix();
 		}

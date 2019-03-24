@@ -20,8 +20,8 @@
 
 //Local
 #include "ccBBox.h"
-#include "ccHObject.h"
 #include "ccGenericPointCloud.h"
+#include "ccHObject.h"
 #include "ccInteractor.h"
 
 //Qt
@@ -35,22 +35,27 @@ class QCC_DB_LIB_API ccClipBox : public QObject, public ccHObject, public ccInte
 public:
 
 	//! Default constructor
-	ccClipBox(ccHObject* associatedEntity = 0, QString name = QString("Clipping box"));
+	ccClipBox(QString name = QString("Clipping box"));
 
 	//! Destructor
-	virtual ~ccClipBox();
+	~ccClipBox() override;
 
-	//! Sets associated entity
+	//! Adds an associated entity
 	/** Warning: resets the current clipping box
 	**/
-	bool setAssociatedEntity(ccHObject* associatedEntity);
+	bool addAssociatedEntity(ccHObject* associatedEntity);
+
+	//! Releases all associated entities
+	/** Warning: resets the current clipping box
+	**/
+	void releaseAssociatedEntities();
 
 	//inherited from ccHObject
-	virtual ccBBox getOwnBB(bool withGLFeatures = false) override;
+	ccBBox getOwnBB(bool withGLFeatures = false) override;
 
 	//inherited from ccInteractor
-	virtual bool move2D(int x, int y, int dx, int dy, int screenWidth, int screenHeight) override;
-	virtual bool move3D(const CCVector3d& u) override;
+	bool move2D(int x, int y, int dx, int dy, int screenWidth, int screenHeight) override;
+	bool move3D(const CCVector3d& u) override;
 
 	//! Sets last clicked point (on screen)
 	void setClickedPoint(int x, int y, int screenWidth, int screenHeight, const ccGLMatrixd& viewMatrix);
@@ -79,7 +84,7 @@ public:
 	void setActiveComponent(int id);
 
 	//inherited from ccHObject
-	inline virtual CC_CLASS_ENUM getClassID() const override { return CC_TYPES::CLIPPING_BOX; }
+	inline CC_CLASS_ENUM getClassID() const override { return CC_TYPES::CLIPPING_BOX; }
 
 	//! Returns the box extents
 	inline const ccBBox& getBox() const { return m_box; }
@@ -92,12 +97,6 @@ public:
 
 	//! Shifts the current box
 	void shift(const CCVector3& v);
-
-	//! Flags the points of the associated entity (cloud or mesh)
-	/** \warning The points entity should already have a valid visibility table instantiated!
-		\param shrink Whether the box is shrinking (faster) or not
-	**/
-	void flagPointsInside(bool shrink = false);
 
 	//! Flags the points of a given cloud depending on whether they are inside or outside of this clipping box
 	/** \param cloud point cloud
@@ -117,8 +116,8 @@ public:
 	//! Returns the box parameters
 	void get(ccBBox& extents, ccGLMatrix& transformation);
 
-	//! Associated entity
-	inline ccHObject* getAssociatedEntity() const { return m_associatedEntity; }
+	//! Associated entity container
+	inline const ccHObject& getContainer() const { return m_entityContainer; }
 
 signals:
 
@@ -131,15 +130,15 @@ protected: //methods
 	void update();
 
 	//inherited from ccHObject
-	virtual void drawMeOnly(CC_DRAW_CONTEXT& context) override;
+	void drawMeOnly(CC_DRAW_CONTEXT& context) override;
 
 	//! Computes arrows display scale
 	PointCoordinateType computeArrowsScale() const;
 
 protected: //members
 	
-	//! Associated entity
-	ccHObject* m_associatedEntity;
+	//! Associated entities container
+	ccHObject m_entityContainer;
 
 	//! Clipping box
 	ccBBox m_box;

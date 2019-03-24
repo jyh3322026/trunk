@@ -16,20 +16,22 @@
 //##########################################################################
 
 #include "DepthMapFileFilter.h"
+#include "FileIO.h"
 
 //qCC_db
 #include <ccGBLSensor.h>
-#include <ccPointCloud.h>
+#include <ccHObjectCaster.h>
 #include <ccLog.h>
+#include <ccPointCloud.h>
 
 //Qt
 #include <QFileInfo>
 #include <QString>
 
 //system
-#include <assert.h>
+#include <cassert>
 
-bool DepthMapFileFilter::canLoadExtension(QString upperCaseExt) const
+bool DepthMapFileFilter::canLoadExtension(const QString& upperCaseExt) const
 {
 	//import not supported
 	return false;
@@ -46,7 +48,7 @@ bool DepthMapFileFilter::canSave(CC_CLASS_ENUM type, bool& multiple, bool& exclu
 	return false;
 }
 
-CC_FILE_ERROR DepthMapFileFilter::saveToFile(ccHObject* entity, QString filename, SaveParameters& parameters)
+CC_FILE_ERROR DepthMapFileFilter::saveToFile(ccHObject* entity, const QString& filename, const SaveParameters& parameters)
 {
 	if (!entity || filename.isEmpty())
 		return CC_FERR_BAD_ARGUMENT;
@@ -89,7 +91,7 @@ CC_FILE_ERROR DepthMapFileFilter::saveToFile(ccHObject* entity, QString filename
 	return result;
 }
 
-CC_FILE_ERROR DepthMapFileFilter::saveToFile(QString filename, ccGBLSensor* sensor)
+CC_FILE_ERROR DepthMapFileFilter::saveToFile(const QString& filename, ccGBLSensor* sensor)
 {
 	assert(sensor);
 	if (!sensor)
@@ -98,7 +100,7 @@ CC_FILE_ERROR DepthMapFileFilter::saveToFile(QString filename, ccGBLSensor* sens
 	}
 
 	//the depth map associated to this sensor
-	const ccGBLSensor::DepthBuffer& db = sensor->getDepthBuffer();
+	const ccDepthBuffer& db = sensor->getDepthBuffer();
 	if (db.zBuff.empty())
 	{
 		ccLog::Warning(QString("[DepthMap] sensor '%1' has no associated depth map (you must compute it first)").arg(sensor->getName()));
@@ -114,7 +116,7 @@ CC_FILE_ERROR DepthMapFileFilter::saveToFile(QString filename, ccGBLSensor* sens
 
 	if (CheckForSpecialChars(filename))
 	{
-		ccLog::Warning(QString("[DXF] Output filename contains special characters. It might be scrambled or rejected by the I/O filter..."));
+		ccLog::Warning(QString("[DepthMap] Output filename contains special characters. It might be scrambled or rejected by the I/O filter..."));
 	}
 
 	//opening file
@@ -126,6 +128,8 @@ CC_FILE_ERROR DepthMapFileFilter::saveToFile(QString filename, ccGBLSensor* sens
 	}
 
 	fprintf(fp, "// SENSOR DEPTH MAP\n");
+	fprintf(fp, "// %s\n", qPrintable(FileIO::createdBy()));
+	fprintf(fp, "// %s\n", qPrintable(FileIO::createdDateTime()));
 	fprintf(fp, "// Associated cloud: %s\n", qPrintable(cloud ? cloud->getName() : "none"));
 	fprintf(fp, "// Pitch  = %f [ %f : %f ]\n",
 		sensor->getPitchStep(),
@@ -141,9 +145,9 @@ CC_FILE_ERROR DepthMapFileFilter::saveToFile(QString filename, ccGBLSensor* sens
 	fprintf(fp, "/////////////////////////\n");
 
 	//an array of projected normals (same size a depth map)
-	ccGBLSensor::NormalGrid* theNorms = NULL;
+	ccGBLSensor::NormalGrid* theNorms = nullptr;
 	//an array of projected colors (same size a depth map)
-	ccGBLSensor::ColorGrid* theColors = NULL;
+	ccGBLSensor::ColorGrid* theColors = nullptr;
 
 	//if the sensor is associated to a "ccPointCloud", we may also extract
 	//normals and color!
@@ -162,52 +166,50 @@ CC_FILE_ERROR DepthMapFileFilter::saveToFile(QString filename, ccGBLSensor* sens
 			//if possible, we create the array of projected normals
 			if (pc->hasNormals())
 			{
-				NormsTableType* decodedNorms = new NormsTableType;
-				if (decodedNorms->reserve(nbPoints))
+				std::vector<CCVector3> decodedNorms;
+				try
 				{
+					decodedNorms.reserve(nbPoints);
 					for (unsigned i = 0; i < nbPoints; ++i)
-						decodedNorms->addElement(pc->getPointNormal(i).u);
+					{
+						decodedNorms.emplace_back(pc->getPointNormal(i));
+					}
 
-					theNorms = sensor->projectNormals(pc, *decodedNorms);
-					decodedNorms->clear();
+					theNorms = sensor->projectNormals(pc, decodedNorms);
 				}
-				else
+				catch (const std::bad_alloc&)
 				{
 					ccLog::Warning(QString("[DepthMap] not enough memory to load normals on sensor '%1'!").arg(sensor->getName()));
 				}
-				decodedNorms->release();
-				decodedNorms = 0;
 			}
 
 			//if possible, we create the array of projected colors
 			if (pc->hasColors())
 			{
-				GenericChunkedArray<3, ColorCompType>* rgbColors = new GenericChunkedArray<3, ColorCompType>();
-				rgbColors->reserve(nbPoints);
-
-				for (unsigned i = 0; i < nbPoints; ++i)
+				try
 				{
-					//conversion from ColorCompType[3] to unsigned char[3]
-					const ColorCompType* col = pc->getPointColor(i);
-					rgbColors->addElement(col);
+					std::vector<ccColor::Rgb> rgbColors;
+					rgbColors.reserve(nbPoints);
+					for (unsigned i = 0; i < nbPoints; ++i)
+					{
+						//conversion from ColorCompType[3] to unsigned char[3]
+						rgbColors.emplace_back(pc->getPointColor(i));
+					}
+					theColors = sensor->projectColors(pc, rgbColors);
 				}
-
-				theColors = sensor->projectColors(pc, *rgbColors);
-				rgbColors->clear();
-				rgbColors->release();
-				rgbColors = 0;
+				catch (const std::bad_alloc&)
+				{
+					ccLog::Warning(QString("[DepthMap] not enough memory to load colors on sensor '%1'!").arg(sensor->getName()));
+				}
 			}
 		}
 	}
 
-	const ScalarType* _zBuff = &(db.zBuff.front());
-	if (theNorms)
-		theNorms->placeIteratorAtBegining();
-	if (theColors)
-		theColors->placeIteratorAtBegining();
+	const PointCoordinateType* _zBuff = db.zBuff.data();
+	unsigned index = 0;
 	for (unsigned k = 0; k < db.height; ++k)
 	{
-		for (unsigned j = 0; j < db.width; ++j, ++_zBuff)
+		for (unsigned j = 0; j < db.width; ++j, ++_zBuff, ++index)
 		{
 			//grid index and depth
 			fprintf(fp, "%u %u %.12f", j, k, *_zBuff);
@@ -215,17 +217,15 @@ CC_FILE_ERROR DepthMapFileFilter::saveToFile(QString filename, ccGBLSensor* sens
 			//color
 			if (theColors)
 			{
-				const ColorCompType* C = theColors->getCurrentValue();
-				fprintf(fp, " %i %i %i", C[0], C[1], C[2]);
-				theColors->forwardIterator();
+				const ccColor::Rgb& C = theColors->at(index);
+				fprintf(fp, " %i %i %i", C.r, C.g, C.b);
 			}
 
 			//normal
 			if (theNorms)
 			{
-				const PointCoordinateType* N = theNorms->getCurrentValue();
-				fprintf(fp, " %f %f %f", N[0], N[1], N[2]);
-				theNorms->forwardIterator();
+				const CCVector3& N = theNorms->at(index);
+				fprintf(fp, " %f %f %f", N.x, N.y, N.z);
 			}
 
 			fprintf(fp, "\n");
@@ -233,17 +233,17 @@ CC_FILE_ERROR DepthMapFileFilter::saveToFile(QString filename, ccGBLSensor* sens
 	}
 
 	fclose(fp);
-	fp = 0;
+	fp = nullptr;
 
 	if (theNorms)
 	{
-		theNorms->release();
-		theNorms = 0;
+		delete theNorms;
+		theNorms = nullptr;
 	}
 	if (theColors)
 	{
-		theColors->release();
-		theColors = 0;
+		delete theColors;
+		theColors = nullptr;
 	}
 
 	return CC_FERR_NO_ERROR;

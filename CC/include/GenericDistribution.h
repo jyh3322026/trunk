@@ -43,7 +43,7 @@ public:
 	GenericDistribution() : m_isValid(false) {}
 
 	//! Default destructor
-	virtual ~GenericDistribution() {}
+	virtual ~GenericDistribution() = default;
 
 	//! Returns distribution name
 	virtual const char* getName() const = 0; 
@@ -56,14 +56,14 @@ public:
 	**/
 	virtual bool isValid() const { return m_isValid; }
 
-	//! Computes the distribution parameters from a group of sample points
-	/**	Virtual method to determine the distribution parameters from the
-		scalar values.
-		Warning: be sure to activate an OUTPUT scalar field on the input cloud
-		\param cloud a point cloud with associated scalar values
+	//! Scalar values container
+	using ScalarContainer = std::vector<ScalarType>;
+
+	//! Computes the distribution parameters from a set of values
+	/**	\param values a set of scalar values
 		\return true (if the computation succeeded) or false (if not)
 	**/
-	virtual bool computeParameters(const GenericCloud* cloud) = 0;
+	virtual bool computeParameters(const ScalarContainer& values) = 0;
 
 	//! Computes the probability of x
 	/** \param x the variable
@@ -95,10 +95,10 @@ public:
 		Warning: be sure to activate an OUTPUT scalar field on the input cloud
 		\param Yk a group of points
 		\param numberOfClasses the number of classes for the Chi2 Test
-		\param histo an array to store the values projection result (optionnal)
+		\param histo an array to store the values projection result (optional)
 		\return the Chi2 distance (or -1.0 if an error occurred)
 	**/
-	virtual double computeChi2Dist(const GenericCloud* Yk, unsigned numberOfClasses, int* histo=0) = 0;
+	virtual double computeChi2Dist(const GenericCloud* Yk, unsigned numberOfClasses, int* histo = nullptr) = 0;
 
 protected:
 

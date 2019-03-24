@@ -43,13 +43,13 @@ public:
 	virtual ~ccGraphicalTransformationTool();
 
 	//inherited from ccOverlayDialog
-	virtual bool linkWith(ccGLWindow* win);
-	virtual bool start();
-	virtual void stop(bool state);
+	virtual bool linkWith(ccGLWindow* win) override;
+	virtual bool start() override;
+	virtual void stop(bool state) override;
 
 	//! Adds an entity to the 'selected' entities set
 	/** Only the 'selected' entities are moved.
-		\return success, if the entitiy is eligible for graphical transformation
+		\return success, if the entity is eligible for graphical transformation
 	**/
 	bool addEntity(ccHObject* anObject);
 

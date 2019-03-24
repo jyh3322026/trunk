@@ -16,12 +16,6 @@
     <verstretch>0</verstretch>
    </sizepolicy>
   </property>
-  <property name="baseSize">
-   <size>
-    <width>800</width>
-    <height>600</height>
-   </size>
-  </property>
   <property name="focusPolicy">
    <enum>Qt::ClickFocus</enum>
   </property>
@@ -52,26 +46,15 @@
     <property name="title">
      <string>&amp;File</string>
     </property>
-    <widget class="QMenu" name="menu3DMouse">
-     <property name="title">
-      <string>3D mouse</string>
-     </property>
-     <property name="icon">
-      <iconset resource="../icones.qrc">
-       <normaloff>:/CC/images/im3DxLogo.png</normaloff>:/CC/images/im3DxLogo.png</iconset>
-     </property>
-     <addaction name="actionEnable3DMouse"/>
-    </widget>
     <addaction name="actionOpen"/>
     <addaction name="actionSave"/>
     <addaction name="actionGlobalShiftSettings"/>
     <addaction name="separator"/>
     <addaction name="actionPrimitiveFactory"/>
     <addaction name="separator"/>
-    <addaction name="menu3DMouse"/>
-    <addaction name="separator"/>
     <addaction name="actionCloseAll"/>
     <addaction name="actionQuit"/>
+    <addaction name="separator"/>
    </widget>
    <widget class="QMenu" name="menuDisplay">
     <property name="title">
@@ -84,8 +67,6 @@
      <addaction name="actionDisplayMainTools"/>
      <addaction name="actionDisplayScalarFieldsTools"/>
      <addaction name="actionDisplayViewTools"/>
-     <addaction name="actionDisplayPluginTools"/>
-     <addaction name="actionDisplayGLFiltersTools"/>
     </widget>
     <widget class="QMenu" name="menuLights">
      <property name="title">
@@ -98,15 +79,6 @@
      <addaction name="actionToggleSunLight"/>
      <addaction name="actionToggleCustomLight"/>
     </widget>
-    <widget class="QMenu" name="menuShadersAndFilters">
-     <property name="title">
-      <string>Shaders &amp;&amp; filters</string>
-     </property>
-     <addaction name="actionLoadShader"/>
-     <addaction name="actionDeleteShader"/>
-     <addaction name="separator"/>
-     <addaction name="actionNoFilter"/>
-    </widget>
     <widget class="QMenu" name="menuActiveScalarField">
      <property name="title">
       <string>Active scalar field</string>
@@ -115,12 +87,18 @@
      <addaction name="actionShowActiveSFPrevious"/>
      <addaction name="actionShowActiveSFNext"/>
     </widget>
+    <widget class="QMenu" name="menuLanguage">
+     <property name="title">
+      <string>Language Translation</string>
+     </property>
+    </widget>
     <addaction name="actionFullScreen"/>
     <addaction name="actionExclusiveFullScreen"/>
     <addaction name="actionRefresh"/>
     <addaction name="actionToggleCenteredPerspective"/>
     <addaction name="actionToggleViewerBasedPerspective"/>
-    <addaction name="actionLockRotationVertAxis"/>
+    <addaction name="actionShowCursor3DCoordinates"/>
+    <addaction name="actionLockRotationAxis"/>
     <addaction name="actionEnterBubbleViewMode"/>
     <addaction name="actionEnableCameraLink"/>
     <addaction name="separator"/>
@@ -132,11 +110,11 @@
     <addaction name="actionTestFrameRate"/>
     <addaction name="separator"/>
     <addaction name="menuLights"/>
-    <addaction name="menuShadersAndFilters"/>
     <addaction name="menuActiveScalarField"/>
     <addaction name="separator"/>
     <addaction name="actionConsole"/>
     <addaction name="menuToolbars"/>
+    <addaction name="menuLanguage"/>
     <addaction name="actionResetGUIElementsPos"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
@@ -172,6 +150,7 @@
      <addaction name="actionAddIdField"/>
      <addaction name="actionExportCoordToSF"/>
      <addaction name="actionSetSFAsCoord"/>
+     <addaction name="actionInterpolateSFs"/>
      <addaction name="actionScalarFieldArithmetic"/>
      <addaction name="separator"/>
      <addaction name="actionOpenColorScalesManager"/>
@@ -191,6 +170,7 @@
      <addaction name="actionRGBToGreyScale"/>
      <addaction name="actionScalarFieldFromColor"/>
      <addaction name="actionInterpolateColors"/>
+     <addaction name="actionEnhanceRGBWithIntensities"/>
      <addaction name="separator"/>
      <addaction name="actionClearColor"/>
     </widget>
@@ -240,9 +220,11 @@
      </widget>
      <addaction name="actionComputeMeshAA"/>
      <addaction name="actionComputeMeshLS"/>
+     <addaction name="actionMeshTwoPolylines"/>
+     <addaction name="actionMeshScanGrids"/>
      <addaction name="separator"/>
      <addaction name="actionConvertTextureToColor"/>
-     <addaction name="actionSamplePoints"/>
+     <addaction name="actionSamplePointsOnMesh"/>
      <addaction name="actionSmoothMeshLaplacian"/>
      <addaction name="actionSubdivideMesh"/>
      <addaction name="separator"/>
@@ -312,11 +294,36 @@
       <string>Waveform</string>
      </property>
      <addaction name="actionShowWaveDialog"/>
+     <addaction name="actionCompressFWFData"/>
+    </widget>
+    <widget class="QMenu" name="menuPlane">
+     <property name="title">
+      <string>Plane</string>
+     </property>
+     <addaction name="actionCreatePlane"/>
+     <addaction name="actionFitPlaneProxy"/>
+     <addaction name="actionEditPlane"/>
+    </widget>
+    <widget class="QMenu" name="menuGrid">
+     <property name="title">
+      <string>Grid</string>
+     </property>
+     <addaction name="actionDeleteScanGrid"/>
+     <addaction name="actionMeshScanGrids"/>
+    </widget>
+    <widget class="QMenu" name="menuPolyline">
+     <property name="title">
+      <string>Polyline</string>
+     </property>
+     <addaction name="actionSamplePointsOnPolyline"/>
     </widget>
     <addaction name="menuColors"/>
     <addaction name="menuNormals"/>
     <addaction name="menuOctree"/>
+    <addaction name="menuGrid"/>
     <addaction name="menuMesh"/>
+    <addaction name="menuPolyline"/>
+    <addaction name="menuPlane"/>
     <addaction name="menuSensors"/>
     <addaction name="menuScalarFields"/>
     <addaction name="menuWaveform"/>
@@ -355,14 +362,6 @@
     <addaction name="actionNext3DView"/>
     <addaction name="actionPrevious3DView"/>
    </widget>
-   <widget class="QMenu" name="menuPlugins">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="title">
-     <string>Plugins</string>
-    </property>
-   </widget>
    <widget class="QMenu" name="menuTools">
     <property name="title">
      <string>Tools</string>
@@ -386,6 +385,7 @@
      <addaction name="actionRasterize"/>
      <addaction name="actionConvertPolylinesToMesh"/>
      <addaction name="actionExportCoordToSF"/>
+     <addaction name="actionCreateSurfaceBetweenTwoPolylines"/>
     </widget>
     <widget class="QMenu" name="menuStatistics">
      <property name="title">
@@ -415,9 +415,7 @@
      <property name="title">
       <string>Other</string>
      </property>
-     <addaction name="actionComputeDensity"/>
-     <addaction name="actionCurvature"/>
-     <addaction name="actionRoughness"/>
+     <addaction name="actionComputeGeometricFeature"/>
      <addaction name="actionRemoveDuplicatePoints"/>
     </widget>
     <widget class="QMenu" name="menuSandBox">
@@ -425,7 +423,6 @@
       <string>Sand box (research)</string>
      </property>
      <addaction name="actionComputeKdTree"/>
-     <addaction name="separator"/>
      <addaction name="separator"/>
      <addaction name="actionComputeBestFitBB"/>
      <addaction name="actionDistanceToBestFitQuadric3D"/>
@@ -438,7 +435,6 @@
      <addaction name="separator"/>
      <addaction name="actionFindBiggestInnerRectangle"/>
      <addaction name="separator"/>
-     <addaction name="actionExportCloudsInfo"/>
      <addaction name="actionCreateCloudFromEntCenters"/>
      <addaction name="separator"/>
      <addaction name="actionComputeBestICPRmsMatrix"/>
@@ -467,6 +463,13 @@
      </property>
      <addaction name="actionCompute2HalfDimVolume"/>
     </widget>
+    <widget class="QMenu" name="menuBatchExport">
+     <property name="title">
+      <string>Batch export</string>
+     </property>
+     <addaction name="actionExportCloudInfo"/>
+     <addaction name="actionExportPlaneInfo"/>
+    </widget>
     <addaction name="menuClean"/>
     <addaction name="menuProjection"/>
     <addaction name="menuRegistration"/>
@@ -475,6 +478,7 @@
     <addaction name="menuStatistics"/>
     <addaction name="menuSegmentation"/>
     <addaction name="menuFit"/>
+    <addaction name="menuBatchExport"/>
     <addaction name="menuOther"/>
     <addaction name="separator"/>
     <addaction name="actionLevel"/>
@@ -489,7 +493,6 @@
    <addaction name="menuEdit"/>
    <addaction name="menuTools"/>
    <addaction name="menuDisplay"/>
-   <addaction name="menuPlugins"/>
    <addaction name="menu3DViews"/>
    <addaction name="menuHelp"/>
   </widget>
@@ -516,6 +519,31 @@
     <layout class="QVBoxLayout">
      <item>
       <widget class="ccCustomQTreeView" name="dbTreeView">
+       <property name="styleSheet">
+        <string notr="true">QTreeView::branch:has-siblings:!adjoins-item {
+    border-image: url(:/CC/images/QTreeView/vline.png) 0;
+}
+
+QTreeView::branch:has-siblings:adjoins-item {
+    border-image: url(:/CC/images/QTreeView/branch-more.png) 0;
+}
+
+QTreeView::branch:!has-children:!has-siblings:adjoins-item {
+    border-image: url(:/CC/images/QTreeView/branch-end.png) 0;
+}
+
+QTreeView::branch:has-children:!has-siblings:closed,
+QTreeView::branch:closed:has-children:has-siblings {
+        border-image: none;
+        image: url(:/CC/images/QTreeView/branch-closed.png);
+}
+
+QTreeView::branch:open:has-children:!has-siblings,
+QTreeView::branch:open:has-children:has-siblings  {
+        border-image: none;
+        image: url(:/CC/images/QTreeView/branch-open.png);
+}</string>
+       </property>
        <property name="dragEnabled">
         <bool>true</bool>
        </property>
@@ -538,10 +566,6 @@
    <property name="windowTitle">
     <string>Viewing tools</string>
    </property>
-   <property name="windowIcon">
-    <iconset>
-     <normaloff>.</normaloff>.</iconset>
-   </property>
    <property name="toolTip">
     <string>Viewing tools</string>
    </property>
@@ -555,6 +579,7 @@
    <addaction name="actionEditCamera"/>
    <addaction name="actionGlobalZoom"/>
    <addaction name="actionPickRotationCenter"/>
+   <addaction name="actionAutoPickRotationCenter"/>
    <addaction name="actionLevel"/>
    <addaction name="actionZoomAndCenter"/>
    <addaction name="actionSetViewTop"/>
@@ -657,7 +682,7 @@
    <addaction name="actionPointPairsAlign"/>
    <addaction name="actionRegister"/>
    <addaction name="actionSubsample"/>
-   <addaction name="actionSamplePoints"/>
+   <addaction name="actionSamplePointsOnMesh"/>
    <addaction name="actionCloudCloudDist"/>
    <addaction name="actionCloudMeshDist"/>
    <addaction name="actionLabelConnectedComponents"/>
@@ -690,23 +715,6 @@
    <addaction name="actionAddConstantSF"/>
    <addaction name="actionScalarFieldArithmetic"/>
    <addaction name="actionOpenColorScalesManager"/>
-  </widget>
-  <widget class="QToolBar" name="toolBarPluginTools">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="windowTitle">
-    <string>Plugins</string>
-   </property>
-   <property name="toolTip">
-    <string>Plugins</string>
-   </property>
-   <attribute name="toolBarArea">
-    <enum>TopToolBarArea</enum>
-   </attribute>
-   <attribute name="toolBarBreak">
-    <bool>false</bool>
-   </attribute>
   </widget>
   <widget class="QDockWidget" name="DockableProperties">
    <property name="minimumSize">
@@ -755,29 +763,13 @@
        <property name="expandsOnDoubleClick">
         <bool>false</bool>
        </property>
+       <attribute name="headerDefaultSectionSize">
+        <number>200</number>
+       </attribute>
       </widget>
      </item>
     </layout>
    </widget>
-  </widget>
-  <widget class="QToolBar" name="toolBarGLFilters">
-   <property name="enabled">
-    <bool>true</bool>
-   </property>
-   <property name="windowTitle">
-    <string>GL filters</string>
-   </property>
-   <property name="toolTip">
-    <string>GL filters</string>
-   </property>
-   <attribute name="toolBarArea">
-    <enum>TopToolBarArea</enum>
-   </attribute>
-   <attribute name="toolBarBreak">
-    <bool>false</bool>
-   </attribute>
-   <addaction name="actionNoFilter"/>
-   <addaction name="separator"/>
   </widget>
   <action name="actionOpen">
    <property name="icon">
@@ -786,12 +778,6 @@
    </property>
    <property name="text">
     <string>&amp;Open</string>
-   </property>
-   <property name="iconText">
-    <string>Open</string>
-   </property>
-   <property name="toolTip">
-    <string>Open</string>
    </property>
    <property name="statusTip">
     <string>Open</string>
@@ -807,9 +793,6 @@
    </property>
    <property name="text">
     <string>&amp;Save</string>
-   </property>
-   <property name="toolTip">
-    <string>Save current entity</string>
    </property>
    <property name="statusTip">
     <string>Save current entity</string>
@@ -846,9 +829,6 @@
    <property name="statusTip">
     <string>Switch to full screen</string>
    </property>
-   <property name="whatsThis">
-    <string/>
-   </property>
    <property name="shortcut">
     <string>F9</string>
    </property>
@@ -859,19 +839,10 @@
   <action name="actionDisplayOptions">
    <property name="icon">
     <iconset resource="../icones.qrc">
-     <normaloff>:/CC/images/ccSettings.png</normaloff>:/CC/images/ccSettings.png</iconset>
+     <normaloff>:/CC/images/monitor.svg</normaloff>:/CC/images/monitor.svg</iconset>
    </property>
    <property name="text">
     <string>Display settings</string>
-   </property>
-   <property name="iconText">
-    <string>Set Lights &amp;&amp; Materials</string>
-   </property>
-   <property name="toolTip">
-    <string>Change lighting and default materials parameters</string>
-   </property>
-   <property name="statusTip">
-    <string>Change lighting and default materials parameters</string>
    </property>
   </action>
   <action name="actionHelp">
@@ -1033,6 +1004,9 @@
    <property name="text">
     <string>Clone</string>
    </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Clone the selected entities&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-style:italic;&quot;&gt;(yes Claire ... these are Nyan sheep!)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
   </action>
   <action name="actionMerge">
    <property name="icon">
@@ -1121,7 +1095,7 @@
     <string>Apply a local statistical test to separate noise from true differences</string>
    </property>
   </action>
-  <action name="actionSamplePoints">
+  <action name="actionSamplePointsOnMesh">
    <property name="icon">
     <iconset resource="../icones.qrc">
      <normaloff>:/CC/images/ccSamplePoints.png</normaloff>:/CC/images/ccSamplePoints.png</iconset>
@@ -1169,7 +1143,7 @@
      <normaloff>:/CC/images/ccInteractiveTransformation.png</normaloff>:/CC/images/ccInteractiveTransformation.png</iconset>
    </property>
    <property name="text">
-    <string>Translate/rotate</string>
+    <string>Translate/Rotate</string>
    </property>
   </action>
   <action name="actionShowHistogram">
@@ -1288,9 +1262,6 @@
    <property name="text">
     <string>Enhance</string>
    </property>
-   <property name="iconText">
-    <string>Enhance</string>
-   </property>
    <property name="toolTip">
     <string>Enhance Scalar Field</string>
    </property>
@@ -1320,9 +1291,6 @@
    </property>
    <property name="text">
     <string>Clear</string>
-   </property>
-   <property name="iconText">
-    <string>Delete</string>
    </property>
    <property name="toolTip">
     <string>Delete normals</string>
@@ -1481,7 +1449,7 @@
   <action name="actionZoomAndCenter">
    <property name="icon">
     <iconset resource="../icones.qrc">
-     <normaloff>:/CC/images/ccZoom.png</normaloff>:/CC/images/ccZoom.png</iconset>
+     <normaloff>:/CC/images/search.svg</normaloff>:/CC/images/search.svg</iconset>
    </property>
    <property name="text">
     <string>Zoom &amp; Center</string>
@@ -1514,7 +1482,7 @@
     <string>Set top view</string>
    </property>
    <property name="shortcut">
-    <string>8</string>
+    <string notr="true">8</string>
    </property>
    <property name="shortcutContext">
     <enum>Qt::ApplicationShortcut</enum>
@@ -1535,7 +1503,7 @@
     <string>Set front view</string>
    </property>
    <property name="shortcut">
-    <string>5</string>
+    <string notr="true">5</string>
    </property>
    <property name="shortcutContext">
     <enum>Qt::ApplicationShortcut</enum>
@@ -1556,7 +1524,7 @@
     <string>Set back view</string>
    </property>
    <property name="shortcut">
-    <string>0</string>
+    <string notr="true">0</string>
    </property>
    <property name="shortcutContext">
     <enum>Qt::ApplicationShortcut</enum>
@@ -1577,7 +1545,7 @@
     <string>Set left side view</string>
    </property>
    <property name="shortcut">
-    <string>4</string>
+    <string notr="true">4</string>
    </property>
    <property name="shortcutContext">
     <enum>Qt::ApplicationShortcut</enum>
@@ -1598,7 +1566,7 @@
     <string>Set right side view</string>
    </property>
    <property name="shortcut">
-    <string>6</string>
+    <string notr="true">6</string>
    </property>
    <property name="shortcutContext">
     <enum>Qt::ApplicationShortcut</enum>
@@ -1619,7 +1587,7 @@
     <string>Set bottom view</string>
    </property>
    <property name="shortcut">
-    <string>2</string>
+    <string notr="true">2</string>
    </property>
    <property name="shortcutContext">
     <enum>Qt::ApplicationShortcut</enum>
@@ -1657,9 +1625,6 @@
    </property>
    <property name="statusTip">
     <string>Show/hide view toolbar</string>
-   </property>
-   <property name="whatsThis">
-    <string/>
    </property>
   </action>
   <action name="actionDisplayScalarFieldsTools">
@@ -1719,9 +1684,6 @@
      <normaloff>:/CC/images/ccGlobalZoom.png</normaloff>:/CC/images/ccGlobalZoom.png</iconset>
    </property>
    <property name="text">
-    <string>Global Zoom</string>
-   </property>
-   <property name="statusTip">
     <string>Global Zoom</string>
    </property>
   </action>
@@ -1794,7 +1756,7 @@
   </action>
   <action name="actionAboutPlugins">
    <property name="text">
-    <string>About Plugins ...</string>
+    <string>About Plugins...</string>
    </property>
   </action>
   <action name="actionConvertToRGB">
@@ -1870,11 +1832,6 @@
     <string>Load shader</string>
    </property>
   </action>
-  <action name="actionNoFilter">
-   <property name="text">
-    <string>Remove filter</string>
-   </property>
-  </action>
   <action name="actionDeleteShader">
    <property name="enabled">
     <bool>false</bool>
@@ -1898,17 +1855,6 @@
     <string>Point picking (point information, distance between 2 points, angles between 3 points, etc.)</string>
    </property>
   </action>
-  <action name="actionDisplayPluginTools">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Plugins</string>
-   </property>
-  </action>
   <action name="actionComputeBestFitBB">
    <property name="text">
     <string>Bounding box P.C.A. fit</string>
@@ -1923,7 +1869,7 @@
   <action name="actionEditCamera">
    <property name="icon">
     <iconset resource="../icones.qrc">
-     <normaloff>:/CC/images/ccCamera.png</normaloff>:/CC/images/ccCamera.png</iconset>
+     <normaloff>:/CC/images/photo-camera.svg</normaloff>:/CC/images/photo-camera.svg</iconset>
    </property>
    <property name="text">
     <string>Camera settings</string>
@@ -1938,9 +1884,6 @@
     <string>Point list picking</string>
    </property>
    <property name="statusTip">
-    <string>Pick several points (and export them to ASCII file, a new cloud, etc.)</string>
-   </property>
-   <property name="whatsThis">
     <string>Pick several points (and export them to ASCII file, a new cloud, etc.)</string>
    </property>
   </action>
@@ -1962,7 +1905,7 @@
     <string>Plane</string>
    </property>
    <property name="toolTip">
-    <string>Compute plane orientation (normal, srtike, dip)</string>
+    <string>Fit a plane on a set of point</string>
    </property>
   </action>
   <action name="actionRenameSF">
@@ -2085,6 +2028,12 @@
    </property>
    <property name="text">
     <string>Pick rotation center</string>
+   </property>
+   <property name="shortcut">
+    <string>P</string>
+   </property>
+   <property name="shortcutContext">
+    <enum>Qt::ApplicationShortcut</enum>
    </property>
   </action>
   <action name="actionComputeDistancesFromSensor">
@@ -2237,14 +2186,6 @@
     <enum>Qt::ApplicationShortcut</enum>
    </property>
   </action>
-  <action name="actionEnable3DMouse">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Enable</string>
-   </property>
-  </action>
   <action name="actionSetOrthoView">
    <property name="icon">
     <iconset resource="../icones.qrc">
@@ -2350,7 +2291,7 @@
     <string>Set view to 'front' isometric</string>
    </property>
    <property name="shortcut">
-    <string>7</string>
+    <string notr="true">7</string>
    </property>
    <property name="shortcutContext">
     <enum>Qt::ApplicationShortcut</enum>
@@ -2371,7 +2312,7 @@
     <string>Set view to 'back' isometric</string>
    </property>
    <property name="shortcut">
-    <string>9</string>
+    <string notr="true">9</string>
    </property>
    <property name="shortcutContext">
     <enum>Qt::ApplicationShortcut</enum>
@@ -2558,9 +2499,12 @@
     <string>Dip/Dip direction SFs</string>
    </property>
   </action>
-  <action name="actionExportCloudsInfo">
+  <action name="actionExportCloudInfo">
    <property name="text">
-    <string>Export cloud(s) info</string>
+    <string>Export cloud info</string>
+   </property>
+   <property name="toolTip">
+    <string>Export cloud info to a CSV file (name, size, barycenter, scalar fields info, etc.)</string>
    </property>
   </action>
   <action name="actionInterpolateColors">
@@ -2576,17 +2520,6 @@
     <string>Distance map to best-fit 3D quadric</string>
    </property>
   </action>
-  <action name="actionDisplayGLFiltersTools">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>GL filters</string>
-   </property>
-  </action>
   <action name="actionChangeColorLevels">
    <property name="text">
     <string>Levels</string>
@@ -2594,10 +2527,10 @@
   </action>
   <action name="actionResetGUIElementsPos">
    <property name="text">
-    <string>Reset all GUI elements positions</string>
+    <string>Reset all GUI element positions</string>
    </property>
    <property name="toolTip">
-    <string>Reset all GUI elements positions (after restart)</string>
+    <string>Reset all GUI element positions (after restart)</string>
    </property>
   </action>
   <action name="actionConvertToRandomRGB">
@@ -2655,15 +2588,15 @@
     <enum>Qt::ApplicationShortcut</enum>
    </property>
   </action>
-  <action name="actionLockRotationVertAxis">
+  <action name="actionLockRotationAxis">
    <property name="checkable">
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Lock rotation about vert. axis</string>
+    <string>Lock rotation about an axis</string>
    </property>
    <property name="toolTip">
-    <string>Lock manual rotation about the vertical (screen) axis</string>
+    <string>Lock 3D camera rotation about an axis</string>
    </property>
    <property name="shortcut">
     <string>L</string>
@@ -2746,7 +2679,7 @@
     <string>Zoom in (current 3D view)</string>
    </property>
    <property name="shortcut">
-    <string>+</string>
+    <string extracomment="Zoom in shortcut">+</string>
    </property>
   </action>
   <action name="actionZoomOut">
@@ -2757,7 +2690,7 @@
     <string>Zoom out (current 3D view)</string>
    </property>
    <property name="shortcut">
-    <string>=</string>
+    <string extracomment="Zoom in shortcut">=</string>
    </property>
   </action>
   <action name="actionDistanceMap">
@@ -2896,6 +2829,143 @@
     <string>2D Waveform viewer</string>
    </property>
   </action>
+  <action name="actionCreatePlane">
+   <property name="text">
+    <string>Create</string>
+   </property>
+   <property name="toolTip">
+    <string>Create a plane</string>
+   </property>
+  </action>
+  <action name="actionEditPlane">
+   <property name="text">
+    <string>Edit</string>
+   </property>
+   <property name="toolTip">
+    <string>Edit the plane parameters</string>
+   </property>
+  </action>
+  <action name="actionCreateSurfaceBetweenTwoPolylines">
+   <property name="text">
+    <string>Create surface between two polylines</string>
+   </property>
+  </action>
+  <action name="actionMeshTwoPolylines">
+   <property name="text">
+    <string>Surface between 2 polylines</string>
+   </property>
+  </action>
+  <action name="actionFitPlaneProxy">
+   <property name="text">
+    <string>Fit</string>
+   </property>
+   <property name="toolTip">
+    <string>Fit a plane on a set of point</string>
+   </property>
+  </action>
+  <action name="actionEnhanceRGBWithIntensities">
+   <property name="text">
+    <string>Enhance with intensities</string>
+   </property>
+  </action>
+  <action name="actionMeshScanGrids">
+   <property name="text">
+    <string>Mesh scan grids</string>
+   </property>
+   <property name="toolTip">
+    <string>Mesh scan grids (structured point clouds)</string>
+   </property>
+  </action>
+  <action name="actionAutoPickRotationCenter">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../icones.qrc">
+     <normaloff>:/CC/images/ccPickCenterAuto.png</normaloff>:/CC/images/ccPickCenterAuto.png</iconset>
+   </property>
+   <property name="text">
+    <string>Auto-pick rotation center</string>
+   </property>
+   <property name="toolTip">
+    <string>Auto-pick rotation center (rotation is always placed at the middle of the screen if possible)</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+P</string>
+   </property>
+   <property name="shortcutContext">
+    <enum>Qt::ApplicationShortcut</enum>
+   </property>
+  </action>
+  <action name="actionShowCursor3DCoordinates">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show cursor coordinates</string>
+   </property>
+   <property name="toolTip">
+    <string>Show cursor coordinates (2D and 3D if possible)</string>
+   </property>
+  </action>
+  <action name="actionDeleteScanGrid">
+   <property name="text">
+    <string>Delete scan grids</string>
+   </property>
+   <property name="toolTip">
+    <string>Delete the underlying scan grids</string>
+   </property>
+  </action>
+  <action name="actionCompressFWFData">
+   <property name="text">
+    <string>Compress FWF data</string>
+   </property>
+   <property name="toolTip">
+    <string>Compress the associated FWF data (maybe interesting after interactive segmentation for instance)</string>
+   </property>
+  </action>
+  <action name="actionInterpolateSFs">
+   <property name="text">
+    <string>Interpolate from another entity</string>
+   </property>
+   <property name="toolTip">
+    <string>Interpolate scalar-field(s) from another cloud or mesh</string>
+   </property>
+  </action>
+  <action name="actionExportPlaneInfo">
+   <property name="text">
+    <string>Export plane info</string>
+   </property>
+   <property name="toolTip">
+    <string>Export plane info to a CSV file (name, width, height, center, normal, dip and dip direction, etc.)</string>
+   </property>
+  </action>
+  <action name="actionLock_rotation_about_arbitrary_axis">
+   <property name="text">
+    <string>Lock rotation about arbitrary axis</string>
+   </property>
+  </action>
+  <action name="actionSamplePointsOnPolyline">
+   <property name="text">
+    <string>Sample points</string>
+   </property>
+  </action>
+  <action name="actionNoTranslation">
+   <property name="text">
+    <string>None (English)</string>
+   </property>
+  </action>
+  <action name="actionComputeGeometricFeature">
+   <property name="text">
+    <string>Compute geometric features</string>
+   </property>
+   <property name="toolTip">
+    <string>Compute geometric features (density, curvature, roughness, etc.)</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
@@ -2994,34 +3064,34 @@
    </hints>
   </connection>
   <connection>
-   <sender>actionDisplayPluginTools</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>toolBarPluginTools</receiver>
-   <slot>setVisible(bool)</slot>
+   <sender>actionFitPlaneProxy</sender>
+   <signal>triggered()</signal>
+   <receiver>actionFitPlane</receiver>
+   <slot>trigger()</slot>
    <hints>
     <hint type="sourcelabel">
      <x>-1</x>
      <y>-1</y>
     </hint>
     <hint type="destinationlabel">
-     <x>963</x>
-     <y>57</y>
+     <x>-1</x>
+     <y>-1</y>
     </hint>
    </hints>
   </connection>
   <connection>
-   <sender>actionDisplayGLFiltersTools</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>toolBarGLFilters</receiver>
-   <slot>setVisible(bool)</slot>
+   <sender>actionCreateSurfaceBetweenTwoPolylines</sender>
+   <signal>triggered()</signal>
+   <receiver>actionMeshTwoPolylines</receiver>
+   <slot>trigger()</slot>
    <hints>
     <hint type="sourcelabel">
      <x>-1</x>
      <y>-1</y>
     </hint>
     <hint type="destinationlabel">
-     <x>957</x>
-     <y>37</y>
+     <x>-1</x>
+     <y>-1</y>
     </hint>
    </hints>
   </connection>

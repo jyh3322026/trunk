@@ -23,22 +23,58 @@
 
 //qCC_db
 #include <ccHObject.h>
+#include <ccHObjectCaster.h>
+//qCC_gl
+#include <ccGLUtils.h>
 
 class QMainWindow;
+class QWidget;
 class ccGLWindow;
 class ccColorScalesManager;
+class ccOverlayDialog;
+class ccPickingHub;
 
 //! Main application interface (for plugins)
 class ccMainAppInterface
 {
 public:
-	virtual ~ccMainAppInterface() {}
+	virtual ~ccMainAppInterface() = default;
 
 	//! Returns main window
 	virtual QMainWindow* getMainWindow() = 0;
 
 	//! Returns active GL sub-window (if any)
 	virtual ccGLWindow* getActiveGLWindow() = 0;
+
+	//! Creates a new instance of GL window (with its encapsulating widget)
+	/** \warning This instance must be destroyed by the application as well (see destroyGLWindow)
+		Note that the encapsulating widget is the window instance itself if 'stereo' mode is disabled
+	**/
+	virtual void createGLWindow(ccGLWindow*& window, QWidget*& widget) const = 0;
+
+	//! Destroys an instance of GL window created by createGLWindow
+	virtual void destroyGLWindow(ccGLWindow*) const = 0;
+
+	//! Registers a MDI area 'overlay' dialog
+	/** Overlay dialogs are displayed in the central MDI area, above the 3D views.
+	The position (pos) is defined relatively to the MDI area (as one of its 4 corners).
+	And it is automatically updated when the main window is moved or resized.
+	Registered dialogs are automatically released when CloudCompare stops.
+
+	Notes:
+	- it may be necessary to call 'updateOverlayDialogsPlacement' after calling this method
+	- it's a good idea to freeez the UI when the tool starts to avoid other overlay dialogs
+	to appear (don't forget to unfreeze the UI afterwards)
+	**/
+	virtual void registerOverlayDialog(ccOverlayDialog* dlg, Qt::Corner pos) = 0;
+
+	//! Unregisters a MDI area 'overlay' dialog
+	/** \warning Original overlay dialog object will be deleted (see QObject::deleteLater)
+	**/
+	virtual void unregisterOverlayDialog(ccOverlayDialog* dlg) = 0;
+
+	//! Forces the update of all registered MDI 'overlay' dialogs
+	virtual void updateOverlayDialogsPlacement() = 0;
 
 	//! Returns the unique ID generator
 	virtual ccUniqueIDGenerator::Shared getUniqueIDGenerator() = 0;
@@ -63,6 +99,28 @@ public:
 	**/
 	virtual void removeFromDB(ccHObject* obj, bool autoDelete = true) = 0;
 
+	//! Backup "context" for an object
+	/** Used with removeObjectTemporarilyFromDBTree/putObjectBackIntoDBTree.
+	**/
+	struct ccHObjectContext
+	{
+		ccHObject* parent = nullptr;
+		int childFlags = 0;
+		int parentFlags = 0;
+	};
+
+	//! Removes object temporarily from DB tree
+	/** This method must be called before any modification to the db tree
+		\warning May change the set of currently selected entities
+	**/
+	virtual ccHObjectContext removeObjectTemporarilyFromDBTree(ccHObject* obj) = 0;
+
+	//! Adds back object to DB tree
+	/** This method should be called once modifications to the db tree are finished
+		(see removeObjectTemporarilyFromDBTree).
+	**/
+	virtual void putObjectBackIntoDBTree(ccHObject* obj, const ccHObjectContext& context) = 0;
+
 	//! Selects or unselects an entity (in db tree)
 	/** \param obj entity
 		\param selected whether entity should be selected or not
@@ -71,6 +129,12 @@ public:
 
 	//! Returns currently selected entities ("read only")
 	virtual const ccHObject::Container& getSelectedEntities() const = 0;
+	
+	//! Checks if we have any selections
+	bool	haveSelection() const { return !getSelectedEntities().empty(); }
+	
+	//! Checks if we have exactly one selection
+	bool	haveOneSelection() const { return getSelectedEntities().size() == 1; }
 
 	//! Console message level (see dispToConsole)
 	enum ConsoleMessageLevel
@@ -132,18 +196,21 @@ public:
 										QString title,
 										QString xAxisLabel) = 0;
 
-	//other usefull methods
-	virtual void setFrontView() = 0;
-	virtual void setBottomView() = 0;
-	virtual void setTopView() = 0;
-	virtual void setBackView() = 0;
-	virtual void setLeftView() = 0;
-	virtual void setRightView() = 0;
+	//! Returns the picking hub (if any)
+	virtual ccPickingHub* pickingHub() { return nullptr; }
+
+	//other useful methods
+	virtual void setView( CC_VIEW_ORIENTATION view ) = 0;
+	
 	virtual void toggleActiveWindowCenteredPerspective() = 0;
 	virtual void toggleActiveWindowCustomLight() = 0;
 	virtual void toggleActiveWindowSunLight() = 0;
 	virtual void toggleActiveWindowViewerBasedPerspective() = 0;
 	virtual void zoomOnSelectedEntities() = 0;
+	virtual void setGlobalZoom() = 0;
+
+	virtual void increasePointSize() = 0;
+	virtual void decreasePointSize() = 0;
 };
 
 #endif //CC_MAIN_APP_INTERFACE_HEADER

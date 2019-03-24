@@ -24,9 +24,9 @@
 #include "CCPlatform.h"
 
 //system
+#include <cassert>
+#include <cstring>
 #include <vector>
-#include <assert.h>
-#include <string.h>
 
 #ifdef CC_ENV_64
 //enables 64 bits code octree (can go up to level 21, but take 50% more memory)
@@ -86,9 +86,9 @@ public:
 		\warning Never pass a 'constant initializer' by reference
 	**/
 #ifdef OCTREE_CODES_64_BITS
-	typedef unsigned long long CellCode; //max 21 levels (but twice more memory!)
+	using CellCode = unsigned long long; //max 21 levels (but twice more memory!)
 #else
-	typedef unsigned CellCode; //max 10 levels
+	using CellCode = unsigned; //max 10 levels
 #endif
 
 	//! Max octree length at last level of subdivision (number of cells)
@@ -99,13 +99,13 @@ public:
 	//! Invalid cell code
 	/** \warning Never pass a 'constant initializer' by reference
 	**/
-	static const CellCode INVALID_CELL_CODE = (~(CellCode)0);
+	static const CellCode INVALID_CELL_CODE = (~static_cast<CellCode>(0));
 
 	//! Octree cell codes container
-	typedef std::vector<CellCode> cellCodesContainer;
+	using cellCodesContainer = std::vector<CellCode>;
 
 	//! Octree cell indexes container
-	typedef std::vector<unsigned> cellIndexesContainer;
+	using cellIndexesContainer = std::vector<unsigned int>;
 
 	//! Structure used during nearest neighbour search
 	/** Association between a point, its index and its square distance to the query point.
@@ -122,7 +122,7 @@ public:
 
 		//! Default constructor
 		PointDescriptor()
-			: point(0)
+			: point(nullptr)
 			, pointIndex(0)
 			, squareDistd(-1.0)
 		{
@@ -156,7 +156,7 @@ public:
 	};
 
 	//! A set of neighbours
-	typedef std::vector<PointDescriptor> NeighboursSet;
+	using NeighboursSet = std::vector<PointDescriptor>;
 
 	//! Structure used during nearest neighbour search
 	struct CellDescriptor
@@ -167,7 +167,7 @@ public:
 		unsigned index;
 
 		//! Default empty constructor
-		CellDescriptor() {}
+		CellDescriptor() = default;
 
 		//! Constructor from a point and an index
 		CellDescriptor(const CCVector3& C, unsigned i)
@@ -177,7 +177,7 @@ public:
 	};
 
 	//! A set of neighbour cells descriptors
-	typedef std::vector<CellDescriptor> NeighbourCellsSet;
+	using NeighbourCellsSet = std::vector<CellDescriptor>;
 
 	//! Container of in/out parameters for nearest neighbour(s) search
 	/** This structure is generic and can be used in multiple cases.
@@ -379,7 +379,7 @@ public:
 	};
 
 	//! Container of 'IndexAndCode' structures
-	typedef std::vector<IndexAndCode> cellsContainer;
+	using cellsContainer = std::vector<IndexAndCode>;
 
 	//! Octree cell descriptor
 	struct octreeCell
@@ -420,7 +420,7 @@ public:
 		- (NormalizedProgress*) optional (normalized) progress callback
 		- return success
 	**/
-	typedef bool (*octreeCellFunc)(const octreeCell& cell, void**, NormalizedProgress*);
+	using octreeCellFunc = bool (*)(const octreeCell &, void **, NormalizedProgress *);
 
 	/******************************/
 	/**          METHODS         **/
@@ -432,7 +432,7 @@ public:
 	explicit DgmOctree(GenericIndexedCloudPersist* cloud);
 
 	//! DgmOctree destructor
-	virtual ~DgmOctree();
+	~DgmOctree() override = default;
 
 	//! Clears the octree
 	virtual void clear();
@@ -442,7 +442,7 @@ public:
 		\param progressCb the client application can get some notification of the process progress through this callback mechanism (see GenericProgressCallback)
 		\return the number of points projected in the octree
 	**/
-	int build(GenericProgressCallback* progressCb = 0);
+	int build(GenericProgressCallback* progressCb = nullptr);
 
 	//! Builds the structure with constraints
 	/** Octree spatial limits must be specified. Also, if specified, points falling outside
@@ -457,9 +457,9 @@ public:
 	**/
 	int build(	const CCVector3& octreeMin,
 				const CCVector3& octreeMax,
-				const CCVector3* pointsMinFilter = 0,
-				const CCVector3* pointsMaxFilter = 0,
-				GenericProgressCallback* progressCb = 0);
+				const CCVector3* pointsMinFilter = nullptr,
+				const CCVector3* pointsMaxFilter = nullptr,
+				GenericProgressCallback* progressCb = nullptr);
 
 	/**** GETTERS ****/
 
@@ -596,6 +596,7 @@ public:
 		\param level the subdivision level of the octree at which to perform the search
 		\param maxSquareDist the square distance between the farthest "nearest neighbour" and the query point
 		\param maxSearchDist the maximum search distance (ignored if <= 0)
+		\param[out] the final neighborhood (half)size (optional)
 		\return the number of neighbours found
 	**/
 	unsigned findPointNeighbourhood(const CCVector3* _queryPoint,
@@ -603,7 +604,8 @@ public:
 									unsigned maxNumberOfNeighbors,
 									unsigned char level,
 									double &maxSquareDist,
-									double maxSearchDist = 0) const;
+									double maxSearchDist = 0,
+									int* finalNeighbourhoodSize = nullptr) const;
 
 	//! Advanced form of the nearest neighbour search algorithm (unique neighbour)
 	/** This version is optimized for a unique nearest-neighbour search.
@@ -697,7 +699,7 @@ public: //extraction of points inside geometrical volumes (sphere, cylinder, box
 		\param params input/output parameters structure
 		\return the number of extracted points
 	**/
-	size_t getPointsInCylindricalNeighbourhood(CylindricalNeighbourhood& params) const;
+	std::size_t getPointsInCylindricalNeighbourhood(CylindricalNeighbourhood& params) const;
 
 	//! Input/output parameters structure for getPointsInCylindricalNeighbourhoodProgressive
 	struct ProgressiveCylindricalNeighbourhood : CylindricalNeighbourhood
@@ -727,7 +729,7 @@ public: //extraction of points inside geometrical volumes (sphere, cylinder, box
 	/** Can be called multiple times (the 'currentHalfLength' parameter will increase
 		each time until 'maxHalfLength' is reached).
 	**/
-	size_t getPointsInCylindricalNeighbourhoodProgressive(ProgressiveCylindricalNeighbourhood& params) const;
+	std::size_t getPointsInCylindricalNeighbourhoodProgressive(ProgressiveCylindricalNeighbourhood& params) const;
 
 	//! Input/output parameters structure for getPointsInBoxNeighbourhood
 	struct BoxNeighbourhood
@@ -746,7 +748,7 @@ public: //extraction of points inside geometrical volumes (sphere, cylinder, box
 		//! Default constructor
 		BoxNeighbourhood()
 			: center(0,0,0)
-			, axes(0)
+			, axes(nullptr)
 			, dimensions(0,0,0)
 			, level(0)
 		{}
@@ -757,7 +759,7 @@ public: //extraction of points inside geometrical volumes (sphere, cylinder, box
 		structure is not used/set
 		\return the number of extracted points
 	**/
-	size_t getPointsInBoxNeighbourhood(BoxNeighbourhood& params) const;
+	std::size_t getPointsInBoxNeighbourhood(BoxNeighbourhood& params) const;
 
 
 public:	/***** CELLS POSITION HANDLING *****/
@@ -911,8 +913,8 @@ public:	/***** CELLS POSITION HANDLING *****/
 	**/
 	unsigned char findBestLevelForComparisonWithOctree(const DgmOctree* theOtherOctree) const;
 
-	//! Determines the best subdivision level of the octree to assure a mean number of points per cell
-	/** \param indicativeNumberOfPointsPerCell 'desired' number of points per cell
+	//! Determines the best subdivision level of the octree that gives the average population per cell closest to the input value
+	/** \param indicativeNumberOfPointsPerCell 'desired' average number of points per cell
 		\return the 'best' level
 	**/
 	unsigned char findBestLevelForAGivenPopulationPerCell(unsigned indicativeNumberOfPointsPerCell) const;
@@ -975,8 +977,9 @@ public:	/***** CELLS POSITION HANDLING *****/
 		\param diffB the number of cells of the second octree that are not in the first octree
 		\param cellsA the number of cells of the first octree for the given number of subdivision
 		\param cellsB the number of cells of the second octree for the given number of subdivision
+		\return false if it could not calculate the differences
 	**/
-	void diff(unsigned char octreeLevel, const cellsContainer &codesA, const cellsContainer &codesB, int &diffA, int &diffB, int &cellsA, int &cellsB) const;
+	bool diff(unsigned char octreeLevel, const cellsContainer &codesA, const cellsContainer &codesB, int &diffA, int &diffB, int &cellsA, int &cellsB) const;
 
 	//! Returns the number of cells for a given level of subdivision
 	inline const unsigned& getCellNumber(unsigned char level) const
@@ -999,12 +1002,12 @@ public:	/***** CELLS POSITION HANDLING *****/
 	**/
 	static inline PointCoordinateType ComputeMinDistanceToCellBorder(const CCVector3& queryPoint, PointCoordinateType cs, const CCVector3& cellCenter)
 	{
-		PointCoordinateType d1 = fabs(cellCenter.x - queryPoint.x);
-		PointCoordinateType d2 = fabs(cellCenter.y - queryPoint.y);
+		PointCoordinateType d1 = std::abs(cellCenter.x - queryPoint.x);
+		PointCoordinateType d2 = std::abs(cellCenter.y - queryPoint.y);
 		if (d2 > d1)
 			d1 = d2;
 		
-		d2 = fabs(cellCenter.z - queryPoint.z);
+		d2 = std::abs(cellCenter.z - queryPoint.z);
 		return cs/2 - (d2 > d1 ? d2 : d1);
 	}
 
@@ -1028,7 +1031,7 @@ public:	/***** CELLS POSITION HANDLING *****/
 	int extractCCs(	const cellCodesContainer& cellCodes,
 					unsigned char level,
 					bool sixConnexity,
-					GenericProgressCallback* progressCb = 0) const;
+					GenericProgressCallback* progressCb = nullptr) const;
 
 	//! Computes the connected components (considering the octree cells only) for a given level of subdivision (complete)
 	/** The octree is seen as a regular 3D grid, and each cell of this grid is either set to 0
@@ -1046,7 +1049,7 @@ public:	/***** CELLS POSITION HANDLING *****/
 	**/
 	int extractCCs(	unsigned char level,
 					bool sixConnexity,
-					GenericProgressCallback* progressCb = 0) const;
+					GenericProgressCallback* progressCb = nullptr) const;
 
 	/**** OCTREE VISITOR ****/
 
@@ -1077,8 +1080,8 @@ public:	/***** CELLS POSITION HANDLING *****/
 														unsigned minNumberOfPointsPerCell,
 														unsigned maxNumberOfPointsPerCell,
 														bool multiThread = true,
-														GenericProgressCallback* progressCb = 0,
-														const char* functionTitle = 0,
+														GenericProgressCallback* progressCb = nullptr,
+														const char* functionTitle = nullptr,
 														int maxThreadCount = 0);
 
 	//! Method to apply automatically a specific function to each cell of the octree
@@ -1100,8 +1103,8 @@ public:	/***** CELLS POSITION HANDLING *****/
 												octreeCellFunc func,
 												void** additionalParameters,
 												bool multiThread = false,
-												GenericProgressCallback* progressCb = 0,
-												const char* functionTitle = 0,
+												GenericProgressCallback* progressCb = nullptr,
+												const char* functionTitle = nullptr,
 												int maxThreadCount = 0);
 
 	//! Ray casting processes
@@ -1163,6 +1166,9 @@ protected:
 
 	//! Number of points projected in the octree
 	unsigned m_numberOfProjectedPoints;
+	
+	//! Nearest power of 2 less than the number of points (used for binary search)
+	unsigned m_nearestPow2;
 
 	//! Min coordinates of the octree bounding-box
 	CCVector3 m_dimMin;
@@ -1195,7 +1201,7 @@ protected:
 	/** \param progressCb the client application can get some notification of the process progress through this callback mechanism (see GenericProgressCallback)
 		\return the number of points projected in the octree
 	**/
-	int genericBuild(GenericProgressCallback* progressCb = 0);
+	int genericBuild(GenericProgressCallback* progressCb = nullptr);
 
 	//! Updates the tables containing octree limits and boundaries
 	void updateMinAndMaxTables();

@@ -20,14 +20,10 @@
 
 //Local
 #include "ccGLDrawContext.h"
-#include "qCC_db.h"
-#include "ccColorTypes.h"
 
 //CCLib
 #include <CCGeom.h>
 
-//system
-#include <vector>
 
 class ccGenericGLDisplay;
 
@@ -36,7 +32,7 @@ struct ccClipPlane
 {
 	Tuple4Tpl<double> equation;
 };
-typedef std::vector<ccClipPlane> ccClipPlaneSet;
+using ccClipPlaneSet = std::vector<ccClipPlane>;
 
 //! Generic interface for (3D) drawable entities
 class QCC_DB_LIB_API ccDrawableObject
@@ -48,7 +44,7 @@ public:
 	//! Copy constructor
 	ccDrawableObject(const ccDrawableObject& object);
 	
-	virtual ~ccDrawableObject() {}
+	virtual ~ccDrawableObject() = default;
 
 public:  //drawing and drawing options
 
@@ -75,7 +71,7 @@ public:  //drawing and drawing options
 	//! Selects/unselects entity
 	inline virtual void setSelected(bool state) { m_selected = state; }
 
-	//! Returns main OpenGL paramters for this entity
+	//! Returns main OpenGL parameters for this entity
 	/** These parameters are deduced from the visiblity states
 		of its different features (points, normals, etc.).
 		\param params a glDrawParams structure
@@ -138,7 +134,7 @@ public: //Name display in 3D
 
 public: //Temporary color
 
-	//! Returns whether colors are currently overriden by a temporary (unique) color
+	//! Returns whether colors are currently overridden by a temporary (unique) color
 	/** See ccDrawableObject::setTempColor.
 	**/
 	inline virtual bool isColorOverriden() const { return m_colorIsOverriden; }
@@ -198,12 +194,12 @@ public: //Transformation matrix management (for display only)
 	//! Enables/disables associated GL transformation
 	/** See ccDrawableObject::setGLTransformation.
 	**/
-	inline virtual void enableGLTransformation(bool state) { m_glTransEnabled = state; }
+	virtual void enableGLTransformation(bool state);
 
 	//! Returns whether a GL transformation is enabled or not
 	inline virtual bool isGLTransEnabled() const { return m_glTransEnabled; }
 
-	//! Retuns associated GL transformation
+	//! Returns associated GL transformation
 	/** See ccDrawableObject::setGLTransformation.
 	**/
 	inline virtual const ccGLMatrix& getGLTransformation() const { return m_glTrans; }
@@ -232,7 +228,7 @@ public: //Transformation matrix management (for display only)
 public: //clipping planes
 
 	//! Removes all clipping planes (if any)
-	virtual void removeAllClipPlanes() { m_clipPlanes.clear(); }
+	virtual void removeAllClipPlanes() { m_clipPlanes.resize(0); }
 
 	//! Registers a new clipping plane
 	/** \return false if the planes couldn't be added (not enough memory)
@@ -280,6 +276,8 @@ protected: //members
 
 	//! Whether name is displayed in 3D or not
 	bool m_showNameIn3D;
+	//! Last 2D position of the '3D' name
+	CCVector3d m_nameIn3DPos;
 
 	//! Currently associated GL display
 	ccGenericGLDisplay* m_currentDisplay;

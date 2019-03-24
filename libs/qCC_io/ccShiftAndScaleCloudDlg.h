@@ -3,6 +3,7 @@
 
 //local
 #include "qCC_io.h"
+#include "ccGlobalShiftManager.h"
 
 //Qt
 #include <QDialog>
@@ -35,6 +36,9 @@ public:
 		\param parent parent widget
 	**/
 	ccShiftAndScaleCloudDlg(const CCVector3d& Pl, double Dl, const CCVector3d& Pg, double Dg, QWidget* parent = 0);
+
+	//! Sets the Shift fields (X, Y and Z) precision (default should be 2)
+	void setShiftFieldsPrecision(int precision);
 
 	//! Destructor
 	virtual ~ccShiftAndScaleCloudDlg();
@@ -71,36 +75,32 @@ public:
 
 	//! Whether to show or not the 'Keep global position' checkbox
 	void showKeepGlobalPosCheckbox(bool state);
-
 	//! Returns whether the global position should be preserved or not
 	bool keepGlobalPos() const;
 	//! Sets whether the global position should be preserved or not
 	void setKeepGlobalPos(bool state);
-
-	//! Shift and scale info
-	struct ShiftInfo
-	{
-		CCVector3d shift;
-		double scale;
-		QString name;
-		
-		//! Default constructor
-		ShiftInfo(QString str = QString("unnamed")) : shift(0,0,0), scale(1.0), name(str) {}
-		//! Constructor from a vector and a scale value
-		ShiftInfo(QString str, const CCVector3d& T, double s = 1.0) : shift(T), scale(s), name(str) {}
-	};
+	
+	//! Whether to show or not the 'Preserve shift on save' checkbox
+	void showPreserveShiftOnSave(bool state);
+	//! Returns whether the global shift should be preserved or not
+	bool preserveShiftOnSave() const;
+	//! Sets whether the global shift should be preserved or not
+	void setPreserveShiftOnSave(bool state);
 
 	//! Adds shift info to the combox
 	/** \param info shift info
 		\return index in combo-box
 	**/
-	int addShiftInfo(const ShiftInfo& info);
+	int addShiftInfo(const ccGlobalShiftManager::ShiftInfo& info);
 
-	//! Returns last input info (if any)
-	bool getLast(ShiftInfo& info) const;
+	//! Adds shift info to the combox
+	/** \param info shift info
+		\return index in combo-box
+	**/
+	int addShiftInfo(const std::vector<ccGlobalShiftManager::ShiftInfo>& info);
 
 	//! Returns a given input info
-	bool getInfo(size_t index, ShiftInfo& info) const;
+	bool getInfo(size_t index, ccGlobalShiftManager::ShiftInfo& info) const;
 
 	//! Returns the number of info currently stored
 	size_t infoCount() const { return m_defaultInfos.size(); }
@@ -110,6 +110,9 @@ public:
 
 	//! Adds information from default file (if any)
 	bool addFileInfo();
+
+    //! Sets the last shift and scale information
+    static void SetLastInfo(const CCVector3d& shift, double scale);
 
 protected slots:
 
@@ -143,7 +146,7 @@ protected:
 	//! Tries to load ShiftInfo data from a (text) file
 	/** Data is stored in m_defaultInfos.
 		\param filename filename
-		\return sucess
+		\return success
 	**/
 	bool loadInfoFromFile(QString filename);
 
@@ -156,7 +159,7 @@ protected:
 	bool m_cancel;
 
 	//! Default infos (typically loaded from the global_shift_list.txt' file)
-	std::vector<ShiftInfo> m_defaultInfos;
+	std::vector<ccGlobalShiftManager::ShiftInfo> m_defaultInfos;
 	//! Active info entry index
 	int m_activeInfoIndex;
 

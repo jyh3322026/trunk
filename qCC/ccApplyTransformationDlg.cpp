@@ -19,6 +19,13 @@
 
 //Local
 #include "ccPersistentSettings.h"
+#include "ccAskTwoDoubleValuesDlg.h"
+#include "mainwindow.h"
+#include "ui_dipDirTransformationDlg.h"
+
+//qCC_db
+#include <ccFileUtils.h>
+#include <ccNormalVectors.h>
 
 //Qt
 #include <QMessageBox>
@@ -34,6 +41,16 @@ static QString s_lastMatrix("1.00000000 0.00000000 0.00000000 0.00000000\n0.0000
 static bool s_inverseMatrix = false;
 static int s_currentFormIndex = 0;
 
+//! Dialog to define a dip / dip dir. transformation
+class DipDirTransformationDialog : public QDialog, public Ui::DipDirTransformationDialog
+{
+	Q_OBJECT
+	
+public:
+
+	DipDirTransformationDialog(QWidget* parent = 0) : QDialog(parent) { setupUi(this); }
+};
+
 ccApplyTransformationDlg::ccApplyTransformationDlg(QWidget* parent/*=0*/)
 	: QDialog(parent)
 	, Ui::ApplyTransformationDialog()
@@ -48,11 +65,13 @@ ccApplyTransformationDlg::ccApplyTransformationDlg(QWidget* parent/*=0*/)
 	onMatrixTextChange(); //provoke the update of the other forms
 	tabWidget->setCurrentIndex(s_currentFormIndex);
 
-	connect(buttonBox,				SIGNAL(accepted()),				this,	SLOT(checkMatrixValidityAndAccept()));
+	connect(buttonBox,				SIGNAL(accepted()),							this,	SLOT(checkMatrixValidityAndAccept()));
+	connect(buttonBox,				SIGNAL(clicked(QAbstractButton*)),			this,	SLOT(buttonClicked(QAbstractButton*)));
 
 	connect(matrixTextEdit,			SIGNAL(textChanged()),			this,	SLOT(onMatrixTextChange()));
 	connect(fromFileToolButton,		SIGNAL(clicked()),				this,	SLOT(loadFromASCIIFile()));
-	connect(fromClipboardToolButton,SIGNAL(clicked()),				this,	SLOT(loadFromClipboard()));
+	connect(fromClipboardToolButton, SIGNAL(clicked()),				this,	SLOT(loadFromClipboard()));
+	connect(fromDipDipDirToolButton, SIGNAL(clicked()),				this,	SLOT(initFromDipAndDipDir()));
 
 	connect(rxAxisDoubleSpinBox,	SIGNAL(valueChanged(double)),	this,	SLOT(onRotAngleValueChanged(double)));
 	connect(ryAxisDoubleSpinBox,	SIGNAL(valueChanged(double)),	this,	SLOT(onRotAngleValueChanged(double)));
@@ -86,7 +105,7 @@ void ccApplyTransformationDlg::onMatrixTextChange()
 	bool valid = false;
 	ccGLMatrix mat = ccGLMatrix::FromString(text,valid);
 	if (valid)
-		updateAll(mat,false,true,true); //no need to update the current form
+		updateAll(mat, false, true, true); //no need to update the current form
 }
 
 void ccApplyTransformationDlg::onRotAngleValueChanged(double)
@@ -105,7 +124,7 @@ void ccApplyTransformationDlg::onRotAngleValueChanged(double)
 	ccGLMatrix mat;
 	mat.initFromParameters(alpha,axis,t);
 
-	updateAll(mat,true,false,true); //no need to update the current form
+	updateAll(mat, true, false, true); //no need to update the current form
 }
 
 void ccApplyTransformationDlg::onEulerValueChanged(double)
@@ -123,7 +142,7 @@ void ccApplyTransformationDlg::onEulerValueChanged(double)
 	ccGLMatrix mat;
 	mat.initFromParameters(phi,theta,psi,t);
 
-	updateAll(mat,true,true,false); //no need to update the current form
+	updateAll(mat, true, true, false); //no need to update the current form
 }
 
 void ccApplyTransformationDlg::updateAll(const ccGLMatrix& mat, bool textForm/*=true*/, bool axisAngleForm/*=true*/, bool eulerForm/*=true*/)
@@ -206,7 +225,9 @@ ccGLMatrixd ccApplyTransformationDlg::getTransformation() const
 	assert(valid);
 	//eventually invert it if necessary
 	if (inverseCheckBox->isChecked())
+	{
 		mat.invert();
+	}
 
 	return mat;
 }
@@ -237,7 +258,7 @@ void ccApplyTransformationDlg::loadFromASCIIFile()
 	//persistent settings
 	QSettings settings;
 	settings.beginGroup(ccPS::LoadFile());
-	QString currentPath = settings.value(ccPS::CurrentPath(),QApplication::applicationDirPath()).toString();
+	QString currentPath = settings.value(ccPS::CurrentPath(), ccFileUtils::defaultDocPath()).toString();
 
 	QString inputFilename = QFileDialog::getOpenFileName(this, "Select input file", currentPath, "*.txt");
 	if (inputFilename.isEmpty())
@@ -254,7 +275,7 @@ void ccApplyTransformationDlg::loadFromASCIIFile()
 	}
 
 	//save last loading location
-	settings.setValue(ccPS::CurrentPath(),QFileInfo(inputFilename).absolutePath());
+	settings.setValue(ccPS::CurrentPath(), QFileInfo(inputFilename).absolutePath());
 	settings.endGroup();
 }
 
@@ -270,3 +291,62 @@ void ccApplyTransformationDlg::loadFromClipboard()
 			ccLog::Warning("[ccApplyTransformationDlg] Clipboard is empty");
 	}
 }
+
+void ccApplyTransformationDlg::initFromDipAndDipDir()
+{
+	static double s_dip_deg = 0.0;
+	static double s_dipDir_deg = 0.0;
+	static bool s_rotateAboutCenter = false;
+	DipDirTransformationDialog dddDlg(this);
+	dddDlg.dipDoubleSpinBox->setValue(s_dip_deg);
+	dddDlg.dipDirDoubleSpinBox->setValue(s_dipDir_deg);
+	dddDlg.rotateAboutCenterCheckBox->setChecked(s_rotateAboutCenter);
+
+	if (!dddDlg.exec())
+	{
+		return;
+	}
+
+	s_dip_deg = dddDlg.dipDoubleSpinBox->value();
+	s_dipDir_deg = dddDlg.dipDirDoubleSpinBox->value();
+	s_rotateAboutCenter = dddDlg.rotateAboutCenterCheckBox->isChecked();
+
+	//resulting normal vector
+	CCVector3 Nd = ccNormalVectors::ConvertDipAndDipDirToNormal(static_cast<PointCoordinateType>(s_dip_deg), static_cast<PointCoordinateType>(s_dipDir_deg));
+	//corresponding rotation (assuming we start from (0, 0, 1))
+
+	ccGLMatrix trans = ccGLMatrix::FromToRotation(CCVector3(0, 0, 1), Nd);
+
+	if (s_rotateAboutCenter && MainWindow::TheInstance())
+	{
+		const ccHObject::Container& selectedEntities = MainWindow::TheInstance()->getSelectedEntities();
+		ccBBox box;
+		for (ccHObject* obj : selectedEntities)
+		{
+			box += obj->getBB_recursive();
+		}
+
+		if (box.isValid())
+		{
+			CCVector3 C = box.getCenter();
+			ccGLMatrix shiftToCenter;
+			shiftToCenter.setTranslation(-C);
+			ccGLMatrix backToOrigin;
+			backToOrigin.setTranslation(C);
+			trans = backToOrigin * trans * shiftToCenter;
+		}
+	}
+
+	updateAll(trans, true, true, true);
+}
+
+void ccApplyTransformationDlg::buttonClicked(QAbstractButton* button)
+{
+	if (buttonBox->buttonRole(button) == QDialogButtonBox::ResetRole)
+	{
+		updateAll(ccGLMatrix(), true, true, true);
+		inverseCheckBox->setChecked(false);
+	}
+}
+
+#include "ccApplyTransformationDlg.moc"

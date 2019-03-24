@@ -38,7 +38,7 @@ namespace CCLib
 	public:
 
 		//! Default constructor
-		SaitoSquaredDistanceTransform() : Grid3D<GridElement>() {}
+		SaitoSquaredDistanceTransform() = default;
 
 		//! Initializes the grid
 		/** The memory for the grid must be explicitelty reserved prior to any action.
@@ -53,7 +53,7 @@ namespace CCLib
 		inline bool initDT(	GenericIndexedMesh* mesh,
 							PointCoordinateType cellLength,
 							const CCVector3& gridMinCorner,
-							GenericProgressCallback* progressCb = 0)
+							GenericProgressCallback* progressCb = nullptr)
 		{
 			return intersecthWith(mesh, cellLength, gridMinCorner, 1, progressCb);
 		}
@@ -62,7 +62,7 @@ namespace CCLib
 		inline bool initDT(	GenericCloud* cloud,
 							PointCoordinateType cellLength,
 							const CCVector3& gridMinCorner,
-							GenericProgressCallback* progressCb = 0)
+							GenericProgressCallback* progressCb = nullptr)
 		{
 			return intersecthWith(cloud, cellLength, gridMinCorner, 1, progressCb);
 		}
@@ -83,16 +83,16 @@ namespace CCLib
 			\param progressCb progress callback (optional)
 			\return success
 		**/
-		inline bool propagateDistance(GenericProgressCallback* progressCb = 0) { return SDT_3D(*this, progressCb); }
+		inline bool propagateDistance(GenericProgressCallback* progressCb = nullptr) { return SDT_3D(*this, progressCb); }
 
 	protected:
 
 		//! 1D Euclidean Distance Transform
-		static bool EDT_1D(GridElement* slice, size_t r, size_t c);
+		static bool EDT_1D(GridElement* slice, std::size_t r, std::size_t c);
 		//! 2D Exact Squared Distance Transform
-		static bool SDT_2D(Grid3D<GridElement>& image, size_t sliceIndex, const std::vector<GridElement>& sq);
+		static bool SDT_2D(Grid3D<GridElement>& image, std::size_t sliceIndex, const std::vector<GridElement>& sq);
 		//! 3D Exact Squared Distance Transform
-		static bool SDT_3D(Grid3D<GridElement>& image, GenericProgressCallback* progressCb = 0);
+		static bool SDT_3D(Grid3D<GridElement>& image, GenericProgressCallback* progressCb = nullptr);
 	};
 
 }

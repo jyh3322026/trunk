@@ -20,16 +20,16 @@
 #define GRID_3D_HEADER
 
 //Local
+#include "CCMiscTools.h"
 #include "GenericCloud.h"
 #include "GenericIndexedMesh.h"
 #include "GenericProgressCallback.h"
 #include "GenericTriangle.h"
-#include "CCMiscTools.h"
 
 //System
+#include <cassert>
+#include <cstdio>
 #include <vector>
-#include <assert.h>
-#include <stdio.h> //for sprintf
 
 namespace CCLib
 {
@@ -43,7 +43,7 @@ template< class Type > class Grid3D
 public:
 
 	//! Cell type
-	typedef Type GridElement;
+	using GridElement = Type;
 
 	//! Default constructor
 	Grid3D()
@@ -116,7 +116,7 @@ public:
 						PointCoordinateType cellLength,
 						const CCVector3& gridMinCorner,
 						GridElement intersectValue = 0,
-						GenericProgressCallback* progressCb = 0)
+						GenericProgressCallback* progressCb = nullptr)
 	{
 		if (!mesh || !isInitialized())
 		{
@@ -149,7 +149,7 @@ public:
 		}
 
 		//for each triangle: look for intersecting cells
-		mesh->placeIteratorAtBegining();
+		mesh->placeIteratorAtBeginning();
 		for (unsigned n = 0; n<numberOfTriangles; ++n)
 		{
 			//get the positions (in the grid) of each vertex 
@@ -339,7 +339,7 @@ public:
 						PointCoordinateType cellLength,
 						const CCVector3& gridMinCorner,
 						GridElement intersectValue = 0,
-						GenericProgressCallback* progressCb = 0)
+						GenericProgressCallback* progressCb = nullptr)
 	{
 		if (!cloud || !isInitialized())
 		{
@@ -369,7 +369,7 @@ public:
 		}
 
 		//for each point: look for the intersecting cell
-		cloud->placeIteratorAtBegining();
+		cloud->placeIteratorAtBeginning();
 		for (unsigned n = 0; n<numberOfPoints; ++n)
 		{
 			CCVector3 P = *cloud->getNextPoint() - gridMinCorner;
@@ -453,9 +453,9 @@ public:
 	}
 
 	//! Gives access to the internal grid data (with margin)
-	inline GridElement* data() { return &(m_grid[0]); }
+	inline GridElement* data() { return m_grid.data(); }
 	//! Gives access to the internal grid data (with margin) (const version)
-	inline const GridElement* data() const { return &(m_grid[0]); }
+	inline const GridElement* data() const { return m_grid.data(); }
 
 	//! Returns the number of cell count (whithout margin)
 	inline unsigned innerCellCount() const { return m_innerCellCount; }

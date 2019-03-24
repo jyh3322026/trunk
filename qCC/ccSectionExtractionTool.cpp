@@ -19,7 +19,7 @@
 
 //Local
 #include "mainwindow.h"
-#include "ccEntityPickerDlg.h"
+#include "ccItemSelectionDlg.h"
 #include "ccOrthoSectionGenerationDlg.h"
 #include "ccSectionExtractionSubDlg.h"
 #include "ccContourExtractor.h"
@@ -46,20 +46,20 @@
 
 //System
 #include <assert.h>
-#include <math.h>
+#include <cmath>
 
 //default parameters
-static const ccColor::Rgba& s_defaultPolylineColor         = ccColor::magenta;
-static const ccColor::Rgba& s_defaultContourColor          = ccColor::green;
-static const ccColor::Rgba& s_defaultEditedPolylineColor   = ccColor::green;
-static const ccColor::Rgba& s_defaultSelectedPolylineColor = ccColor::red;
-static const int            s_defaultPolylineWidth         = 1;
-static const int            s_defaultSelectedPolylineWidth = 3;
+static const ccColor::Rgb& s_defaultPolylineColor = ccColor::magenta;
+static const ccColor::Rgb& s_defaultContourColor = ccColor::green;
+static const ccColor::Rgb& s_defaultEditedPolylineColor = ccColor::green;
+static const ccColor::Rgb& s_defaultSelectedPolylineColor = ccColor::red;
+static const int           s_defaultPolylineWidth = 1;
+static const int           s_defaultSelectedPolylineWidth = 3;
 
 //default export groups
-static unsigned s_polyExportGroupID    = 0;
+static unsigned s_polyExportGroupID = 0;
 static unsigned s_profileExportGroupID = 0;
-static unsigned s_cloudExportGroupID   = 0;
+static unsigned s_cloudExportGroupID = 0;
 
 //default arrow size
 static const PointCoordinateType s_defaultArrowSize = 20;
@@ -74,17 +74,17 @@ ccSectionExtractionTool::ccSectionExtractionTool(QWidget* parent)
 {
 	setupUi(this);
 
-	connect(undoToolButton,						SIGNAL(clicked()),					this,	SLOT(undo()));
-	connect(validToolButton,					SIGNAL(clicked()),					this,	SLOT(apply()));
-	connect(cancelToolButton,					SIGNAL(clicked()),					this,	SLOT(cancel()));
-	connect(polylineToolButton,					SIGNAL(toggled(bool)),				this,	SLOT(enableSectionEditingMode(bool)));
-	connect(importFromDBToolButton,				SIGNAL(clicked()),					this,	SLOT(doImportPolylinesFromDB()));
-	connect(vertAxisComboBox,					SIGNAL(currentIndexChanged(int)),	this,	SLOT(setVertDimension(int)));
+	connect(undoToolButton, SIGNAL(clicked()), this, SLOT(undo()));
+	connect(validToolButton, SIGNAL(clicked()), this, SLOT(apply()));
+	connect(cancelToolButton, SIGNAL(clicked()), this, SLOT(cancel()));
+	connect(polylineToolButton, SIGNAL(toggled(bool)), this, SLOT(enableSectionEditingMode(bool)));
+	connect(importFromDBToolButton, SIGNAL(clicked()), this, SLOT(doImportPolylinesFromDB()));
+	connect(vertAxisComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(setVertDimension(int)));
 
-	connect(generateOrthoSectionsToolButton,	SIGNAL(clicked()),					this,	SLOT(generateOrthoSections()));
-	connect(extractPointsToolButton,			SIGNAL(clicked()),					this,	SLOT(extractPoints()));
-	connect(unfoldToolButton,					SIGNAL(clicked()),					this,	SLOT(unfoldPoints()));
-	connect(exportSectionsToolButton,			SIGNAL(clicked()),					this,	SLOT(exportSections()));
+	connect(generateOrthoSectionsToolButton, SIGNAL(clicked()), this, SLOT(generateOrthoSections()));
+	connect(extractPointsToolButton, SIGNAL(clicked()), this, SLOT(extractPoints()));
+	connect(unfoldToolButton, SIGNAL(clicked()), this, SLOT(unfoldPoints()));
+	connect(exportSectionsToolButton, SIGNAL(clicked()), this, SLOT(exportSections()));
 
 	//add shortcuts
 	addOverridenShortcut(Qt::Key_Space);  //space bar for the "pause" button
@@ -107,11 +107,11 @@ ccSectionExtractionTool::~ccSectionExtractionTool()
 
 void ccSectionExtractionTool::setVertDimension(int dim)
 {
-	assert(dim >=0 && dim < 3);
+	assert(dim >= 0 && dim < 3);
 	if (!m_associatedWin)
 		return;
 
-	switch(dim)
+	switch (dim)
 	{
 	case 0:
 		m_associatedWin->setView(CC_RIGHT_VIEW);
@@ -129,7 +129,7 @@ void ccSectionExtractionTool::setVertDimension(int dim)
 
 void ccSectionExtractionTool::onShortcutTriggered(int key)
 {
- 	switch(key)
+	switch (key)
 	{
 	case Qt::Key_Space:
 		polylineToolButton->toggle();
@@ -206,7 +206,7 @@ bool ccSectionExtractionTool::linkWith(ccGLWindow* win)
 			}
 		}
 	}
-	
+
 	if (m_associatedWin)
 	{
 		connect(m_associatedWin, SIGNAL(leftButtonClicked(int, int)), this, SLOT(addPointToPolyline(int, int)));
@@ -275,7 +275,7 @@ void ccSectionExtractionTool::selectPolyline(Section* poly, bool autoRefreshDisp
 	}
 
 	m_selectedPoly = poly;
-	
+
 	//select new polyline (if any)
 	if (m_selectedPoly)
 	{
@@ -327,13 +327,13 @@ void ccSectionExtractionTool::deleteSelectedPolyline()
 	Section* selectedPoly = m_selectedPoly;
 
 	//deslect polyline before anything
-	selectPolyline(0,false);
-	
+	selectPolyline(0, false);
+
 	releasePolyline(selectedPoly);
 
 	//remove the section from the list
 	m_sections.removeOne(*selectedPoly);
-	m_undoCount.clear();
+	m_undoCount.resize(0);
 	undoToolButton->setEnabled(false);
 
 	if (m_associatedWin)
@@ -348,7 +348,7 @@ void ccSectionExtractionTool::entitySelected(ccHObject* entity)
 	{
 		return;
 	}
-	
+
 	//look if this selected entity corresponds to an active polyline
 	for (SectionPool::iterator it = m_sections.begin(); it != m_sections.end(); ++it)
 	{
@@ -375,7 +375,7 @@ bool ccSectionExtractionTool::start()
 	m_associatedWin->setUnclosable(true);
 	m_associatedWin->updateConstellationCenterAndZoom();
 	updateCloudsBox();
-	
+
 	enableSectionEditingMode(true);
 
 	return ccOverlayDialog::start();
@@ -387,7 +387,7 @@ void ccSectionExtractionTool::removeAllEntities()
 
 	//and we remove the remaining clouds (if any)
 	{
-		for (int i=0; i < m_clouds.size(); ++i)
+		for (int i = 0; i < m_clouds.size(); ++i)
 		{
 			Cloud& cloud = m_clouds[i];
 			if (cloud.entity)
@@ -412,11 +412,10 @@ void ccSectionExtractionTool::undo()
 	{
 		count = m_undoCount.back();
 		m_undoCount.pop_back();
-	}
-	while (static_cast<int>(count) >= m_sections.size() && !m_undoCount.empty());
+	} while (static_cast<int>(count) >= m_sections.size() && !m_undoCount.empty());
 
 	//ask for a confirmation
-	if (QMessageBox::question(MainWindow::TheInstance(),"Undo",QString("Remove %1 polylines?").arg(m_sections.size()-count),QMessageBox::Yes,QMessageBox::No) == QMessageBox::No)
+	if (QMessageBox::question(MainWindow::TheInstance(), "Undo", QString("Remove %1 polylines?").arg(m_sections.size() - count), QMessageBox::Yes, QMessageBox::No) == QMessageBox::No)
 	{
 		//restore undo stack!
 		m_undoCount.push_back(count);
@@ -478,7 +477,7 @@ bool ccSectionExtractionTool::reset(bool askForConfirmation/*=true*/)
 			releasePolyline(&section);
 		}
 		m_sections.clear();
-		m_undoCount.clear();
+		m_undoCount.resize(0);
 		undoToolButton->setEnabled(false);
 		exportSectionsToolButton->setEnabled(false);
 		extractPointsToolButton->setEnabled(false);
@@ -486,7 +485,7 @@ bool ccSectionExtractionTool::reset(bool askForConfirmation/*=true*/)
 
 	//and we remove only temporary clouds
 	{
-		for (int i=0; i < m_clouds.size(); )
+		for (int i = 0; i < m_clouds.size();)
 		{
 			Cloud& cloud = m_clouds[i];
 			if (cloud.entity && !cloud.isInDB)
@@ -540,7 +539,7 @@ void ccSectionExtractionTool::updateCloudsBox()
 {
 	m_cloudsBox.clear();
 
-	for (int i=0; i<m_clouds.size(); ++i)
+	for (int i = 0; i < m_clouds.size(); ++i)
 	{
 		if (m_clouds[i].entity)
 			m_cloudsBox += m_clouds[i].entity->getOwnBB();
@@ -591,7 +590,7 @@ bool ccSectionExtractionTool::addPolyline(ccPolyline* inputPoly, bool alreadyInD
 		if (duplicatePoly->initWith(duplicateVertices, *inputPoly))
 		{
 			assert(duplicateVertices);
-			for (unsigned i=0; i<duplicateVertices->size(); ++i)
+			for (unsigned i = 0; i < duplicateVertices->size(); ++i)
 			{
 				CCVector3& P = const_cast<CCVector3&>(*duplicateVertices->getPoint(i));
 				CCVector3d Pd(half_w + P.x, half_h + P.y, 0/*P.z*/);
@@ -619,7 +618,7 @@ bool ccSectionExtractionTool::addPolyline(ccPolyline* inputPoly, bool alreadyInD
 		{
 			delete duplicatePoly;
 			duplicatePoly = 0;
-			
+
 			ccLog::Error("Not enough memory to import polyline!");
 			return false;
 		}
@@ -627,7 +626,7 @@ bool ccSectionExtractionTool::addPolyline(ccPolyline* inputPoly, bool alreadyInD
 
 	//add polyline to the 'sections' set
 	//(all its parameters will be backuped!)
-	m_sections.push_back(Section(inputPoly,alreadyInDB));
+	m_sections.push_back(Section(inputPoly, alreadyInDB));
 	exportSectionsToolButton->setEnabled(true);
 	extractPointsToolButton->setEnabled(true);
 
@@ -670,8 +669,8 @@ bool ccSectionExtractionTool::addCloud(ccGenericPointCloud* inputCloud, bool alr
 		//test (on the first cloud) that the global shift & scale info is the same
 		if (!s_mixedShiftAndScaleInfo && it == m_clouds.begin())
 		{
-			if (	cloud.entity->getGlobalScale() != inputCloud->getGlobalScale()
-				||	(cloud.entity->getGlobalShift() - inputCloud->getGlobalShift()).norm() < ZERO_TOLERANCE)
+			if (cloud.entity->getGlobalScale() != inputCloud->getGlobalScale()
+				|| (cloud.entity->getGlobalShift() - inputCloud->getGlobalShift()).norm() < ZERO_TOLERANCE)
 			{
 				ccLog::Warning("[ccSectionExtractionTool] Clouds have different shift & scale information! Only the first one will be used");
 				s_mixedShiftAndScaleInfo = true;
@@ -679,7 +678,7 @@ bool ccSectionExtractionTool::addCloud(ccGenericPointCloud* inputCloud, bool alr
 		}
 	}
 
-	m_clouds.push_back(Cloud(inputCloud,alreadyInDB));
+	m_clouds.push_back(Cloud(inputCloud, alreadyInDB));
 	if (m_associatedWin)
 	{
 		inputCloud->setDisplay(m_associatedWin);
@@ -708,13 +707,14 @@ void ccSectionExtractionTool::updatePolyLine(int x, int y, Qt::MouseButtons butt
 	unsigned vertCount = m_editedPolyVertices->size();
 	if (vertCount < 2)
 		return;
-	
-	CCVector3 P = CCVector3(static_cast<PointCoordinateType>(x - m_associatedWin->width()/2),
-							static_cast<PointCoordinateType>(m_associatedWin->height()/2 - y),
-							0);
+
+	QPointF pos2D = m_associatedWin->toCenteredGLCoordinates(x, y);
+	CCVector3 P(static_cast<PointCoordinateType>(pos2D.x()),
+		static_cast<PointCoordinateType>(pos2D.y()),
+		0);
 
 	//we replace last point by the current one
-	CCVector3* lastP = const_cast<CCVector3*>(m_editedPolyVertices->getPointPersistentPtr(vertCount-1));
+	CCVector3* lastP = const_cast<CCVector3*>(m_editedPolyVertices->getPointPersistentPtr(vertCount - 1));
 	*lastP = P;
 
 	m_associatedWin->redraw(true, false);
@@ -755,9 +755,10 @@ void ccSectionExtractionTool::addPointToPolyline(int x, int y)
 	unsigned vertCount = m_editedPolyVertices->size();
 
 	//clicked point (2D)
-	CCVector3 P = CCVector3(static_cast<PointCoordinateType>(x - m_associatedWin->width()/2),
-							static_cast<PointCoordinateType>(m_associatedWin->height()/2 - y),
-							0);
+	QPointF pos2D = m_associatedWin->toCenteredGLCoordinates(x, y);
+	CCVector3 P(static_cast<PointCoordinateType>(pos2D.x()),
+		static_cast<PointCoordinateType>(pos2D.y()),
+		0);
 
 	//start new polyline?
 	if (((m_state & RUNNING) == 0) || vertCount == 0)
@@ -775,7 +776,7 @@ void ccSectionExtractionTool::addPointToPolyline(int x, int y)
 		m_editedPolyVertices->addPoint(P);
 		m_editedPolyVertices->addPoint(P);
 		m_editedPoly->clear();
-		if (!m_editedPoly->addPointIndex(0,2))
+		if (!m_editedPoly->addPointIndex(0, 2))
 		{
 			ccLog::Error("Out of memory!");
 			return;
@@ -783,7 +784,7 @@ void ccSectionExtractionTool::addPointToPolyline(int x, int y)
 	}
 	else //next points
 	{
-		if (!m_editedPolyVertices->reserve(vertCount+1))
+		if (!m_editedPolyVertices->reserve(vertCount + 1))
 		{
 			ccLog::Error("Out of memory!");
 			return;
@@ -791,8 +792,8 @@ void ccSectionExtractionTool::addPointToPolyline(int x, int y)
 
 		//we replace last point by the current one
 		assert(vertCount >= 2);
-		CCVector3* lastP = const_cast<CCVector3*>(m_editedPolyVertices->getPointPersistentPtr(vertCount-1));
-		CCVector3* lastQ = const_cast<CCVector3*>(m_editedPolyVertices->getPointPersistentPtr(vertCount-2));
+		CCVector3* lastP = const_cast<CCVector3*>(m_editedPolyVertices->getPointPersistentPtr(vertCount - 1));
+		CCVector3* lastQ = const_cast<CCVector3*>(m_editedPolyVertices->getPointPersistentPtr(vertCount - 2));
 		PointCoordinateType tipLength = (*lastQ - *lastP).norm();
 		*lastP = P;
 		//and add a new (equivalent) one
@@ -802,8 +803,8 @@ void ccSectionExtractionTool::addPointToPolyline(int x, int y)
 			ccLog::Error("Out of memory!");
 			return;
 		}
-		PointCoordinateType defaultArrowSize = std::min(s_defaultArrowSize, tipLength/2);
-		m_editedPoly->showArrow(true,vertCount-1,defaultArrowSize);
+		PointCoordinateType defaultArrowSize = std::min(s_defaultArrowSize, tipLength / 2);
+		m_editedPoly->showArrow(true, vertCount - 1, defaultArrowSize);
 	}
 
 	m_associatedWin->redraw(true, false);
@@ -825,7 +826,7 @@ void ccSectionExtractionTool::closePolyLine(int, int)
 	else
 	{
 		//remove last point!
-		m_editedPoly->resize(vertCount-1); //can't fail --> smaller
+		m_editedPoly->resize(vertCount - 1); //can't fail --> smaller
 
 		//remove polyline from the 'temporary' world
 		if (m_associatedWin)
@@ -836,9 +837,9 @@ void ccSectionExtractionTool::closePolyLine(int, int)
 		m_editedPoly->setWidth(s_defaultPolylineWidth);
 		if (!m_clouds.isEmpty())
 			m_editedPoly->setDisplay_recursive(m_clouds.front().originalDisplay); //set the same 'default' display as the cloud
-		m_editedPoly->setName(QString("Polyline #%1").arg(m_sections.size()+1));
+		m_editedPoly->setName(QString("Polyline #%1").arg(m_sections.size() + 1));
 		//save polyline
-		if (!addPolyline(m_editedPoly,false))
+		if (!addPolyline(m_editedPoly, false))
 		{
 			//if something went wrong, we have to remove the polyline manually
 			delete m_editedPoly;
@@ -858,8 +859,8 @@ void ccSectionExtractionTool::closePolyLine(int, int)
 
 void ccSectionExtractionTool::cancelCurrentPolyline()
 {
-	if (	(m_state & STARTED) == 0
-		||	!m_editedPoly)
+	if ((m_state & STARTED) == 0
+		|| !m_editedPoly)
 	{
 		return;
 	}
@@ -887,7 +888,7 @@ void ccSectionExtractionTool::enableSectionEditingMode(bool state)
 			selectPolyline(&m_sections.back());
 
 		m_state = PAUSED;
-		
+
 		if (m_editedPoly && m_editedPolyVertices)
 		{
 			m_editedPoly->clear();
@@ -906,11 +907,11 @@ void ccSectionExtractionTool::enableSectionEditingMode(bool state)
 		addUndoStep();
 
 		m_state = STARTED;
-		
+
 		m_associatedWin->setPickingMode(ccGLWindow::NO_PICKING);
 		m_associatedWin->setInteractionMode(ccGLWindow::INTERACT_SEND_ALL_SIGNALS);
-		m_associatedWin->displayNewMessage("Section edition mode",ccGLWindow::UPPER_CENTER_MESSAGE,false,3600,ccGLWindow::MANUAL_SEGMENTATION_MESSAGE);
-		m_associatedWin->displayNewMessage("Left click: add section points / Right click: stop",ccGLWindow::UPPER_CENTER_MESSAGE,true,3600,ccGLWindow::MANUAL_SEGMENTATION_MESSAGE);
+		m_associatedWin->displayNewMessage("Section edition mode", ccGLWindow::UPPER_CENTER_MESSAGE, false, 3600, ccGLWindow::MANUAL_SEGMENTATION_MESSAGE);
+		m_associatedWin->displayNewMessage("Left click: add section points / Right click: stop", ccGLWindow::UPPER_CENTER_MESSAGE, true, 3600, ccGLWindow::MANUAL_SEGMENTATION_MESSAGE);
 	}
 
 	//update mini-GUI
@@ -941,28 +942,28 @@ void ccSectionExtractionTool::doImportPolylinesFromDB()
 	ccHObject::Container polylines;
 	if (root)
 	{
-		root->filterChildren(polylines,true,CC_TYPES::POLY_LINE);
+		root->filterChildren(polylines, true, CC_TYPES::POLY_LINE);
 	}
 
 	if (!polylines.empty())
 	{
-		ccEntityPickerDlg epDlg(polylines,true,0,this);
-		if (!epDlg.exec())
+		std::vector<int> indexes;
+		if (!ccItemSelectionDlg::SelectEntities(polylines, indexes, this))
+		{
 			return;
+		}
 
 		//set new 'undo' step
 		addUndoStep();
 
 		enableSectionEditingMode(false);
-		std::vector<int> indexes;
-		epDlg.getSelectedIndexes(indexes);
-		for (size_t i=0; i<indexes.size(); ++i)
+		for (size_t i = 0; i < indexes.size(); ++i)
 		{
 			int index = indexes[i];
 			assert(index >= 0 && index < static_cast<int>(polylines.size()));
 			assert(polylines[index]->isA(CC_TYPES::POLY_LINE));
 			ccPolyline* poly = static_cast<ccPolyline*>(polylines[index]);
-			addPolyline(poly,true);
+			addPolyline(poly, true);
 		}
 		//auto-select the last one
 		if (!m_sections.empty())
@@ -987,12 +988,12 @@ void ccSectionExtractionTool::apply()
 {
 	if (!reset(true))
 		return;
-	
+
 	stop(true);
 }
 
 static double s_orthoSectionWidth = -1.0;
-static double s_orthoSectionStep  = -1.0;
+static double s_orthoSectionStep = -1.0;
 static bool s_autoSaveAndRemoveGeneratrix = true;
 void ccSectionExtractionTool::generateOrthoSections()
 {
@@ -1016,12 +1017,12 @@ void ccSectionExtractionTool::generateOrthoSections()
 	//show arrow
 	{
 		assert(vertCount >= 2);
-		const CCVector3* lastQ = poly->getPoint(vertCount-2);
-		const CCVector3* lastP = poly->getPoint(vertCount-1);
+		const CCVector3* lastQ = poly->getPoint(vertCount - 2);
+		const CCVector3* lastP = poly->getPoint(vertCount - 1);
 		PointCoordinateType tipLength = (*lastQ - *lastP).norm();
 		PointCoordinateType defaultArrowSize = m_associatedWin->computeActualPixelSize() * s_defaultArrowSize;
-		defaultArrowSize = std::min(defaultArrowSize, tipLength/2);
-		poly->showArrow(true,poly->size()-1,defaultArrowSize);
+		defaultArrowSize = std::min(defaultArrowSize, tipLength / 2);
+		poly->showArrow(true, poly->size() - 1, defaultArrowSize);
 		m_associatedWin->redraw();
 	}
 
@@ -1051,7 +1052,7 @@ void ccSectionExtractionTool::generateOrthoSections()
 				destEntity->addChild(m_selectedPoly->entity);
 				m_selectedPoly->isInDB = true;
 				m_selectedPoly->entity->setDisplay_recursive(destEntity->getDisplay());
-				MainWindow::TheInstance()->addToDB(m_selectedPoly->entity,false,false);
+				MainWindow::TheInstance()->addToDB(m_selectedPoly->entity, false, false);
 			}
 			//and remove
 			deleteSelectedPolyline();
@@ -1061,7 +1062,7 @@ void ccSectionExtractionTool::generateOrthoSections()
 		addUndoStep();
 
 		//normal to the plane
-		CCVector3 N(0,0,0);
+		CCVector3 N(0, 0, 0);
 		int vertDim = vertAxisComboBox->currentIndex();
 		assert(vertDim >= 0 && vertDim < 3);
 		{
@@ -1076,16 +1077,16 @@ void ccSectionExtractionTool::generateOrthoSections()
 		if (!poly->isClosed())
 			maxCount--;
 		unsigned polyIndex = 0;
-		for (unsigned i=0; i<maxCount; ++i)
+		for (unsigned i = 0; i < maxCount; ++i)
 		{
 			const CCVector3* A = poly->getPoint(i);
-			const CCVector3* B = poly->getPoint((i+1) % vertCount);
-			CCVector3 AB = (*B-*A);
+			const CCVector3* B = poly->getPoint((i + 1) % vertCount);
+			CCVector3 AB = (*B - *A);
 			AB.u[vertDim] = 0;
 			CCVector3 nAB = AB.cross(N);
 			nAB.normalize();
-		
-			double lAB = (*B-*A).norm();
+
+			double lAB = (*B - *A).norm();
 			while (s < l + lAB)
 			{
 				double s_local = s - l;
@@ -1099,8 +1100,8 @@ void ccSectionExtractionTool::generateOrthoSections()
 				{
 					//intersection point
 					CCVector3 I = *A + AB * (s_local / lAB);
-					CCVector3 I1 = I + nAB * static_cast<PointCoordinateType>(s_orthoSectionWidth/2);
-					CCVector3 I2 = I - nAB * static_cast<PointCoordinateType>(s_orthoSectionWidth/2);
+					CCVector3 I1 = I + nAB * static_cast<PointCoordinateType>(s_orthoSectionWidth / 2);
+					CCVector3 I2 = I - nAB * static_cast<PointCoordinateType>(s_orthoSectionWidth / 2);
 
 					vertices->addPoint(I1);
 					orthoPoly->addPointIndex(0);
@@ -1123,17 +1124,17 @@ void ccSectionExtractionTool::generateOrthoSections()
 
 					//add meta data (for Mascaret export)
 					{
-						orthoPoly->setMetaData(ccPolyline::MetaKeyUpDir()               ,QVariant(vertDim));
-						orthoPoly->setMetaData(ccPolyline::MetaKeyAbscissa()            ,QVariant(s));
-						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixCenter()+".x"   ,QVariant(static_cast<double>(I.x)));
-						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixCenter()+".y"   ,QVariant(static_cast<double>(I.y)));
-						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixCenter()+".z"   ,QVariant(static_cast<double>(I.z)));
-						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixDirection()+".x",QVariant(static_cast<double>(nAB.x)));
-						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixDirection()+".y",QVariant(static_cast<double>(nAB.y)));
-						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixDirection()+".z",QVariant(static_cast<double>(nAB.z)));
+						orthoPoly->setMetaData(ccPolyline::MetaKeyUpDir(), QVariant(vertDim));
+						orthoPoly->setMetaData(ccPolyline::MetaKeyAbscissa(), QVariant(s));
+						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixCenter() + ".x", QVariant(static_cast<double>(I.x)));
+						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixCenter() + ".y", QVariant(static_cast<double>(I.y)));
+						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixCenter() + ".z", QVariant(static_cast<double>(I.z)));
+						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixDirection() + ".x", QVariant(static_cast<double>(nAB.x)));
+						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixDirection() + ".y", QVariant(static_cast<double>(nAB.y)));
+						orthoPoly->setMetaData(ccPolyline::MetaKeyPrefixDirection() + ".z", QVariant(static_cast<double>(nAB.z)));
 					}
 
-					if (!addPolyline(orthoPoly,false))
+					if (!addPolyline(orthoPoly, false))
 					{
 						delete orthoPoly;
 						orthoPoly = 0;
@@ -1142,8 +1143,10 @@ void ccSectionExtractionTool::generateOrthoSections()
 				else
 				{
 					delete orthoPoly;
+					orthoPoly = 0;
 					ccLog::Error("Not enough memory!");
-					i = vertCount;
+					//early stop
+					i = maxCount;
 					break;
 				}
 
@@ -1152,13 +1155,11 @@ void ccSectionExtractionTool::generateOrthoSections()
 
 			l += lAB;
 		}
-
-		if (m_associatedWin)
-			m_associatedWin->redraw();
 	}
 
-	poly->showArrow(false,0,0);
-	m_associatedWin->redraw();
+	poly->showArrow(false, 0, 0);
+	if (m_associatedWin)
+		m_associatedWin->redraw();
 }
 
 ccHObject* ccSectionExtractionTool::getExportGroup(unsigned& defaultGroupID, QString defaultName)
@@ -1171,13 +1172,13 @@ ccHObject* ccSectionExtractionTool::getExportGroup(unsigned& defaultGroupID, QSt
 		assert(false);
 		return 0;
 	}
-	
+
 	ccHObject* destEntity = (defaultGroupID != 0 ? root->find(defaultGroupID) : 0);
 	if (!destEntity)
 	{
 		destEntity = new ccHObject(defaultName);
 		//assign default display
-		for (int i=0; i<static_cast<int>(m_clouds.size()); ++i)
+		for (int i = 0; i < static_cast<int>(m_clouds.size()); ++i)
 		{
 			if (m_clouds[i].entity)
 			{
@@ -1218,7 +1219,7 @@ void ccSectionExtractionTool::exportSections()
 	assert(destEntity);
 
 	MainWindow* mainWin = MainWindow::TheInstance();
-	
+
 	//export entites
 	{
 		for (SectionPool::iterator it = m_sections.begin(); it != m_sections.end(); ++it)
@@ -1229,7 +1230,7 @@ void ccSectionExtractionTool::exportSections()
 				destEntity->addChild(section.entity);
 				section.isInDB = true;
 				section.entity->setDisplay_recursive(destEntity->getDisplay());
-				mainWin->addToDB(section.entity,false,false);
+				mainWin->addToDB(section.entity, false, false);
 			}
 		}
 	}
@@ -1238,15 +1239,15 @@ void ccSectionExtractionTool::exportSections()
 }
 
 bool ccSectionExtractionTool::extractSectionContour(const ccPolyline* originalSection,
-													const ccPointCloud* originalSectionCloud,
-													ccPointCloud* unrolledSectionCloud,
-													unsigned sectionIndex,
-													ccContourExtractor::ContourType contourType,
-													PointCoordinateType maxEdgeLength,
-													bool multiPass,
-													bool splitContour,
-													bool& contourGenerated,
-													bool visualDebugMode/*=false*/)
+	const ccPointCloud* originalSectionCloud,
+	ccPointCloud* unrolledSectionCloud,
+	unsigned sectionIndex,
+	ccContourExtractor::ContourType contourType,
+	PointCoordinateType maxEdgeLength,
+	bool multiPass,
+	bool splitContour,
+	bool& contourGenerated,
+	bool visualDebugMode/*=false*/)
 {
 	contourGenerated = false;
 
@@ -1255,7 +1256,7 @@ bool ccSectionExtractionTool::extractSectionContour(const ccPolyline* originalSe
 		ccLog::Warning("[ccSectionExtractionTool][extract contour] Internal error: invalid input parameter(s)");
 		return false;
 	}
-	
+
 	if (originalSectionCloud->size() < 2)
 	{
 		//nothing to do
@@ -1264,18 +1265,18 @@ bool ccSectionExtractionTool::extractSectionContour(const ccPolyline* originalSe
 	}
 
 	//by default, the points in 'unrolledSectionCloud' are 2D (X = curvilinear coordinate, Y = height, Z = 0)
-	CCVector3 N(0,0,1);
-	CCVector3 Y(0,1,0);
+	CCVector3 N(0, 0, 1);
+	CCVector3 Y(0, 1, 0);
 
 	std::vector<unsigned> vertIndexes;
-	ccPolyline* contour = ccContourExtractor::ExtractFlatContour(	unrolledSectionCloud,
-																	multiPass,
-																	maxEdgeLength,
-																	N.u,
-																	Y.u,
-																	contourType,
-																	&vertIndexes,
-																	visualDebugMode);
+	ccPolyline* contour = ccContourExtractor::ExtractFlatContour(unrolledSectionCloud,
+		multiPass,
+		maxEdgeLength,
+		N.u,
+		Y.u,
+		contourType,
+		&vertIndexes,
+		visualDebugMode);
 	if (contour)
 	{
 		//update vertices (to replace 'unrolled' points by 'original' ones
@@ -1283,13 +1284,13 @@ bool ccSectionExtractionTool::extractSectionContour(const ccPolyline* originalSe
 			CCLib::GenericIndexedCloud* vertices = contour->getAssociatedCloud();
 			if (vertIndexes.size() == static_cast<size_t>(vertices->size()))
 			{
-				for (unsigned i=0; i<vertices->size(); ++i)
+				for (unsigned i = 0; i < vertices->size(); ++i)
 				{
 					const CCVector3* P = vertices->getPoint(i);
 					assert(vertIndexes[i] < originalSectionCloud->size());
 					*const_cast<CCVector3*>(P) = *originalSectionCloud->getPoint(vertIndexes[i]);
 				}
-			
+
 				ccPointCloud* verticesAsPC = dynamic_cast<ccPointCloud*>(vertices);
 				if (verticesAsPC)
 					verticesAsPC->refreshBB();
@@ -1335,7 +1336,7 @@ bool ccSectionExtractionTool::extractSectionContour(const ccPolyline* originalSe
 			}
 #endif
 
-			/*bool success = */contour->split(maxEdgeLength,parts);
+			/*bool success = */contour->split(maxEdgeLength, parts);
 			delete contour;
 			contour = 0;
 		}
@@ -1345,15 +1346,15 @@ bool ccSectionExtractionTool::extractSectionContour(const ccPolyline* originalSe
 		}
 
 		//create output group if necessary
-		ccHObject* destEntity = getExportGroup(s_profileExportGroupID,"Extracted profiles");
+		ccHObject* destEntity = getExportGroup(s_profileExportGroupID, "Extracted profiles");
 		assert(destEntity);
 
-		for (size_t p=0; p<parts.size(); ++p)
+		for (size_t p = 0; p < parts.size(); ++p)
 		{
 			ccPolyline* contourPart = parts[p];
 			QString name = QString("Section contour #%1").arg(sectionIndex);
 			if (parts.size() > 1)
-				name += QString("(part %1/%2)").arg(p+1).arg(parts.size());
+				name += QString("(part %1/%2)").arg(p + 1).arg(parts.size());
 			contourPart->setName(name);
 			contourPart->setGlobalScale(originalSectionCloud->getGlobalScale());
 			contourPart->setGlobalShift(originalSectionCloud->getGlobalShift());
@@ -1364,14 +1365,14 @@ bool ccSectionExtractionTool::extractSectionContour(const ccPolyline* originalSe
 				const QVariantMap& metaData = originalSection->metaData();
 				for (QVariantMap::const_iterator it = metaData.begin(); it != metaData.end(); ++it)
 				{
-					contourPart->setMetaData(it.key(),it.value());
+					contourPart->setMetaData(it.key(), it.value());
 				}
 			}
 
 			//add to main DB
 			destEntity->addChild(contourPart);
 			contourPart->setDisplay_recursive(destEntity->getDisplay());
-			MainWindow::TheInstance()->addToDB(contourPart,false,false);
+			MainWindow::TheInstance()->addToDB(contourPart, false, false);
 		}
 
 		contourGenerated = true;
@@ -1380,19 +1381,19 @@ bool ccSectionExtractionTool::extractSectionContour(const ccPolyline* originalSe
 	return true;
 }
 
-bool ccSectionExtractionTool::extractSectionCloud(	const std::vector<CCLib::ReferenceCloud*>& refClouds,
-													unsigned sectionIndex,
-													bool& cloudGenerated)
+bool ccSectionExtractionTool::extractSectionCloud(const std::vector<CCLib::ReferenceCloud*>& refClouds,
+	unsigned sectionIndex,
+	bool& cloudGenerated)
 {
 	cloudGenerated = false;
 
 	ccPointCloud* sectionCloud = 0;
-	for (int i=0; i<static_cast<int>(refClouds.size()); ++i)
+	for (int i = 0; i < static_cast<int>(refClouds.size()); ++i)
 	{
 		if (!refClouds[i])
 			continue;
 		assert(m_clouds[i].entity); //a valid ref. cloud must have a valid counterpart!
-		
+
 		//extract part/section from each cloud
 		ccPointCloud* part = 0;
 		{
@@ -1405,7 +1406,7 @@ bool ccSectionExtractionTool::extractSectionCloud(	const std::vector<CCLib::Refe
 			}
 			else
 			{
-				part = ccPointCloud::From(refClouds[i],m_clouds[i].entity);
+				part = ccPointCloud::From(refClouds[i], m_clouds[i].entity);
 			}
 		}
 
@@ -1420,8 +1421,8 @@ bool ccSectionExtractionTool::extractSectionCloud(	const std::vector<CCLib::Refe
 			{
 				//fuse it with the global cloud
 				unsigned cloudSizeBefore = sectionCloud->size();
-				unsigned partSize        = part->size();
-				sectionCloud->append(part,cloudSizeBefore,true);
+				unsigned partSize = part->size();
+				sectionCloud->append(part, cloudSizeBefore, true);
 
 				//don't need it anymore
 				delete part;
@@ -1458,9 +1459,9 @@ bool ccSectionExtractionTool::extractSectionCloud(	const std::vector<CCLib::Refe
 
 		//add to main DB
 		destEntity->addChild(sectionCloud);
-		MainWindow::TheInstance()->addToDB(sectionCloud,false,false);
+		MainWindow::TheInstance()->addToDB(sectionCloud, false, false);
 
-		cloudGenerated  = true;
+		cloudGenerated = true;
 	}
 
 	return true;
@@ -1469,9 +1470,9 @@ bool ccSectionExtractionTool::extractSectionCloud(	const std::vector<CCLib::Refe
 struct Segment
 {
 	Segment()
-		: A(0,0)
-		, B(0,0)
-		, u(0,0)
+		: A(0, 0)
+		, B(0, 0)
+		, u(0, 0)
 		, d(0)
 		, curvPos(0)
 	{}
@@ -1501,7 +1502,7 @@ void ccSectionExtractionTool::unfoldPoints()
 	ccBBox box;
 	unsigned totalPointCount = 0;
 	{
-		for (int i=0; i<m_clouds.size(); ++i)
+		for (int i = 0; i < m_clouds.size(); ++i)
 		{
 			if (m_clouds[i].entity)
 			{
@@ -1510,13 +1511,13 @@ void ccSectionExtractionTool::unfoldPoints()
 			}
 		}
 	}
-	
+
 	static double s_defaultThickness = -1.0;
 	if (s_defaultThickness <= 0)
 	{
-		s_defaultThickness = box.getMaxBoxDim() / 10;
+		s_defaultThickness = box.getMaxBoxDim() / 10.0;
 	}
-	
+
 	bool ok;
 	double thickness = QInputDialog::getDouble(MainWindow::TheInstance(), "Thickness", "Distance to polyline:", s_defaultThickness, 1.0e-6, 1.0e6, 6, &ok);
 	if (!ok)
@@ -1525,19 +1526,19 @@ void ccSectionExtractionTool::unfoldPoints()
 
 	//projection direction
 	int vertDim = vertAxisComboBox->currentIndex();
-	int xDim = (vertDim < 2 ? vertDim+1 : 0);
-	int yDim = (xDim    < 2 ? xDim+1    : 0);
+	int xDim = (vertDim < 2 ? vertDim + 1 : 0);
+	int yDim = (xDim < 2 ? xDim + 1 : 0);
 
 	//we consider half of the total thickness as points can be on both sides!
-	double maxSquareDistToPolyline = (thickness/2) * (thickness/2);
+	double maxSquareDistToPolyline = (thickness / 2) * (thickness / 2);
 
 	//prepare the computation of 2D distances
 	std::vector<Segment> segments;
-	unsigned polyMaxCount = poly->isClosed() ? polyVertCount : polyVertCount-1;
+	unsigned polySegmentCount = poly->isClosed() ? polyVertCount : polyVertCount - 1;
 	{
 		try
 		{
-			segments.reserve(polyMaxCount);
+			segments.reserve(polySegmentCount);
 		}
 		catch (const std::bad_alloc&)
 		{
@@ -1547,16 +1548,16 @@ void ccSectionExtractionTool::unfoldPoints()
 		}
 
 		PointCoordinateType curvPos = 0;
-		for (unsigned j=0; j<polyMaxCount; ++j)
+		for (unsigned j = 0; j < polySegmentCount; ++j)
 		{
 			//current polyline segment
 			const CCVector3* A = poly->getPoint(j);
-			const CCVector3* B = poly->getPoint((j+1) % polyVertCount);
+			const CCVector3* B = poly->getPoint((j + 1) % polyVertCount);
 
 			Segment s;
 			{
-				s.A = CCVector2(A->u[xDim],A->u[yDim]);
-				s.B = CCVector2(B->u[xDim],B->u[yDim]);
+				s.A = CCVector2(A->u[xDim], A->u[yDim]);
+				s.B = CCVector2(B->u[xDim], B->u[yDim]);
 				s.u = s.B - s.A;
 				s.d = s.u.norm();
 				if (s.d > ZERO_TOLERANCE)
@@ -1568,21 +1569,21 @@ void ccSectionExtractionTool::unfoldPoints()
 			}
 
 			//update curvilinear pos
-			curvPos += (*B-*A).norm();
+			curvPos += (*B - *A).norm();
 		}
 	}
 
 	ccProgressDialog pdlg(true);
 	CCLib::NormalizedProgress nprogress(&pdlg, totalPointCount);
 	pdlg.setMethodTitle(tr("Unfold cloud(s)"));
-	pdlg.setInfo(tr("Number of segments: %1\nNumber of points: %2").arg(polyMaxCount).arg(totalPointCount));
+	pdlg.setInfo(tr("Number of segments: %1\nNumber of points: %2").arg(polySegmentCount).arg(totalPointCount));
 	pdlg.start();
 	QCoreApplication::processEvents();
 
 	unsigned exportedClouds = 0;
 
 	//for each cloud
-	for (int c=0; c<m_clouds.size(); ++c)
+	for (int c = 0; c < m_clouds.size(); ++c)
 	{
 		ccGenericPointCloud* cloud = m_clouds[c].entity;
 		if (!cloud)
@@ -1609,15 +1610,15 @@ void ccSectionExtractionTool::unfoldPoints()
 		}
 
 		//now test each point and see if it's close to the current polyline (in 2D)
-		for (unsigned i=0; i<cloud->size(); ++i)
+		for (unsigned i = 0; i < cloud->size(); ++i)
 		{
 			const CCVector3* P = cloud->getPoint(i);
-			CCVector2 P2D(P->u[xDim],P->u[yDim]);
+			CCVector2 P2D(P->u[xDim], P->u[yDim]);
 
 			//test each segment
 			int closestSegment = -1;
 			PointCoordinateType minSquareDist = -PC_ONE;
-			for (unsigned j=0; j<polyMaxCount; ++j)
+			for (unsigned j = 0; j < polySegmentCount; ++j)
 			{
 				const Segment& s = segments[j];
 				CCVector2 AP2D = P2D - s.A;
@@ -1626,7 +1627,7 @@ void ccSectionExtractionTool::unfoldPoints()
 				PointCoordinateType dotprod = s.u.dot(AP2D);
 
 				PointCoordinateType squareDist = 0;
-				if (dotprod < 0)
+				if (dotprod < 0.0f)
 				{
 					//dist to nearest vertex
 					squareDist = AP2D.norm2();
@@ -1641,7 +1642,7 @@ void ccSectionExtractionTool::unfoldPoints()
 					//orthogonal distance
 					squareDist = (AP2D - s.u*dotprod).norm2();
 				}
-				
+
 				if (squareDist <= maxSquareDistToPolyline)
 				{
 					if (closestSegment < 0 || squareDist < minSquareDist)
@@ -1666,8 +1667,8 @@ void ccSectionExtractionTool::unfoldPoints()
 					//compute the sign of 'minDist'
 					PointCoordinateType crossprod = AP2D.y * s.u.x - AP2D.x * s.u.y;
 
-					Q.u[xDim]    = s.curvPos + dotprod;
-					Q.u[yDim]    = crossprod < 0 ? -d : d; //signed orthogonal distance to the polyline
+					Q.u[xDim] = s.curvPos + dotprod;
+					Q.u[yDim] = crossprod < 0 ? -d : d; //signed orthogonal distance to the polyline
 					Q.u[vertDim] = P->u[vertDim];
 				}
 
@@ -1702,8 +1703,8 @@ void ccSectionExtractionTool::unfoldPoints()
 			assert(unfoldedCloud->size() == unfoldedPoints.size());
 			CCVector3 C = box.minCorner();
 			C.u[vertDim] = 0;
-			C.u[xDim]    = box.minCorner().u[xDim]; //we start at the bounding-box limit
-			for (unsigned i=0; i<unfoldedCloud->size(); ++i)
+			C.u[xDim] = box.minCorner().u[xDim]; //we start at the bounding-box limit
+			for (unsigned i = 0; i < unfoldedCloud->size(); ++i)
 			{
 				//update the points positions
 				*const_cast<CCVector3*>(unfoldedCloud->getPoint(i)) = unfoldedPoints[i] + C;
@@ -1730,6 +1731,15 @@ void ccSectionExtractionTool::unfoldPoints()
 	ccLog::Print(QString("[Unfold] %1 cloud(s) exported").arg(exportedClouds));
 }
 
+struct Segment2D
+{
+	Segment2D() : s(0) {}
+
+	CCVector2 A, B, uAB;
+	PointCoordinateType lAB;
+	PointCoordinateType s; //curvilinear coordinate
+};
+
 void ccSectionExtractionTool::extractPoints()
 {
 	static double s_defaultSectionThickness = -1.0;
@@ -1743,7 +1753,7 @@ void ccSectionExtractionTool::extractPoints()
 	//number of eligible sections
 	unsigned sectionCount = 0;
 	{
-		for (int s=0; s<m_sections.size(); ++s)
+		for (int s = 0; s < m_sections.size(); ++s)
 			if (m_sections[s].entity && m_sections[s].entity->size() > 1)
 				++sectionCount;
 	}
@@ -1757,7 +1767,7 @@ void ccSectionExtractionTool::extractPoints()
 	ccBBox box;
 	unsigned pointCount = 0;
 	{
-		for (int i=0; i<m_clouds.size(); ++i)
+		for (int i = 0; i < m_clouds.size(); ++i)
 		{
 			if (m_clouds[i].entity)
 			{
@@ -1766,7 +1776,7 @@ void ccSectionExtractionTool::extractPoints()
 			}
 		}
 	}
-	
+
 	if (s_defaultSectionThickness <= 0)
 	{
 		s_defaultSectionThickness = box.getMaxBoxDim() / 500.0;
@@ -1782,21 +1792,21 @@ void ccSectionExtractionTool::extractPoints()
 	sesDlg.setSectionThickness(s_defaultSectionThickness);
 	sesDlg.setMaxEdgeLength(s_contourMaxEdgeLength);
 	sesDlg.doExtractClouds(s_extractSectionsAsClouds);
-	sesDlg.doExtractContours(s_extractSectionsAsContours,s_extractSectionsType);
+	sesDlg.doExtractContours(s_extractSectionsAsContours, s_extractSectionsType);
 	sesDlg.doUseMultiPass(s_multiPass);
 	sesDlg.doSplitContours(s_splitContour);
 
 	if (!sesDlg.exec())
 		return;
 
-	s_defaultSectionThickness   = sesDlg.getSectionThickness();
-	s_contourMaxEdgeLength      = sesDlg.getMaxEdgeLength();
-	s_extractSectionsAsClouds   = sesDlg.extractClouds();
+	s_defaultSectionThickness = sesDlg.getSectionThickness();
+	s_contourMaxEdgeLength = sesDlg.getMaxEdgeLength();
+	s_extractSectionsAsClouds = sesDlg.extractClouds();
 	s_extractSectionsAsContours = sesDlg.extractContours();
-	s_extractSectionsType       = sesDlg.getContourType();
-	s_multiPass                 = sesDlg.useMultiPass();
-	s_splitContour              = sesDlg.splitContours();
-	bool visualDebugMode        = sesDlg.visualDebugMode();
+	s_extractSectionsType = sesDlg.getContourType();
+	s_multiPass = sesDlg.useMultiPass();
+	s_splitContour = sesDlg.splitContours();
+	bool visualDebugMode = sesDlg.visualDebugMode();
 
 	//progress dialog
 	ccProgressDialog pdlg(true);
@@ -1810,11 +1820,11 @@ void ccSectionExtractionTool::extractPoints()
 	}
 
 	int vertDim = vertAxisComboBox->currentIndex();
-	int xDim = (vertDim < 2 ? vertDim+1 : 0);
-	int yDim = (xDim    < 2 ? xDim+1    : 0);
+	int xDim = (vertDim < 2 ? vertDim + 1 : 0);
+	int yDim = (xDim < 2 ? xDim + 1 : 0);
 
 	//we consider half of the total thickness as points can be on both sides!
-	double sectionThicknessSq = pow(s_defaultSectionThickness/2,2.0);
+	double sectionThicknessSq = std::pow(s_defaultSectionThickness / 2.0, 2.0);
 	bool error = false;
 
 	unsigned generatedContours = 0;
@@ -1823,7 +1833,7 @@ void ccSectionExtractionTool::extractPoints()
 	try
 	{
 		//for each slice
-		for (int s=0; s<m_sections.size(); ++s)
+		for (int s = 0; s < m_sections.size(); ++s)
 		{
 			ccPolyline* poly = m_sections[s].entity;
 			if (poly)
@@ -1834,13 +1844,48 @@ void ccSectionExtractionTool::extractPoints()
 					assert(false);
 					continue;
 				}
-				unsigned polyMaxCount = poly->isClosed() ? polyVertCount : polyVertCount-1;
+				unsigned polySegmentCount = poly->isClosed() ? polyVertCount : polyVertCount - 1;
+
+				//project the section in '2D'
+				std::vector<Segment2D> polySegments2D;
+				{
+					polySegments2D.reserve(polySegmentCount);
+					PointCoordinateType s = 0;
+					for (unsigned j = 0; j < polySegmentCount; ++j)
+					{
+						Segment2D seg2D;
+						const CCVector3* A = poly->getPoint(j);
+						const CCVector3* B = poly->getPoint((j + 1) % polyVertCount);
+						seg2D.A = CCVector2(A->u[xDim], A->u[yDim]);
+						seg2D.B = CCVector2(B->u[xDim], B->u[yDim]);
+						seg2D.uAB = seg2D.B - seg2D.A; //(unit) direction
+						seg2D.lAB = seg2D.uAB.norm(); //length
+						seg2D.s = s;
+						s += seg2D.lAB;
+
+						if (seg2D.lAB < ZERO_TOLERANCE)
+						{
+							//ignore too small segments
+							continue;
+						}
+						
+						seg2D.uAB /= seg2D.lAB;
+						polySegments2D.push_back(seg2D);
+					}
+
+					if (polySegments2D.empty())
+					{
+						assert(false);
+						continue;
+					}
+					polySegments2D.shrink_to_fit();
+				}
 
 				int cloudCount = m_clouds.size();
 				std::vector<CCLib::ReferenceCloud*> refClouds;
 				if (s_extractSectionsAsClouds)
 				{
-					refClouds.resize(cloudCount,0);
+					refClouds.resize(cloudCount, 0);
 				}
 
 				//for contour extraction as a polyline
@@ -1859,7 +1904,7 @@ void ccSectionExtractionTool::extractPoints()
 				}
 
 				//for each cloud
-				for (int c=0; c<cloudCount; ++c)
+				for (int c = 0; c < cloudCount; ++c)
 				{
 					ccGenericPointCloud* cloud = m_clouds[c].entity;
 					if (cloud)
@@ -1871,98 +1916,114 @@ void ccSectionExtractionTool::extractPoints()
 							refCloud = new CCLib::ReferenceCloud(cloud);
 						}
 
-						//now test each point and see if it's close to the current polyline (in 2D)
-						PointCoordinateType s = 0;
-						for (unsigned j=0; j<polyMaxCount; ++j)
+						//compute the distance of each point to the current polyline segment
+						for (unsigned i = 0; i < cloud->size(); ++i)
 						{
-							//current polyline segment
-							const CCVector3* A = poly->getPoint(j);
-							const CCVector3* B = poly->getPoint((j+1) % polyVertCount);
-							CCVector2 A2D(A->u[xDim],A->u[yDim]);
-							CCVector2 B2D(B->u[xDim],B->u[yDim]);
+							const CCVector3* P = cloud->getPoint(i);
+							CCVector2 P2D(P->u[xDim], P->u[yDim]);
 
-							CCVector2 u = B2D-A2D;
-							PointCoordinateType d = u.norm();
-							if (d < ZERO_TOLERANCE)
-								continue;
-							u /= d;
-
-							//compute the distance of each point to the current polyline segment
-							for (unsigned i=0; i<cloud->size(); ++i)
+							//for each vertex
+							PointCoordinateType minSquareDist = -PC_ONE;
+							PointCoordinateType curvilinearPos = 0.0;
+							size_t minIndex = 0;
+							for (size_t j = 0; j < polySegments2D.size(); ++j)
 							{
-								const CCVector3* P = cloud->getPoint(i);
-								CCVector2 P2D(P->u[xDim],P->u[yDim]);
-								CCVector2 AP2D = P2D-A2D;
-								
+								const Segment2D& seg2D = polySegments2D[j];
+								CCVector2 AP2D = P2D - seg2D.A;
+
+								//square distance to the polyline
+								PointCoordinateType squareDist = 0;
+
 								//longitudinal 'distance'
-								PointCoordinateType dotprod = u.dot(AP2D);
-								if (dotprod < 0 || dotprod > d)
-									continue;
-
-								//orthogonal distance
-								PointCoordinateType h = (AP2D - u*dotprod).norm2();
-								if (h <= sectionThicknessSq)
+								double dotprod = seg2D.uAB.dot(AP2D);
+								if (dotprod < 0)
 								{
-									//if we extract the section as cloud(s), we add the point to the (current) ref. cloud
-									if (s_extractSectionsAsClouds)
+									if (j == 0 && !poly->isClosed())
+										continue;
+									squareDist = AP2D.norm2();
+								}
+								else if (dotprod > seg2D.lAB)
+								{
+									if (j + 1 == polySegments2D.size() && !poly->isClosed())
+										continue;
+									squareDist = (P2D - seg2D.B).norm2();
+								}
+								else
+								{
+									//orthogonal distance
+									squareDist = (AP2D - seg2D.uAB * dotprod).norm2();
+								}
+
+								if (minSquareDist < 0 || squareDist < minSquareDist)
+								{
+									minSquareDist = squareDist;
+									curvilinearPos = dotprod;
+									minIndex = j;
+								}
+							}
+
+							//elligible point?
+							if (minSquareDist >= 0 && minSquareDist < sectionThicknessSq)
+							{
+								//if we extract the section as cloud(s), we add the point to the (current) ref. cloud
+								if (s_extractSectionsAsClouds)
+								{
+									assert(refCloud);
+									unsigned refCloudSize = refCloud->size();
+									if (refCloudSize == refCloud->capacity())
 									{
-										assert(refCloud);
-										unsigned refCloudSize = refCloud->size();
-										if (refCloudSize == refCloud->capacity())
+										refCloudSize += (refCloudSize / 2 + 1);
+										if (!refCloud->reserve(refCloudSize))
 										{
-											refCloudSize += (refCloudSize/2 + 1);
-											if (!refCloud->reserve(refCloudSize))
-											{
-												//not enough memory
-												ccLog::Warning("[ccSectionExtractionTool] Not enough memory");
-												error = true;
-												break;
-											}
+											//not enough memory
+											ccLog::Warning("[ccSectionExtractionTool] Not enough memory");
+											error = true;
+											break;
 										}
-										refCloud->addPointIndex(i);
+									}
+									refCloud->addPointIndex(i);
+								}
+
+								//if we extract the section as contour(s), we add it to the 2D points set
+								if (s_extractSectionsAsContours)
+								{
+									assert(originalSlicePoints && unrolledSlicePoints);
+									assert(originalSlicePoints->size() == unrolledSlicePoints->size());
+
+									unsigned cloudSize = originalSlicePoints->size();
+									if (cloudSize == originalSlicePoints->capacity())
+									{
+										cloudSize += (cloudSize / 2 + 1);
+										if (!originalSlicePoints->reserve(cloudSize)
+											|| !unrolledSlicePoints->reserve(cloudSize))
+										{
+											//not enough memory
+											ccLog::Warning("[ccSectionExtractionTool] Not enough memory");
+											error = true;
+											break;
+										}
 									}
 
-									//if we extract the section as contour(s), we add it to the 2D points set
-									if (s_extractSectionsAsContours)
-									{
-										assert(originalSlicePoints && unrolledSlicePoints);
-										assert(originalSlicePoints->size() == unrolledSlicePoints->size());
-										
-										unsigned cloudSize = originalSlicePoints->size();
-										if (cloudSize == originalSlicePoints->capacity())
-										{
-											cloudSize += (cloudSize/2 + 1);
-											if (	!originalSlicePoints->reserve(cloudSize)
-												||	!unrolledSlicePoints->reserve(cloudSize))
-											{
-												//not enough memory
-												ccLog::Warning("[ccSectionExtractionTool] Not enough memory");
-												error = true;
-												break;
-											}
-										}
+									const Segment2D& seg2D = polySegments2D[minIndex];
 
-										//we project the 'real' 3D point in the section plane
-										CCVector3 Pproj3D;
-										{
-											Pproj3D.u[xDim]    = A2D.x + u.x * dotprod;
-											Pproj3D.u[yDim]    = A2D.y + u.y * dotprod;
-											Pproj3D.u[vertDim] = P->u[vertDim];
-										}
-										originalSlicePoints->addPoint(Pproj3D);
-										unrolledSlicePoints->addPoint(CCVector3(s+dotprod,P->u[vertDim],0));
+									//we project the 'real' 3D point in the section plane
+									CCVector3 Pproj3D;
+									{
+										Pproj3D.u[xDim] = seg2D.A.x + seg2D.uAB.x * curvilinearPos;
+										Pproj3D.u[yDim] = seg2D.A.y + seg2D.uAB.y * curvilinearPos;
+										Pproj3D.u[vertDim] = P->u[vertDim];
 									}
+									originalSlicePoints->addPoint(Pproj3D);
+									unrolledSlicePoints->addPoint(CCVector3(seg2D.s + curvilinearPos, P->u[vertDim], 0));
 								}
 							}
 
 							if (error)
+							{
 								break;
+							}
 
-							//update curvilinear length
-							CCVector3 AB = *B - *A;
-							s += AB.norm();
-						
-						} //for (unsigned j=0; j<polyMaxCount; ++j)
+						} //for each point
 
 						if (refCloud)
 						{
@@ -1978,12 +2039,14 @@ void ccSectionExtractionTool::extractPoints()
 							}
 						}
 
-					} //if (cloud)
+					}
 
 					if (error)
+					{
 						break;
-				
-				} //for (int c=0; c<cloudCount; ++c)
+					}
+
+				} //for each cloud
 
 				if (!error)
 				{
@@ -1995,7 +2058,7 @@ void ccSectionExtractionTool::extractPoints()
 						error = !extractSectionContour(	poly,
 														originalSlicePoints,
 														unrolledSlicePoints,
-														s+1,
+														s + 1,
 														s_extractSectionsType,
 														s_contourMaxEdgeLength,
 														s_multiPass,
@@ -2006,21 +2069,21 @@ void ccSectionExtractionTool::extractPoints()
 						if (contourGenerated)
 							++generatedContours;
 					}
-					
+
 					//Extract sections as clouds
 					if (!error && s_extractSectionsAsClouds)
 					{
 						assert(static_cast<int>(refClouds.size()) == cloudCount);
 						bool cloudGenerated = false;
-						error = !extractSectionCloud(refClouds,s+1,cloudGenerated);
+						error = !extractSectionCloud(refClouds, s + 1, cloudGenerated);
 						if (cloudGenerated)
 							++generatedClouds;
 					}
 				}
-				
+
 				//release memory
 				{
-					for (size_t i=0; i<refClouds.size(); ++i)
+					for (size_t i = 0; i < refClouds.size(); ++i)
 					{
 						if (refClouds[i])
 							delete refClouds[i];

@@ -18,25 +18,34 @@
 #ifndef CC_GL_FILTER_PLUGIN_INTERFACE_HEADER
 #define CC_GL_FILTER_PLUGIN_INTERFACE_HEADER
 
-#include "ccPluginInterface.h"
-
 //CC_FBO_LIB
 #include <ccGlFilter.h>
 
+#include "ccDefaultPluginInterface.h"
+
 //! GL Filter plugin interface
-/** Version 1.1
+/** Version 1.2
 **/
-class ccGLFilterPluginInterface : public ccPluginInterface
+class ccGLFilterPluginInterface : public ccDefaultPluginInterface
 {
 public:
+	ccGLFilterPluginInterface( const QString &resourcePath = QString() ) :
+		ccDefaultPluginInterface( resourcePath )
+	{
+	}
+	
+	~ccGLFilterPluginInterface() override = default;
+
 	//inherited from ccPluginInterface
-	virtual CC_PLUGIN_TYPE getType() const { return CC_GL_FILTER_PLUGIN; }
+	CC_PLUGIN_TYPE getType() const override { return CC_GL_FILTER_PLUGIN; }
 
 	//! Returns a GL filter object
 	virtual ccGlFilter* getFilter() = 0;
 };
 
+Q_DECLARE_METATYPE(ccGLFilterPluginInterface *);
+
 Q_DECLARE_INTERFACE(ccGLFilterPluginInterface,
-                    "edf.rd.CloudCompare.ccGLFilterPluginInterface/1.1")
+                    "edf.rd.CloudCompare.ccGLFilterPluginInterface/1.2")
 
 #endif //CC_GL_FILTER_PLUGIN_INTERFACE_HEADER

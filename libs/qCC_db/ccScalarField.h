@@ -24,7 +24,6 @@
 //qCC_db
 #include "ccColorScale.h"
 
-
 //! A scalar field associated to display-related parameters
 /** Extends the CCLib::ScalarField object.
 **/
@@ -35,7 +34,7 @@ public:
 	//! Default constructor
 	/** \param name scalar field name
 	**/
-	explicit ccScalarField(const char* name = 0);
+	explicit ccScalarField(const char* name = nullptr);
 
 	//! Copy constructor
 	/** \param sf scalar field to copy
@@ -52,8 +51,6 @@ public:
 
 		//! Default constructor
 		Range() : m_min(0), m_start(0), m_stop(0), m_max(0), m_range(1) {}
-		//! Copy constructor
-		Range(const Range& range) : m_min(range.m_min), m_start(range.m_start), m_stop(range.m_stop), m_max(range.m_max), m_range(range.m_range) {}
 
 		//getters
 		inline ScalarType min()			const { return m_min;		}
@@ -94,7 +91,7 @@ public:
 	protected:
 
 		//! Updates actual range
-		inline void updateRange() { m_range = std::max(m_stop-m_start,(ScalarType)ZERO_TOLERANCE); }
+		inline void updateRange() { m_range = std::max(m_stop - m_start, static_cast<ScalarType>(ZERO_TOLERANCE)); }
 
 		ScalarType m_min;		/**< Minimum value **/
 		ScalarType m_start;		/**< Current start value (in [min,max]) **/
@@ -133,14 +130,14 @@ public:
 	//! Returns the color corresponding to a given value (wrt to the current display parameters)
 	/** Warning: must no be called if the SF is not associated to a color scale!
 	**/
-	inline const ColorCompType* getColor(ScalarType value) const
+	inline const ccColor::Rgb* getColor(ScalarType value) const
 	{
 		assert(m_colorScale);
-		return m_colorScale->getColorByRelativePos(normalize(value), m_colorRampSteps, m_showNaNValuesInGrey ? ccColor::lightGrey.rgba : 0);
+		return m_colorScale->getColorByRelativePos(normalize(value), m_colorRampSteps, m_showNaNValuesInGrey ? &ccColor::lightGrey : nullptr);
 	}
 
 	//! Shortcut to getColor
-	inline const ColorCompType* getValueColor(unsigned index) const { return getColor(getValue(index)); }
+	inline const ccColor::Rgb* getValueColor(unsigned index) const { return getColor(getValue(index)); }
 
 	//! Sets whether NaN/out of displayed range values should be displayed in grey or hidden
 	void showNaNValuesInGrey(bool state);
@@ -171,7 +168,7 @@ public:
 	inline bool logScale() const { return m_logScale; }
 
 	//inherited
-	virtual void computeMinAndMax();
+	void computeMinAndMax() override;
 
 	//! Returns associated color scale
 	inline const ccColorScale::Shared& getColorScale() const { return m_colorScale; }
@@ -189,17 +186,11 @@ public:
 	struct Histogram : std::vector<unsigned>
 	{
 		//! Max histogram value
-		unsigned maxValue;
-
-		//! Default constructor
-		Histogram() : maxValue(0) {}
-
-		//! Copy constructor
-		Histogram(const Histogram& h) : std::vector<unsigned>(h), maxValue(h.maxValue) {}
+		unsigned maxValue = 0;
 	};
 
 	//! Returns associated histogram values (for display)
-	const Histogram& getHistogram() const { return m_histogram; }
+	inline const Histogram& getHistogram() const { return m_histogram; }
 
 	//! Returns whether the scalar field in its current configuration MAY have 'hidden' values or not
 	/** 'Hidden' values are typically NaN values or values outside of the 'displayed' intervale
@@ -208,29 +199,29 @@ public:
 	bool mayHaveHiddenValues() const;
 
 	//! Sets modification flag state
-	void setModificationFlag(bool state) { m_modified = state; }
+	inline void setModificationFlag(bool state) { m_modified = state; }
 	//! Returns modification flag state
-	bool getModificationFlag() const { return m_modified; }
+	inline bool getModificationFlag() const { return m_modified; }
 
 	//! Imports the parameters from another scalar field
 	void importParametersFrom(const ccScalarField* sf);
 
 	//inherited from ccSerializableObject
-	virtual bool isSerializable() const { return true; }
-	virtual bool toFile(QFile& out) const;
-	virtual bool fromFile(QFile& in, short dataVersion, int flags);
+	inline bool isSerializable() const override { return true; }
+	bool toFile(QFile& out) const override;
+	bool fromFile(QFile& in, short dataVersion, int flags) override;
 
 	//! Returns the global shift (if any)
 	inline double getGlobalShift() const { return m_globalShift; }
 	//! Sets the global shift
 	inline void setGlobalShift(double shift) { m_globalShift = shift; }
 
-protected:
+protected: //methods
 
 	//! Default destructor
-	/** [SHAREABLE] Call 'release' to destroy this object properly.
+	/** Call release instead
 	**/
-	virtual ~ccScalarField() {}
+	~ccScalarField() override = default;
 
 	//! Updates saturation values
 	void updateSaturationBounds();
@@ -240,6 +231,8 @@ protected:
 		\return a number between 0 and 1 if inside displayed range or -1 otherwise
 	**/
 	ScalarType normalize(ScalarType val) const;
+
+protected: //members
 
 	//! Displayed values range
 	Range m_displayRange;

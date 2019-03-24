@@ -24,11 +24,11 @@
 #include "CCGeom.h"
 
 //system
+#include <cfloat>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <vector>
-#include <float.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 namespace CCLib
 {
@@ -104,7 +104,7 @@ public:
 	//! Returns the front arrival time at a given cell
 	/** This method should only be called after the propagation
 		succeeded. The coordinates of the cell can be absolute
-		(i.e. exressed relatively to the octree borders) or relative
+		(i.e. expressed relatively to the octree borders) or relative
 		(i.e. expressed relatively to the Fast Marching grid).
 		\param pos the cell position (3 integer coordinates)
 		\param absoluteCoordinates whether the cell coordinates are absolute or relative
@@ -147,7 +147,7 @@ protected:
 		{}
 
 		//! Virtual destructor
-		virtual ~Cell() {}
+		virtual ~Cell() = default;
 
 		//! Cell state
 		STATE state;
@@ -215,7 +215,7 @@ protected:
 			return false;
 		memset(grid,0,size*sizeof(T*));
 
-		m_theGrid = (Cell**)grid;
+		m_theGrid = reinterpret_cast<Cell **>(grid);
 
 		return true;
 	}

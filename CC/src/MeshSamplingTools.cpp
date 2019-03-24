@@ -16,20 +16,16 @@
 //#                                                                        #
 //##########################################################################
 
-#include "MeshSamplingTools.h"
+#include <MeshSamplingTools.h>
 
 //local
-#include "GenericProgressCallback.h"
-#include "GenericIndexedCloud.h"
-#include "GenericIndexedMesh.h"
-#include "GenericMesh.h"
-#include "GenericTriangle.h"
-#include "ScalarField.h"
-#include "SimpleCloud.h"
-#include "CCConst.h"
+#include <GenericIndexedMesh.h>
+#include <GenericProgressCallback.h>
+#include <GenericTriangle.h>
+#include <PointCloud.h>
+#include <ScalarField.h>
 
 //system
-#include <assert.h>
 #include <random>
 
 using namespace CCLib;
@@ -45,7 +41,7 @@ double MeshSamplingTools::computeMeshArea(GenericMesh* mesh)
 	//total area
 	double Stotal = 0.0;
 
-	mesh->placeIteratorAtBegining();
+	mesh->placeIteratorAtBeginning();
 	for (unsigned n=0; n<mesh->size(); ++n)
 	{
 		GenericTriangle* tri = mesh->_getNextTriangle();
@@ -78,7 +74,7 @@ double MeshSamplingTools::computeMeshVolume(GenericMesh* mesh)
 	CCVector3 origin,upperCorner;
 	mesh->getBoundingBox(origin,upperCorner);
 
-	mesh->placeIteratorAtBegining();
+	mesh->placeIteratorAtBeginning();
 	for (unsigned n=0; n<mesh->size(); ++n)
 	{
 		GenericTriangle* tri = mesh->_getNextTriangle();
@@ -90,17 +86,17 @@ double MeshSamplingTools::computeMeshVolume(GenericMesh* mesh)
 
 		//see "EFFICIENT FEATURE EXTRACTION FOR 2D/3D OBJECTS IN MESH REPRESENTATION" by Cha Zhang and Tsuhan Chen (2001)
 		//We compute the (signed) volume of the tetrahedron defined by each triangle and the origin
-		double signedVol = (-static_cast<double>(C.x*B.y*A.z)
-							+static_cast<double>(B.x*C.y*A.z)
-							+static_cast<double>(C.x*A.y*B.z)
-							-static_cast<double>(A.x*C.y*B.z)
-							-static_cast<double>(B.x*A.y*C.z)
-							+static_cast<double>(A.x*B.y*C.z))/6.0;
+		double signedVol = (- static_cast<double>(C.x*B.y*A.z)
+							+ static_cast<double>(B.x*C.y*A.z)
+							+ static_cast<double>(C.x*A.y*B.z)
+							- static_cast<double>(A.x*C.y*B.z)
+							- static_cast<double>(B.x*A.y*C.z)
+							+ static_cast<double>(A.x*B.y*C.z)) / 6;
 
 		Vtotal += signedVol;
 	}
 
-	return fabs(Vtotal); //in case the triangles are in the wrong order!
+	return std::abs(Vtotal); //in case the triangles are in the wrong order!
 }
 
 unsigned long long MeshSamplingTools::ComputeEdgeKey(unsigned i1, unsigned i2)
@@ -126,7 +122,7 @@ bool MeshSamplingTools::buildMeshEdgeUsageMap(GenericIndexedMesh* mesh, EdgeUsag
 
 	try
 	{
-		mesh->placeIteratorAtBegining();
+		mesh->placeIteratorAtBeginning();
 		//for all triangles
 		for (unsigned n=0; n<mesh->size(); ++n)
 		{
@@ -190,7 +186,7 @@ bool MeshSamplingTools::flagMeshVerticesByType(GenericIndexedMesh* mesh, ScalarF
 
 	//count the number of triangles using each edge
 	EdgeUsageMap edgeCounters;
-	if (!buildMeshEdgeUsageMap(mesh,edgeCounters))
+	if (!buildMeshEdgeUsageMap(mesh, edgeCounters))
 		return false;
 
 	//now scan all the edges and flag their vertices
@@ -228,8 +224,8 @@ bool MeshSamplingTools::flagMeshVerticesByType(GenericIndexedMesh* mesh, ScalarF
 			}
 			//else --> isolated vertex?
 
-			flags->setValue(i1,flag);
-			flags->setValue(i2,flag);
+			flags->setValue(i1, flag);
+			flags->setValue(i2, flag);
 		}
 	}
 
@@ -238,19 +234,19 @@ bool MeshSamplingTools::flagMeshVerticesByType(GenericIndexedMesh* mesh, ScalarF
 	return true;
 }
 
-SimpleCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
+PointCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
 													unsigned numberOfPoints,
 													GenericProgressCallback* progressCb/*=0*/,
-													GenericChunkedArray<1,unsigned>* triIndices/*=0*/)
+													std::vector<unsigned>* triIndices/*=0*/)
 {
 	if (!mesh)
-        return 0;
+        return nullptr;
 
 	//total mesh surface
 	double Stotal = computeMeshArea(mesh);
 
 	if (Stotal < ZERO_TOLERANCE)
-        return 0;
+        return nullptr;
 
 	double samplingDensity = numberOfPoints / Stotal;
 
@@ -258,13 +254,13 @@ SimpleCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
 	return samplePointsOnMesh(mesh, samplingDensity, numberOfPoints, progressCb, triIndices);
 }
 
-SimpleCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
+PointCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
 													double samplingDensity,
 													GenericProgressCallback* progressCb/*=0*/,
-													GenericChunkedArray<1,unsigned>* triIndices/*=0*/)
+													std::vector<unsigned>* triIndices/*=0*/)
 {
 	if (!mesh)
-        return 0;
+        return nullptr;
 
 	//we must compute the total area to deduce the number of points
 	double Stotal = computeMeshArea(mesh);
@@ -274,37 +270,39 @@ SimpleCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
 	return samplePointsOnMesh(mesh, samplingDensity, theoreticNumberOfPoints, progressCb, triIndices);
 }
 
-SimpleCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
+PointCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
 													double samplingDensity,
 													unsigned theoreticNumberOfPoints,
 													GenericProgressCallback* progressCb,
-													GenericChunkedArray<1,unsigned>* triIndices/*=0*/)
+													std::vector<unsigned>* triIndices/*=0*/)
 {
 	if (theoreticNumberOfPoints < 1)
-        return 0;
+        return nullptr;
 
 	assert(mesh);
 	unsigned triCount = (mesh ? mesh->size() : 0);
 	if (triCount == 0)
-		return 0;
+		return nullptr;
 
-	SimpleCloud* sampledCloud = new SimpleCloud();
+	PointCloud* sampledCloud = new PointCloud();
 	if (!sampledCloud->reserve(theoreticNumberOfPoints)) //not enough memory
 	{
 		delete sampledCloud;
-		return 0;
+		return nullptr;
 	}
 
 	if (triIndices)
 	{
 	    triIndices->clear(); //just in case
-
-		if (!triIndices->reserve(theoreticNumberOfPoints) || triIndices->capacity() < theoreticNumberOfPoints)
+		try
+		{
+			triIndices->reserve(theoreticNumberOfPoints);
+		}
+		catch (const std::bad_alloc&)
 		{
 			//not enough memory? DGM TODO: we should warn the caller
 			delete sampledCloud;
-			triIndices->clear();
-			return 0;
+			return nullptr;
 		}
 	}
 
@@ -328,8 +326,8 @@ SimpleCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
 	std::uniform_real_distribution<double> dist(0, 1);
 
 	//for each triangle
-	mesh->placeIteratorAtBegining();
-	for (unsigned n=0; n<triCount; ++n)
+	mesh->placeIteratorAtBeginning();
+	for (unsigned n = 0; n < triCount; ++n)
 	{
 		const GenericTriangle* tri = mesh->_getNextTriangle();
 
@@ -350,13 +348,13 @@ SimpleCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
 		double fPointsToAdd = S*samplingDensity;
 		unsigned pointsToAdd = static_cast<unsigned>(fPointsToAdd);
 
-        //take care of the remaining fractional part
+		//take care of the remaining fractional part
 		double fracPart = fPointsToAdd - static_cast<double>(pointsToAdd);
 		if (fracPart > 0)
 		{
 			//we add a point with the same probability as its (relative) area
 			if (dist(gen) <= fracPart)
-                pointsToAdd += 1;
+				pointsToAdd += 1;
 		}
 
 		if (pointsToAdd)
@@ -364,17 +362,38 @@ SimpleCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
 			if (addedPoints + pointsToAdd >= theoreticNumberOfPoints)
 			{
 				theoreticNumberOfPoints += pointsToAdd;
-				if (!sampledCloud->reserve(theoreticNumberOfPoints)
-					|| (triIndices && triIndices->capacity() < theoreticNumberOfPoints && !triIndices->reserve(theoreticNumberOfPoints))) //not enough memory
+				//reserve memory for the cloud
+				if (!sampledCloud->reserve(theoreticNumberOfPoints))
 				{
 					delete sampledCloud;
-					sampledCloud = 0;
-					triIndices->clear();
+					sampledCloud = nullptr;
+					if (triIndices)
+					{
+						triIndices->resize(0);
+					}
 					break;
+				}
+				//reserve memory for the triangle indexes
+				if (triIndices && triIndices->capacity() < theoreticNumberOfPoints) //not enough memory
+				{
+					try
+					{
+						triIndices->reserve(theoreticNumberOfPoints);
+					}
+					catch (const std::bad_alloc&)
+					{
+						delete sampledCloud;
+						sampledCloud = nullptr;
+						if (triIndices)
+						{
+							triIndices->resize(0);
+						}
+						break;
+					}
 				}
 			}
 
-			for (unsigned i=0; i<pointsToAdd; ++i)
+			for (unsigned i = 0; i < pointsToAdd; ++i)
 			{
 				//we generate random points as in:
 				//'Greg Turk. Generating random points in triangles. In A. S. Glassner, editor, Graphics Gems, pages 24-28. Academic Press, 1990.'
@@ -382,17 +401,17 @@ SimpleCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
 				double y = dist(gen);
 
 				//we test if the generated point lies on the right side of (AB)
-				if (x+y > 1.0)
+				if (x + y > 1.0)
 				{
-                    x = 1.0-x;
-                    y = 1.0-y;
+					x = 1.0 - x;
+					y = 1.0 - y;
                 }
 
 				CCVector3 P = (*O) + static_cast<PointCoordinateType>(x) * u + static_cast<PointCoordinateType>(y) * v;
 
 				sampledCloud->addPoint(P);
 				if (triIndices)
-					triIndices->addElement(n);
+					triIndices->push_back(n);
 				++addedPoints;
 			}
 		}
@@ -412,7 +431,7 @@ SimpleCloud* MeshSamplingTools::samplePointsOnMesh(	GenericMesh* mesh,
 		else
 		{
 			if (triIndices)
-				triIndices->clear();
+				triIndices->resize(0);
 		}
 	}
 

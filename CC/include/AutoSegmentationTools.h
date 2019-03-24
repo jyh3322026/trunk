@@ -19,6 +19,8 @@
 #ifndef AUTO_SEGMENTATION_TOOLS_HEADER
 #define AUTO_SEGMENTATION_TOOLS_HEADER
 
+#include <vector>
+
 //Local
 #include "CCToolbox.h"
 #include "CCTypes.h"
@@ -35,7 +37,7 @@ class ReferenceCloud;
 /** Several algorithms of the AutoSegmentationTools toolbox return a collection of subsets of points
 	corresponding to each segmented part. Such a collection is generally stored in this type of container.
 **/
-typedef std::vector<ReferenceCloud*> ReferenceCloudContainer;
+using ReferenceCloudContainer = std::vector<ReferenceCloud *>;
 
 //! Several point cloud auto-segmentation algorithms (Connected Components, Front propagation, etc.)
 class CC_CORE_LIB_API AutoSegmentationTools : public CCToolbox
@@ -66,8 +68,8 @@ public:
 	static int labelConnectedComponents(GenericIndexedCloudPersist* theCloud,
 										unsigned char level,
 										bool sixConnexity = false,
-										CCLib::GenericProgressCallback* progressCb = 0,
-										CCLib::DgmOctree* inputOctree = 0);
+										CCLib::GenericProgressCallback* progressCb = nullptr,
+										CCLib::DgmOctree* inputOctree = nullptr);
 
 	//! Extracts connected components from a point cloud
 	/** This method shloud only be called after the connected components have been
@@ -106,8 +108,8 @@ public:
 													PointCoordinateType radius,
 													unsigned char octreeLevel,
 													ReferenceCloudContainer& theSegmentedLists,
-													CCLib::GenericProgressCallback* progressCb = 0,
-													CCLib::DgmOctree* inputOctree = 0,
+													CCLib::GenericProgressCallback* progressCb = nullptr,
+													CCLib::DgmOctree* inputOctree = nullptr,
 													bool applyGaussianFilter = false,
 													float alpha = 2.0f);
 

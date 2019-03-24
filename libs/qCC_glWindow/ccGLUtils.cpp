@@ -17,18 +17,7 @@
 
 #include "ccGLUtils.h"
 
-//Local
-#include "ccLog.h"
-
-//CCLib
-#include <CCConst.h>
-
-//Qt
-#include <QOpenGLContext>
-#include <QOpenGLFunctions_2_1>
-
-//system
-#include <assert.h>
+#include <QOpenGLTexture>
 
 //*********** OPENGL TEXTURES ***********//
 
@@ -67,7 +56,6 @@ void ccGLUtils::DisplayTexture2DPosition(GLuint texID, int x, int y, int w, int 
 		glFunc->glVertex2i(x + w, y + h);
 		glFunc->glEnd();
 
-		glFunc->glBindTexture(GL_TEXTURE_2D, 0);
 		glFunc->glPopAttrib();
 
 		glFunc->glBindTexture(GL_TEXTURE_2D, 0);

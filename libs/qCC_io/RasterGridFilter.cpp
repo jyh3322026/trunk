@@ -35,7 +35,7 @@
 //System
 #include <string.h> //for memset
 
-bool RasterGridFilter::canLoadExtension(QString upperCaseExt) const
+bool RasterGridFilter::canLoadExtension(const QString& upperCaseExt) const
 {
 	return (	upperCaseExt == "TIF"
 			||	upperCaseExt == "TIFF"
@@ -48,7 +48,7 @@ bool RasterGridFilter::canSave(CC_CLASS_ENUM type, bool& multiple, bool& exclusi
 	return false;
 }
 
-CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container, LoadParameters& parameters)
+CC_FILE_ERROR RasterGridFilter::loadFile(const QString& filename, ccHObject& container, LoadParameters& parameters)
 {
 	GDALAllRegister();
 	ccLog::PrintDebug("(GDAL drivers: %i)", GetGDALDriverManager()->GetDriverCount());
@@ -57,7 +57,7 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 	{
 		GDALDataset* poDataset = static_cast<GDALDataset*>(GDALOpen( qPrintable(filename), GA_ReadOnly ));
 
-		if( poDataset != NULL )
+		if( poDataset != nullptr )
 		{
 			ccLog::Print(QString("Raster file: '%1'").arg(filename));
 			ccLog::Print( "Driver: %s/%s",
@@ -69,7 +69,7 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 			int rasterY = poDataset->GetRasterYSize();
 			ccLog::Print( "Size is %dx%dx%d", rasterX, rasterY, rasterCount );
 
-			if( poDataset->GetProjectionRef() != NULL )
+			if( poDataset->GetProjectionRef() != nullptr )
 				ccLog::Print( "Projection is `%s'", poDataset->GetProjectionRef() );
 
 			double adfGeoTransform[6] = {	 0, //top left x
@@ -128,16 +128,17 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 			ccPointCloud* pc = new ccPointCloud();
 
 			CCVector3d origin(adfGeoTransform[0], adfGeoTransform[3], 0.0);
-			CCVector3d Pshift(0,0,0);
+			CCVector3d Pshift(0, 0, 0);
 			//check for 'big' coordinates
 			{
-				if (HandleGlobalShift(origin, Pshift, parameters))
+				bool preserveCoordinateShift = true;
+				if (HandleGlobalShift(origin, Pshift, preserveCoordinateShift, parameters))
 				{
-					if (pc)
+					if (pc && preserveCoordinateShift)
 					{
 						pc->setGlobalShift(Pshift);
 					}
-					ccLog::Warning("[RasterFilter::loadFile] Raster has been recentered! Translation: (%.2f,%.2f,%.2f)", Pshift.x, Pshift.y, Pshift.z);
+					ccLog::Warning("[RasterFilter::loadFile] Raster has been recentered! Translation: (%.2f ; %.2f ; %.2f)", Pshift.x, Pshift.y, Pshift.z);
 				}
 			}
 
@@ -164,14 +165,14 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 				// A ------ D
 				CCVector3d B = origin + Pshift; //origin is 'top left'
 				CCVector3d C = B;
-				C.x += (rasterX - 1) * adfGeoTransform[1];
-				C.y += (rasterX - 1) * adfGeoTransform[4];
+				C.x += rasterX * adfGeoTransform[1];
+				C.y += rasterX * adfGeoTransform[4];
 				CCVector3d D = C;
-				D.x += (rasterY - 1) * adfGeoTransform[2];
-				D.y += (rasterY - 1) * adfGeoTransform[5];
+				D.x += rasterY * adfGeoTransform[2];
+				D.y += rasterY * adfGeoTransform[5];
 				CCVector3d A = B;
-				A.x += (rasterY - 1) * adfGeoTransform[2];
-				A.y += (rasterY - 1) * adfGeoTransform[5];
+				A.x += rasterY * adfGeoTransform[2];
+				A.y += rasterY * adfGeoTransform[5];
 
 				pc->addPoint(CCVector3::fromArray(A.u));
 				pc->addPoint(CCVector3::fromArray(B.u));
@@ -194,8 +195,8 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 				{
 					for (int i = 0; i < rasterX; ++i)
 					{
-						double x = adfGeoTransform[0] + static_cast<double>(i) * adfGeoTransform[1] + static_cast<double>(j) * adfGeoTransform[2] + Pshift.x;
-						double y = adfGeoTransform[3] + static_cast<double>(i) * adfGeoTransform[4] + static_cast<double>(j) * adfGeoTransform[5] + Pshift.y;
+						double x = adfGeoTransform[0] + (static_cast<double>(i) + 0.5) * adfGeoTransform[1] + (static_cast<double>(j) + 0.5) * adfGeoTransform[2] + Pshift.x;
+						double y = adfGeoTransform[3] + (static_cast<double>(i) + 0.5) * adfGeoTransform[4] + (static_cast<double>(j) + 0.5) * adfGeoTransform[5] + Pshift.y;
 						CCVector3 P(static_cast<PointCoordinateType>(x), static_cast<PointCoordinateType>(y), static_cast<PointCoordinateType>(z));
 						pc->addPoint(P);
 					}
@@ -240,7 +241,7 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 				ccLog::Print( "[GDAL] Min=%.3fd, Max=%.3f", adfMinMax[0], adfMinMax[1] );
 
 				GDALColorTable* colTable = poBand->GetColorTable();
-				if( colTable != NULL )
+				if( colTable != nullptr )
 					printf( "[GDAL] Band has a color table with %d entries", colTable->GetColorEntryCount() );
 
 				if( poBand->GetOverviewCount() > 0 )
@@ -256,7 +257,7 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 					zMinMax[0] = adfMinMax[0];
 					zMinMax[1] = adfMinMax[1];
 
-					double* scanline = (double*) CPLMalloc(sizeof(double)*nXSize);
+					double* scanline = (double*)CPLMalloc(sizeof(double)*nXSize);
 					//double* scanline = new double[nXSize];
 					memset(scanline, 0, sizeof(double)*nXSize);
 
@@ -347,7 +348,6 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 						if (isPalette && !colTable)
 						{
 							ccLog::Warning(QString("Band is declared as a '%1' but no palette is associated!").arg(GDALGetColorInterpretationName(colorInterp)));
-							isPalette = false;
 						}
 						else
 						{
@@ -360,7 +360,7 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 							{
 								assert(poBand->GetRasterDataType() <= GDT_Int32);
 
-								int* colIndexes = (int*) CPLMalloc(sizeof(int)*nXSize);
+								int* colIndexes = (int*)CPLMalloc(sizeof(int)*nXSize);
 								//double* scanline = new double[nXSize];
 								memset(colIndexes, 0, sizeof(int)*nXSize);
 
@@ -385,12 +385,12 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 											if (loadAsTexturedQuad)
 											{
 												QRgb origColor = quadTexture.pixel(k, j);
-												C = ccColor::Rgba(qRed(origColor), qGreen(origColor), qBlue(origColor), qAlpha(origColor));
+												C = ccColor::FromQRgba(origColor);
 											}
 											else
 											{
-												const ColorCompType* origColor = pc->getPointColor(pointIndex);
-												C = ccColor::Rgba(origColor[0], origColor[1], origColor[2], ccColor::MAX);
+												const ccColor::Rgb& origColor = pc->getPointColor(pointIndex);
+												C = ccColor::Rgba(origColor, ccColor::MAX);
 											}
 
 											switch (colorInterp)
@@ -431,7 +431,7 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 											}
 											else
 											{
-												pc->setPointColor(pointIndex, C.rgba);
+												pc->setPointColor(pointIndex, C);
 											}
 										}
 									}
@@ -447,11 +447,11 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 					{
 						QString sfName = QString("band #%1 (%2)").arg(i).arg(GDALGetColorInterpretationName(colorInterp)); //SF names really need to be unique!
 						ccScalarField* sf = new ccScalarField(qPrintable(sfName));
-						if (!sf->resize(pc->size(), true, NAN_VALUE))
+						if (!sf->resizeSafe(pc->size(), true, NAN_VALUE))
 						{
 							ccLog::Warning(QString("Failed to instantiate memory for storing '%1' as a scalar field!").arg(sf->getName()));
 							sf->release();
-							sf = 0;
+							sf = nullptr;
 						}
 						else
 						{
@@ -459,22 +459,22 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 							//double* scanline = new double[nXSize];
 							memset(colValues, 0, sizeof(double)*nXSize);
 
-							for (int j=0; j<nYSize; ++j)
+							for (int j = 0; j < nYSize; ++j)
 							{
-								if (poBand->RasterIO( GF_Read, /*xOffset=*/0, /*yOffset=*/j, /*xSize=*/nXSize, /*ySize=*/1, /*buffer=*/colValues, /*bufferSizeX=*/nXSize, /*bufferSizeY=*/1, /*bufferType=*/GDT_Float64, /*x_offset=*/0, /*y_offset=*/0 ) != CE_None)
+								if (poBand->RasterIO(GF_Read, /*xOffset=*/0, /*yOffset=*/j, /*xSize=*/nXSize, /*ySize=*/1, /*buffer=*/colValues, /*bufferSizeX=*/nXSize, /*bufferSizeY=*/1, /*bufferType=*/GDT_Float64, /*x_offset=*/0, /*y_offset=*/0) != CE_None)
 								{
 									CPLFree(colValues);
 									delete pc;
 									return CC_FERR_READING;
 								}
 
-								for (int k=0; k<nXSize; ++k)
+								for (int k = 0; k < nXSize; ++k)
 								{
 									unsigned pointIndex = static_cast<unsigned>(k + j * rasterX);
 									if (pointIndex <= pc->size())
 									{
 										ScalarType s = static_cast<ScalarType>(colValues[k]);
-										sf->setValue(pointIndex,s);
+										sf->setValue(pointIndex, s);
 									}
 								}
 							}
@@ -508,14 +508,19 @@ CC_FILE_ERROR RasterGridFilter::loadFile(QString filename, ccHObject& container,
 				else if (zInvalid != 0 && zInvalid < pc->size())
 				{
 					//shall we remove the points with invalid heights?
-					if (QMessageBox::question(0, "Remove NaN points?", "This raster has pixels with invalid heights. Shall we remove them?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+					static bool s_alwaysRemoveInvalidHeights = false;
+					int result = (s_alwaysRemoveInvalidHeights ? QMessageBox::Yes : QMessageBox::question(0, "Remove NaN points?", "This raster has pixels with invalid heights. Shall we remove them?", QMessageBox::Yes, QMessageBox::YesToAll, QMessageBox::No));
+					if (result != QMessageBox::No)
 					{
+						if (result == QMessageBox::YesToAll)
+							s_alwaysRemoveInvalidHeights = true;
+
 						CCLib::ReferenceCloud validPoints(pc);
 						unsigned count = pc->size();
 						bool error = true;
-						if (validPoints.reserve(count-zInvalid))
+						if (validPoints.reserve(count - zInvalid))
 						{
-							for (unsigned i=0; i<count; ++i)
+							for (unsigned i = 0; i < count; ++i)
 							{
 								if (pc->getPoint(i)->z >= zMinMax[0])
 									validPoints.addPointIndex(i);

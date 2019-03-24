@@ -17,8 +17,8 @@
 
 #include "ccColorGradientDlg.h"
 
-//Local
-#include "ccQtHelpers.h"
+//common
+#include <ccQtHelpers.h>
 
 //Qt
 #include <QColorDialog>
@@ -27,10 +27,11 @@
 #include <assert.h>
 
 //persistent parameters
-QColor s_firstColor(Qt::black);
-QColor s_secondColor(Qt::white);
-ccColorGradientDlg::GradientType s_lastType(ccColorGradientDlg::Default);
-static double s_lastFreq = 1.0;
+static QColor s_firstColor(Qt::black);
+static QColor s_secondColor(Qt::white);
+static ccColorGradientDlg::GradientType s_lastType(ccColorGradientDlg::Default);
+static double s_lastFreq = 5.0;
+static int s_lastDimIndex = 2;
 
 ccColorGradientDlg::ccColorGradientDlg(QWidget* parent)
 	: QDialog(parent, Qt::Tool)
@@ -38,19 +39,21 @@ ccColorGradientDlg::ccColorGradientDlg(QWidget* parent)
 {
 	setupUi(this);
 
-	connect(firstColorButton, SIGNAL(clicked()), this, SLOT(changeFirstColor()));
-	connect(secondColorButton, SIGNAL(clicked()), this, SLOT(changeSecondColor()));
+	connect(firstColorButton, &QAbstractButton::clicked, this, &ccColorGradientDlg::changeFirstColor);
+	connect(secondColorButton, &QAbstractButton::clicked, this, &ccColorGradientDlg::changeSecondColor);
 
 	//restore previous parameters
-	ccQtHelpers::SetButtonColor(secondColorButton,s_secondColor);
-	ccQtHelpers::SetButtonColor(firstColorButton,s_firstColor);
+	ccQtHelpers::SetButtonColor(secondColorButton, s_secondColor);
+	ccQtHelpers::SetButtonColor(firstColorButton, s_firstColor);
 	setType(s_lastType);
 	bandingFreqSpinBox->setValue(s_lastFreq);
+	directionComboBox->setCurrentIndex(s_lastDimIndex);
 }
 
 unsigned char ccColorGradientDlg::getDimension() const
 {
-	return static_cast<unsigned char>(directionComboBox->currentIndex());
+	s_lastDimIndex = directionComboBox->currentIndex();
+	return static_cast<unsigned char>(s_lastDimIndex);
 }
 
 void ccColorGradientDlg::setType(ccColorGradientDlg::GradientType type)
@@ -94,7 +97,6 @@ void ccColorGradientDlg::getColors(QColor& first, QColor& second) const
 
 double ccColorGradientDlg::getBandingFrequency() const
 {
-	assert(bandingRadioButton->isChecked());
 	//ugly hack: we use 's_lastFreq' here as the frequency is only requested
 	//when the dialog is accepted
 	s_lastFreq = bandingFreqSpinBox->value();
@@ -107,7 +109,7 @@ void ccColorGradientDlg::changeFirstColor()
 	if (newCol.isValid())
 	{
 		s_firstColor = newCol;
-		ccQtHelpers::SetButtonColor(firstColorButton,s_firstColor);
+		ccQtHelpers::SetButtonColor(firstColorButton, s_firstColor);
 	}
 }
 
@@ -117,6 +119,6 @@ void ccColorGradientDlg::changeSecondColor()
 	if (newCol.isValid())
 	{
 		s_secondColor = newCol;
-		ccQtHelpers::SetButtonColor(secondColorButton,s_secondColor);
+		ccQtHelpers::SetButtonColor(secondColorButton, s_secondColor);
 	}
 }

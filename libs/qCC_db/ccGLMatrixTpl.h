@@ -26,8 +26,6 @@
 #include <CCGeom.h>
 
 //Qt
-#include <QStringList>
-#include <QRegExp>
 #include <QTextStream>
 
 
@@ -293,7 +291,7 @@ public:
 	/** \param[in] matText matrix text
 		\param[out] success whether input matrix text is valid or not
 	**/
-	static ccGLMatrixTpl<T> FromString(QString matText, bool& success)
+	static ccGLMatrixTpl<T> FromString(const QString &matText, bool& success)
 	{
 		QStringList valuesStr = matText.split(QRegExp("\\s+"),QString::SkipEmptyParts);
 		if (valuesStr.size() != OPENGL_MATRIX_SIZE)
@@ -349,9 +347,10 @@ public:
 
 		QTextStream stream(&fp);
 		stream.setRealNumberPrecision(precision);
-		for (unsigned i=0; i<4; ++i)
+		stream.setRealNumberNotation(QTextStream::FixedNotation);
+		for (unsigned i = 0; i < 4; ++i)
 		{
-			stream << m_mat[i] << " " << m_mat[i+4] << " " << m_mat[i+8] << " " << m_mat[i+12] << endl;
+			stream << m_mat[i] << " " << m_mat[i + 4] << " " << m_mat[i + 8] << " " << m_mat[i + 12] << endl;
 		}
 
 		return (fp.error() == QFile::NoError);
@@ -647,13 +646,13 @@ public:
 	inline const T* data() const { return m_mat; }
 
 	//! Retruns a pointer to internal translation
-	/** Translation corresponds to the begining of the
+	/** Translation corresponds to the beginning of the
 		third column of the matrix.
 	**/
 	inline T* getTranslation() { return m_mat+12; }
 
 	//! Retruns a const pointer to internal translation
-	/** Translation corresponds to the begining of the
+	/** Translation corresponds to the beginning of the
 		third column of the matrix.
 	**/
 	inline const T* getTranslation() const { return m_mat+12; }
@@ -805,16 +804,16 @@ public:
 	//! Applies transformation to a 3D vector (in place) - double version
 	/** Input vector is directly modified after calling this method
 	**/
-	inline void apply(Vector3Tpl<double>& vec) const	{ vec = (*this)*vec; }
+	inline void apply(Vector3Tpl<double>& vec) const { vec = (*this)*vec; }
 
 	//! Applies transformation to a 4D vector (in place) - float version
 	/** Input vector is directly modified after calling this method
 	**/
-	inline void apply(Tuple4Tpl<float>& vec) const	{ vec = (*this)*vec; }
+	inline void apply(Tuple4Tpl<float>& vec) const { vec = (*this)*vec; }
 	//! Applies transformation to a 3D vector (in place) - double version
 	/** Input vector is directly modified after calling this method
 	**/
-	inline void apply(Tuple4Tpl<double>& vec) const	{ vec = (*this)*vec; }
+	inline void apply(Tuple4Tpl<double>& vec) const { vec = (*this)*vec; }
 
 	//! Get the resulting transformation along X dimension (float version)
 	inline float applyX(const Vector3Tpl<float>& vec) const
@@ -1093,7 +1092,7 @@ public:
 	//! Scales the whole matrix
 	/** \param coef scaling coef.
 	**/
-	inline void scale(T coef) { for (unsigned i=0; i<OPENGL_MATRIX_SIZE; ++i) m_mat[i] *= coef; }
+	inline void scale(T coef) { for (auto &cell : m_mat) cell *= coef; }
 
 	//! Scales one line of the matrix
 	/** \param lineIndex (0-3)
@@ -1123,8 +1122,8 @@ public:
 	}
 
 	//inherited from ccSerializableObject
-	virtual bool isSerializable() const { return true; }
-	virtual bool toFile(QFile& out) const
+	bool isSerializable() const override { return true; }
+	bool toFile(QFile& out) const override
 	{
 		assert(out.isOpen() && (out.openMode() & QIODevice::WriteOnly));
 
@@ -1135,7 +1134,7 @@ public:
 		return true;
 	}
 
-	virtual bool fromFile(QFile& in, short dataVersion, int flags)
+	bool fromFile(QFile& in, short dataVersion, int flags) override
 	{
 		assert(in.isOpen() && (in.openMode() & QIODevice::ReadOnly));
 

@@ -16,33 +16,25 @@
 //#                                                                        #
 //##########################################################################
 
-#include "RegistrationTools.h"
+#include <RegistrationTools.h>
 
 //local
-#include "SquareMatrix.h"
-#include "GenericProgressCallback.h"
-#include "GenericCloud.h"
-#include "GenericIndexedCloudPersist.h"
-#include "ReferenceCloud.h"
-#include "DgmOctree.h"
-#include "DistanceComputationTools.h"
-#include "CCConst.h"
-#include "CloudSamplingTools.h"
-#include "ScalarFieldTools.h"
-#include "NormalDistribution.h"
-#include "ManualSegmentationTools.h"
-#include "GeometricalAnalysisTools.h"
-#include "KdTree.h"
-#include "SimpleCloud.h"
-#include "ChunkedPointCloud.h"
-#include "Garbage.h"
-#include "Jacobi.h"
-#include "SortAlgo.h"
+#include <CloudSamplingTools.h>
+#include <DistanceComputationTools.h>
+#include <Garbage.h>
+#include <GenericProgressCallback.h>
+#include <GeometricalAnalysisTools.h>
+#include <Jacobi.h>
+#include <KdTree.h>
+#include <ManualSegmentationTools.h>
+#include <NormalDistribution.h>
+#include <ParallelSort.h>
+#include <PointCloud.h>
+#include <ReferenceCloud.h>
+#include <ScalarFieldTools.h>
 
 //system
-#include <time.h>
-#include <algorithm>
-#include <assert.h>
+#include <ctime>
 
 using namespace CCLib;
 
@@ -136,21 +128,21 @@ void RegistrationTools::FilterTransformation(	const ScaledTransformation& inTran
 
 struct ModelCloud
 {
-	ModelCloud() : cloud(0), weights(0) {}
-	ModelCloud(const ModelCloud& m) : cloud(m.cloud), weights(m.weights) {}
+	ModelCloud() : cloud(nullptr), weights(nullptr) {}
+	ModelCloud(const ModelCloud& m) = default;
 	GenericIndexedCloudPersist* cloud;
 	ScalarField* weights;
 };
 
 struct DataCloud
 {
-	DataCloud() : cloud(0), rotatedCloud(0), weights(0), CPSetRef(0), CPSetPlain(0) {}
-	DataCloud(const DataCloud& d) : cloud(d.cloud), rotatedCloud(d.rotatedCloud), weights(d.weights), CPSetRef(d.CPSetRef), CPSetPlain(d.CPSetPlain) {}
+	DataCloud() : cloud(nullptr), rotatedCloud(nullptr), weights(nullptr), CPSetRef(nullptr), CPSetPlain(nullptr) {}
+	
 	ReferenceCloud* cloud;
-	SimpleCloud* rotatedCloud;
+	PointCloud* rotatedCloud;
 	ScalarField* weights;
 	ReferenceCloud* CPSetRef;
-	ChunkedPointCloud* CPSetPlain;
+	PointCloud* CPSetPlain;
 };
 
 ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexedCloudPersist* inputModelCloud,
@@ -198,7 +190,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 				sfGarbage.add(data.weights);
 				
 				unsigned destCount = data.cloud->size();
-				if (data.weights->resize(destCount))
+				if (data.weights->resizeSafe(destCount))
 				{
 					for (unsigned i = 0; i < destCount; ++i)
 					{
@@ -277,7 +269,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 				sfGarbage.add(model.weights);
 
 				unsigned destCount = subModelCloud->size();
-				if (model.weights->resize(destCount))
+				if (model.weights->resizeSafe(destCount))
 				{
 					for (unsigned i = 0; i < destCount; ++i)
 					{
@@ -325,7 +317,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 	//Closest Point Set (see ICP algorithm)
 	if (inputModelMesh)
 	{
-		data.CPSetPlain = new ChunkedPointCloud;
+		data.CPSetPlain = new PointCloud;
 		cloudGarbage.add(data.CPSetPlain);
 	}
 	else
@@ -335,7 +327,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 	}
 
 	//per-point couple weights
-	ScalarField* coupleWeights = 0;
+	ScalarField* coupleWeights = nullptr;
 	if (model.weights || data.weights)
 	{
 		coupleWeights = new ScalarField("CoupleWeights");
@@ -374,8 +366,8 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 		assert(false);
 	}
 
-	FILE* fTraceFile = 0;
-#ifdef QT_DEBUG
+	FILE* fTraceFile = nullptr;
+#ifdef CC_DEBUG
 	fTraceFile = fopen("registration_trace_log.csv","wt");
 	if (fTraceFile)
 		fprintf(fTraceFile,"Iteration; RMS; Point count;\n");
@@ -416,7 +408,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 				}
 				else if (data.CPSetPlain)
 				{
-					filteredData.CPSetPlain = new ChunkedPointCloud; //we must also update the CPSet!
+					filteredData.CPSetPlain = new PointCloud; //we must also update the CPSet!
 					cloudGarbage.add(filteredData.CPSetPlain);
 				}
 
@@ -430,7 +422,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 				if (	!filteredData.cloud->reserve(pointCount)
 					||	(filteredData.CPSetRef && !filteredData.CPSetRef->reserve(pointCount))
 					||	(filteredData.CPSetPlain && !filteredData.CPSetPlain->reserve(pointCount))
-					||	(filteredData.weights && !filteredData.weights->reserve(pointCount)))
+					||	(filteredData.weights && !filteredData.weights->reserveSafe(pointCount)))
 				{
 					//not enough memory
 					result = ICP_ERROR_NOT_ENOUGH_MEMORY;
@@ -486,7 +478,8 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 				overlapDistances[i] = data.cloud->getPointScalarValue(i);
 				assert(overlapDistances[i] == overlapDistances[i]);
 			}
-			SortAlgo(overlapDistances.begin(), overlapDistances.begin() + pointCount);
+			
+			ParallelSort(overlapDistances.begin(), overlapDistances.begin() + pointCount);
 
 			assert(maxOverlapCount != 0);
 			ScalarType maxOverlapDist = overlapDistances[maxOverlapCount-1];
@@ -500,7 +493,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 			}
 			else if (data.CPSetPlain)
 			{
-				filteredData.CPSetPlain = new ChunkedPointCloud; //we must also update the CPSet!
+				filteredData.CPSetPlain = new PointCloud; //we must also update the CPSet!
 				cloudGarbage.add(filteredData.CPSetPlain);
 			}
 			cloudGarbage.add(filteredData.cloud);
@@ -513,7 +506,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 			if (	!filteredData.cloud->reserve(pointCount) //should be maxOverlapCount in theory, but there may be several points with the same value as maxOverlapDist!
 				||	(filteredData.CPSetRef && !filteredData.CPSetRef->reserve(pointCount))
 				||	(filteredData.CPSetPlain && !filteredData.CPSetPlain->reserve(pointCount))
-				||	(filteredData.weights && !filteredData.weights->reserve(pointCount)))
+				||	(filteredData.weights && !filteredData.weights->reserveSafe(pointCount)))
 			{
 				//not enough memory
 				result = ICP_ERROR_NOT_ENOUGH_MEMORY;
@@ -557,7 +550,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 			unsigned count = data.cloud->size();
 			assert(!model.weights || (data.CPSetRef && data.CPSetRef->size() == count));
 
-			if (coupleWeights->currentSize() != count && !coupleWeights->resize(count))
+			if (coupleWeights->currentSize() != count && !coupleWeights->resizeSafe(count))
 			{
 				//not enough memory to store weights
 				result = ICP_ERROR_NOT_ENOUGH_MEMORY;
@@ -590,7 +583,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 						ScalarType w = coupleWeights->getValue(i);
 						if (!ScalarField::ValidValue(w))
 							continue;
-						wi = fabs(w);
+						wi = std::abs(w);
 					}
 					double Vd = wi * V;
 					wiSum += wi * wi;
@@ -603,7 +596,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 
 			double rms = sqrt(meanSquareError);
 
-#ifdef QT_DEBUG
+#ifdef CC_DEBUG
 			if (fTraceFile)
 				fprintf(fTraceFile, "%u; %f; %u;\n", iteration, rms, data.cloud->size());
 #endif
@@ -743,7 +736,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 		if (!data.rotatedCloud || pointOrderHasBeenChanged)
 		{
 			//we create a new structure, with rotated points
-			SimpleCloud* rotatedDataCloud = PointProjectionTools::applyTransformation(data.cloud, currentTrans);
+			PointCloud* rotatedDataCloud = PointProjectionTools::applyTransformation(data.cloud, currentTrans);
 			if (!rotatedDataCloud)
 			{
 				//not enough memory
@@ -757,7 +750,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 			cloudGarbage.add(data.rotatedCloud);
 
 			//update data.cloud
-			data.cloud->clear(false);
+			data.cloud->clear();
 			data.cloud->setAssociatedCloud(data.rotatedCloud);
 			if (!data.cloud->addPointIndex(0, data.rotatedCloud->size()))
 			{
@@ -769,7 +762,9 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 		else
 		{
 			//we simply have to rotate the existing temporary cloud
-			data.rotatedCloud->applyTransformation(currentTrans);
+			currentTrans.apply(*data.rotatedCloud);
+			data.rotatedCloud->invalidateBoundingBox(); //invalidate bb
+
 			//DGM: warning, we must manually invalidate the ReferenceCloud bbox after rotation!
 			data.cloud->invalidateBoundingBox();
 		}
@@ -810,7 +805,7 @@ ICPRegistrationTools::RESULT_TYPE ICPRegistrationTools::Register(	GenericIndexed
 	if (fTraceFile)
 	{
 		fclose(fTraceFile);
-		fTraceFile = 0;
+		fTraceFile = nullptr;
 	}
 
 	//end of progress notification
@@ -840,8 +835,8 @@ double HornRegistrationTools::ComputeRMS(GenericCloud* lCloud,
 
 	double rms = 0.0;
 
-	rCloud->placeIteratorAtBegining();
-	lCloud->placeIteratorAtBegining();
+	rCloud->placeIteratorAtBeginning();
+	lCloud->placeIteratorAtBeginning();
 	unsigned count = rCloud->size();
 			
 	for (unsigned i=0; i<count; i++)
@@ -850,7 +845,7 @@ double HornRegistrationTools::ComputeRMS(GenericCloud* lCloud,
 		const CCVector3* Li = lCloud->getNextPoint();
 		CCVector3 Lit = (trans.R.isValid() ? trans.R * (*Li) : (*Li))*trans.s + trans.T;
 
-//#ifdef QT_DEBUG
+//#ifdef CC_DEBUG
 //		double dist = (*Ri-Lit).norm();
 //#endif
 
@@ -872,19 +867,19 @@ bool RegistrationTools::RegistrationProcedure(	GenericCloud* P, //data
 	trans.T = CCVector3(0,0,0);
 	trans.s = PC_ONE;
 
-	if (P == 0 || X == 0 || P->size() != X->size() || P->size() < 3)
+	if (P == nullptr || X == nullptr || P->size() != X->size() || P->size() < 3)
 		return false;
 
 	//centers of mass
-	CCVector3 Gp = coupleWeights ? GeometricalAnalysisTools::computeWeightedGravityCenter(P, coupleWeights) : GeometricalAnalysisTools::computeGravityCenter(P);
-	CCVector3 Gx = coupleWeights ? GeometricalAnalysisTools::computeWeightedGravityCenter(X, coupleWeights) : GeometricalAnalysisTools::computeGravityCenter(X);
+	CCVector3 Gp = coupleWeights ? GeometricalAnalysisTools::ComputeWeightedGravityCenter(P, coupleWeights) : GeometricalAnalysisTools::ComputeGravityCenter(P);
+	CCVector3 Gx = coupleWeights ? GeometricalAnalysisTools::ComputeWeightedGravityCenter(X, coupleWeights) : GeometricalAnalysisTools::ComputeGravityCenter(X);
 
 	//specific case: 3 points only
 	//See section 5.A in Horn's paper
 	if (P->size() == 3)
 	{
 		//compute the first set normal
-		P->placeIteratorAtBegining();
+		P->placeIteratorAtBeginning();
 		const CCVector3* Ap = P->getNextPoint();
 		const CCVector3* Bp = P->getNextPoint();
 		const CCVector3* Cp = P->getNextPoint();
@@ -897,7 +892,7 @@ bool RegistrationTools::RegistrationProcedure(	GenericCloud* P, //data
 			Np /= static_cast<PointCoordinateType>(norm);
 		}
 		//compute the second set normal
-		X->placeIteratorAtBegining();
+		X->placeIteratorAtBeginning();
 		const CCVector3* Ax = X->getNextPoint();
 		const CCVector3* Bx = X->getNextPoint();
 		const CCVector3* Cx = X->getNextPoint();
@@ -1021,15 +1016,15 @@ bool RegistrationTools::RegistrationProcedure(	GenericCloud* P, //data
 		//it's the case when the two clouds are very far away from
 		//each other in the ICP process) we try to get the two clouds closer
 		CCVector3 diag = bbMax-bbMin;
-		if (fabs(diag.x) + fabs(diag.y) + fabs(diag.z) < ZERO_TOLERANCE)
+		if (std::abs(diag.x) + std::abs(diag.y) + std::abs(diag.z) < ZERO_TOLERANCE)
 		{
 			trans.T = Gx - Gp*aPrioriScale;
 			return true;
 		}
 
 		//Cross covariance matrix, eq #24 in Besl92 (but with weights, if any)
-		SquareMatrixd Sigma_px = (coupleWeights ? GeometricalAnalysisTools::computeWeightedCrossCovarianceMatrix(P, X, Gp, Gx, coupleWeights)
-												: GeometricalAnalysisTools::computeCrossCovarianceMatrix(P,X,Gp,Gx) );
+		SquareMatrixd Sigma_px = (coupleWeights ? GeometricalAnalysisTools::ComputeWeightedCrossCovarianceMatrix(P, X, Gp, Gx, coupleWeights)
+												: GeometricalAnalysisTools::ComputeCrossCovarianceMatrix(P,X,Gp,Gx) );
 		if (!Sigma_px.isValid())
 			return false;
 
@@ -1071,7 +1066,7 @@ bool RegistrationTools::RegistrationProcedure(	GenericCloud* P, //data
 		//we compute its eigenvalues and eigenvectors
 		CCLib::SquareMatrixd eigVectors;
 		std::vector<double> eigValues;
-		if (!Jacobi<double>::ComputeEigenValuesAndVectors(QSigma, eigVectors, eigValues))
+		if (!Jacobi<double>::ComputeEigenValuesAndVectors(QSigma, eigVectors, eigValues, false))
 		{
 			//failure
 			return false;
@@ -1092,8 +1087,8 @@ bool RegistrationTools::RegistrationProcedure(	GenericCloud* P, //data
 			double acc_denom = 0.0;
 
 			//now deduce the scale (refer to "Point Set Registration with Integrated Scale Estimation", Zinsser et. al, PRIP 2005)
-			X->placeIteratorAtBegining();
-			P->placeIteratorAtBegining();
+			X->placeIteratorAtBeginning();
+			P->placeIteratorAtBeginning();
 
 			unsigned count = X->size();
 			assert(P->size() == count);
@@ -1110,7 +1105,7 @@ bool RegistrationTools::RegistrationProcedure(	GenericCloud* P, //data
 
 			//DGM: acc_2 can't be 0 because we already have checked that the bbox is not a single point!
 			assert(acc_denom > 0.0);
-			trans.s = static_cast<PointCoordinateType>(fabs(acc_num / acc_denom));
+			trans.s = static_cast<PointCoordinateType>(std::abs(acc_num / acc_denom));
 		}
 
 		//and we deduce the translation
@@ -1144,7 +1139,7 @@ bool FPCSRegistrationTools::RegisterClouds(	GenericIndexedCloud* modelCloud,
 	//}
 
 	//Initialize random seed with current time
-	srand(static_cast<unsigned>(time(0)));
+	srand(static_cast<unsigned>(time(nullptr)));
 
 	unsigned bestScore = 0, score = 0;
 	transform.R.invalidate();
@@ -1311,10 +1306,10 @@ bool FPCSRegistrationTools::FindBase(	GenericIndexedCloud* cloud,
 	size = cloud->size();
 	best = 0.;
 	b = c = 0;
-	a = rand()%size;
+	a = rand() % size;
 	p0 = cloud->getPoint(a);
 	//Randomly pick 3 points as sparsed as possible
-	for(i=0; i<nbTries; i++)
+	for (i = 0; i < nbTries; i++)
 	{
 		unsigned t1 = (rand() % size);
 		unsigned t2 = (rand() % size);
@@ -1324,19 +1319,19 @@ bool FPCSRegistrationTools::FindBase(	GenericIndexedCloud* cloud,
 		p1 = cloud->getPoint(t1);
 		p2 = cloud->getPoint(t2);
 		//Checked that the selected points are not more than overlap-distant from p0
-		u = *p1-*p0;
+		u = *p1 - *p0;
 		if (u.norm2() > overlap)
 			continue;
-		u = *p2-*p0;
+		u = *p2 - *p0;
 		if (u.norm2() > overlap)
 			continue;
 
 		//compute [p0, p1, p2] area thanks to cross product
-		x = ((p1->y-p0->y)*(p2->z-p0->z))-((p1->z-p0->z)*(p2->y-p0->y));
-		y = ((p1->z-p0->z)*(p2->x-p0->x))-((p1->x-p0->x)*(p2->z-p0->z));
-		z = ((p1->x-p0->x)*(p2->y-p0->y))-((p1->y-p0->y)*(p2->x-p0->x));
+		x = ((p1->y - p0->y)*(p2->z - p0->z)) - ((p1->z - p0->z)*(p2->y - p0->y));
+		y = ((p1->z - p0->z)*(p2->x - p0->x)) - ((p1->x - p0->x)*(p2->z - p0->z));
+		z = ((p1->x - p0->x)*(p2->y - p0->y)) - ((p1->y - p0->y)*(p2->x - p0->x));
 		//don't need to compute the true area : f=(area²)*2 is sufficient for comparison
-		f = x*x + y*y + z*z;
+		f = x * x + y * y + z * z;
 		if (f > best)
 		{
 			b = t1;
@@ -1355,12 +1350,12 @@ bool FPCSRegistrationTools::FindBase(	GenericIndexedCloud* cloud,
 	f = normal.norm();
 	if (f <= 0)
 		return false;
-	normal *= 1.0f/f;
+	normal *= 1.0f / f;
 	//plane equation : p lies in the plane if x*p[0] + y*p[1] + z*p[2] + w = 0
 	x = normal.x;
 	y = normal.y;
 	z = normal.z;
-	w = -(x*p0->x)-(y*p0->y)-(z*p0->z);
+	w = -(x*p0->x) - (y*p0->y) - (z*p0->z);
 	d = a;
 	best = -1.;
 	p1 = cloud->getPoint(b);
@@ -1375,12 +1370,12 @@ bool FPCSRegistrationTools::FindBase(	GenericIndexedCloud* cloud,
 		d0 = (*p3 - *p0).norm2();
 		d1 = (*p3 - *p1).norm2();
 		d2 = (*p3 - *p2).norm2();
-		if ((d0>=overlap && d1>=overlap) || (d0>=overlap && d2>=overlap) || (d1>=overlap && d2>=overlap))
+		if ((d0 >= overlap && d1 >= overlap) || (d0 >= overlap && d2 >= overlap) || (d1 >= overlap && d2 >= overlap))
 			continue;
 		//Compute distance to the plane (cloud[a], cloud[b], cloud[c])
-		f = fabs((x*p3->x)+(y*p3->y)+(z*p3->z)+w);
+		f = std::abs((x*p3->x) + (y*p3->y) + (z*p3->z) + w);
 		//keep the point which is the closest to the plane, while being as far as possible from the other three points
-		f=(f+1.0f)/(sqrt(d0)+sqrt(d1)+sqrt(d2));
+		f = (f + 1.0f) / (sqrt(d0) + sqrt(d1) + sqrt(d2));
 		if ((best < 0.) || (f < best))
 		{
 			d = t1;
@@ -1422,7 +1417,7 @@ bool FPCSRegistrationTools::FindBase(	GenericIndexedCloud* cloud,
 }
 
 //pair of indexes
-typedef std::pair<unsigned,unsigned> IndexPair;
+using IndexPair = std::pair<unsigned,unsigned>;
 
 int FPCSRegistrationTools::FindCongruentBases(KDTree* tree,
 												ScalarType delta,
@@ -1450,7 +1445,7 @@ int FPCSRegistrationTools::FindCongruentBases(KDTree* tree,
 	//Find all pairs which are d1-appart and d2-appart
 	std::vector<IndexPair> pairs1, pairs2;
 	{
-		unsigned count = (unsigned)cloud->size();
+		unsigned count = static_cast<unsigned>(cloud->size());
 		std::vector<unsigned> pointsIndexes;
 		try
 		{
@@ -1462,7 +1457,7 @@ int FPCSRegistrationTools::FindCongruentBases(KDTree* tree,
 			return -1;
 		}
 
-		for (unsigned i=0; i<count; i++)
+		for (unsigned i = 0; i < count; i++)
 		{
 			const CCVector3 *q0 = cloud->getPoint(i);
 			IndexPair idxPair;
@@ -1471,10 +1466,10 @@ int FPCSRegistrationTools::FindCongruentBases(KDTree* tree,
 			pointsIndexes.clear();
 			tree->findPointsLyingToDistance(q0->u, static_cast<ScalarType>(d1), delta, pointsIndexes);
 			{
-				for(size_t j=0; j<pointsIndexes.size(); j++)
+				for (std::size_t j = 0; j < pointsIndexes.size(); j++)
 				{
 					//As ||pi-pj|| = ||pj-pi||, we only take care of pairs that verify i<j
-					if (pointsIndexes[j]>i)
+					if (pointsIndexes[j] > i)
 					{
 						idxPair.second = pointsIndexes[j];
 						pairs1.push_back(idxPair);
@@ -1485,9 +1480,9 @@ int FPCSRegistrationTools::FindCongruentBases(KDTree* tree,
 			pointsIndexes.clear();
 			tree->findPointsLyingToDistance(q0->u, static_cast<ScalarType>(d2), delta, pointsIndexes);
 			{
-				for(size_t j=0; j<pointsIndexes.size(); j++)
+				for (std::size_t j = 0; j < pointsIndexes.size(); j++)
 				{
-					if (pointsIndexes[j]>i)
+					if (pointsIndexes[j] > i)
 					{
 						idxPair.second = pointsIndexes[j];
 						pairs2.push_back(idxPair);
@@ -1500,12 +1495,12 @@ int FPCSRegistrationTools::FindCongruentBases(KDTree* tree,
 	//Select among the pairs the ones that can be congruent to the base "base"
 	std::vector<IndexPair> match;
 	{
-		SimpleCloud tmpCloud1,tmpCloud2;
+		PointCloud tmpCloud1, tmpCloud2;
 		{
-			unsigned count = (unsigned)pairs1.size();
-			if (!tmpCloud1.reserve(count*2)) //not enough memory
+			unsigned count = static_cast<unsigned>(pairs1.size());
+			if (!tmpCloud1.reserve(count * 2)) //not enough memory
 				return -2;
-			for(unsigned i=0; i<count; i++)
+			for (unsigned i = 0; i < count; i++)
 			{
 				//generate the two intermediate points from r1 in pairs1[i]
 				const CCVector3 *q0 = cloud->getPoint(pairs1[i].first);
@@ -1518,7 +1513,7 @@ int FPCSRegistrationTools::FindCongruentBases(KDTree* tree,
 		}
 	
 		{
-			unsigned count = (unsigned)pairs2.size();
+			unsigned count = static_cast<unsigned>(pairs2.size());
 			if (!tmpCloud2.reserve(count*2)) //not enough memory
 				return -3;
 			for(unsigned i=0; i<count; i++)
@@ -1540,7 +1535,7 @@ int FPCSRegistrationTools::FindCongruentBases(KDTree* tree,
 
 		//Find matching (up to delta) intermediate points in tmpCloud1 and tmpCloud2
 		{
-			unsigned count = (unsigned)tmpCloud2.size();
+			unsigned count = static_cast<unsigned>(tmpCloud2.size());
 			match.reserve(count);
 			if (match.capacity() < count)	//not enough memory
 				return -5;
@@ -1562,14 +1557,20 @@ int FPCSRegistrationTools::FindCongruentBases(KDTree* tree,
 
 	//Find bases from matching intermediate points indexes
 	{
-		results.clear();
-		size_t count = match.size();
-		if (count>0)
+		results.resize(0);
+		std::size_t count = match.size();
+		if (count > 0)
 		{
-			results.reserve(count);
-			if (results.capacity() < count)		//not enough memory
+			try
+			{
+				results.reserve(count);
+			}
+			catch (const std::bad_alloc&)
+			{
+				//not enough memory
 				return -6;
-			for(size_t i=0; i<count; i++)
+			}
+			for (std::size_t i = 0; i < count; i++)
 			{
 				Base quad;
 				unsigned b = match[i].second / 2;
@@ -1600,7 +1601,7 @@ int FPCSRegistrationTools::FindCongruentBases(KDTree* tree,
 		}
 	}
 
-	return (int)results.size();
+	return static_cast<int>(results.size());
 }
 
 
@@ -1624,23 +1625,23 @@ bool FPCSRegistrationTools::LinesIntersections(	const CCVector3 &p0,
 	p10 = p1-p0;
 	num = (p02.dot(p32) * p32.dot(p10)) - (p02.dot(p10) * p32.dot(p32));
 	denom = (p10.dot(p10) * p32.dot(p32)) - (p32.dot(p10) * p32.dot(p10));
-	if (fabs(denom) < 0.00001)
+	if (std::abs(denom) < 0.00001)
 		return false;
 	lambda = num / denom;
 	num = p02.dot(p32) + (lambda*p32.dot(p10));
 	denom = p32.dot(p32);
-	if (fabs(denom) < 0.00001)
+	if (std::abs(denom) < 0.00001)
 		return false;
 	mu = num / denom;
-	A.x = p0.x+(lambda*p10.x);
-	A.y = p0.y+(lambda*p10.y);
-	A.z = p0.z+(lambda*p10.z);
-	B.x = p2.x+(mu*p32.x);
-	B.y = p2.y+(mu*p32.y);
-	B.z = p2.z+(mu*p32.z);
-	inter.x = (A.x+B.x)/2.0f;
-	inter.y = (A.y+B.y)/2.0f;
-	inter.z = (A.z+B.z)/2.0f;
+	A.x = p0.x + (lambda*p10.x);
+	A.y = p0.y + (lambda*p10.y);
+	A.z = p0.z + (lambda*p10.z);
+	B.x = p2.x + (mu*p32.x);
+	B.y = p2.y + (mu*p32.y);
+	B.z = p2.z + (mu*p32.z);
+	inter.x = (A.x + B.x) / 2.0f;
+	inter.y = (A.y + B.y) / 2.0f;
+	inter.z = (A.z + B.z) / 2.0f;
 
 	return true;
 }
@@ -1657,7 +1658,7 @@ bool FPCSRegistrationTools::FilterCandidates(	GenericIndexedCloud *modelCloud,
 	const CCVector3* p[4];
 	ScaledTransformation t;
 	std::vector<ScaledTransformation> tarray;
-	SimpleCloud referenceBaseCloud, dataBaseCloud;
+	PointCloud referenceBaseCloud, dataBaseCloud;
 
 	unsigned candidatesCount = static_cast<unsigned>(candidates.size());
 	if (candidatesCount == 0)
@@ -1712,7 +1713,7 @@ bool FPCSRegistrationTools::FilterCandidates(	GenericIndexedCloud *modelCloud,
 	{
 		for (unsigned i=0; i<table.size(); i++)
 		{
-			dataBaseCloud.clear();
+			dataBaseCloud.reset();
 			if (!dataBaseCloud.reserve(4)) //we never know ;)
 				return false;
 			for (unsigned j=0; j<4; j++)
@@ -1742,8 +1743,7 @@ bool FPCSRegistrationTools::FilterCandidates(	GenericIndexedCloud *modelCloud,
 
 	if (filter)
 	{
-		transforms.clear();
-		candidates.clear();
+		transforms.resize(0);
 		try
 		{
 			candidates.resize(nbMaxCandidates);
@@ -1755,9 +1755,9 @@ bool FPCSRegistrationTools::FilterCandidates(	GenericIndexedCloud *modelCloud,
 
 		//Sort the scores in ascending order and only keep the nbMaxCandidates smallest scores
 		sort(sortedscores.begin(), sortedscores.end());
-		float score = sortedscores[nbMaxCandidates-1];
+		float score = sortedscores[nbMaxCandidates - 1];
 		unsigned j = 0;
-		for (unsigned i=0; i<scores.size(); i++)
+		for (unsigned i = 0; i < scores.size(); i++)
 		{
 			if (scores[i] <= score && j < nbMaxCandidates)
 			{
@@ -1774,4 +1774,3 @@ bool FPCSRegistrationTools::FilterCandidates(	GenericIndexedCloud *modelCloud,
 
 	return true;
 }
-

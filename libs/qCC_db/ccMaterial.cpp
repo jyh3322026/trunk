@@ -20,24 +20,16 @@
 
 //Local
 #include "ccMaterial.h"
-#include "ccBasicTypes.h"
-#include "ccLog.h"
 
 //Qt
-#include <QMap>
-#include <QUuid>
-#include <QFileInfo>
-#include <QDataStream>
 #include <QOpenGLTexture>
-
-//System
-#include <assert.h>
+#include <QUuid>
 
 //Textures DB
-QMap<QString, QImage> s_textureDB;
-QMap<QString, QSharedPointer<QOpenGLTexture>> s_openGLTextureDB;
+static QMap<QString, QImage> s_textureDB;
+static QMap<QString, QSharedPointer<QOpenGLTexture>> s_openGLTextureDB;
 
-ccMaterial::ccMaterial(QString name)
+ccMaterial::ccMaterial(const QString& name)
 	: m_name(name)
 	, m_uniqueID(QUuid::createUuid().toString())
 	, m_diffuseFront(ccColor::bright)
@@ -103,8 +95,8 @@ void ccMaterial::applyGL(const QOpenGLContext* context, bool lightEnabled, bool 
 		glFunc->glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT,   m_ambient.rgba);
 		glFunc->glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR,  m_specular.rgba);
 		glFunc->glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION,  m_emission.rgba);
-		glFunc->glMaterialf (GL_FRONT,          GL_SHININESS, m_shininessFront);
-		glFunc->glMaterialf (GL_BACK,           GL_SHININESS, m_shininessBack);
+		glFunc->glMaterialf (GL_FRONT,          GL_SHININESS, std::max(0.0f, std::min(m_shininessFront, 128.0f)));
+		glFunc->glMaterialf (GL_BACK,           GL_SHININESS, std::max(0.0f, std::min(m_shininessBack, 128.0f)));
 	}
 	else
 	{
@@ -112,7 +104,7 @@ void ccMaterial::applyGL(const QOpenGLContext* context, bool lightEnabled, bool 
 	}
 }
 
-bool ccMaterial::loadAndSetTexture(QString absoluteFilename)
+bool ccMaterial::loadAndSetTexture(const QString& absoluteFilename)
 {
 	if (absoluteFilename.isEmpty())
 	{
@@ -249,12 +241,12 @@ void ccMaterial::MakeLightsNeutral(const QOpenGLContext* context)
 	}
 }
 
-QImage ccMaterial::GetTexture(QString absoluteFilename)
+QImage ccMaterial::GetTexture(const QString& absoluteFilename)
 {
 	return s_textureDB[absoluteFilename];
 }
 
-void ccMaterial::AddTexture(QImage image, QString absoluteFilename)
+void ccMaterial::AddTexture(QImage image, const QString& absoluteFilename)
 {
 	s_textureDB[absoluteFilename] = image;
 }

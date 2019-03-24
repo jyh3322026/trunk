@@ -20,8 +20,8 @@
 #define FAST_MARCHING_PROP_HEADER
 
 //local
-#include "FastMarching.h"
 #include "DgmOctree.h"
+#include "FastMarching.h"
 
 namespace CCLib
 {
@@ -80,7 +80,7 @@ public:
 	//! Sets the accceleration exageration factor
 	/** In order to detect the front arrival time jumps (see
 		FastMarchingForPropagation::setDetectionThreshold), it
-		is possible to exagerate the result of the acceleration
+		is possible to exaggerate the result of the acceleration
 		computation with this factor.
 		\param value the acceleration exageration factor
 	**/
@@ -94,7 +94,7 @@ public:
 	void findPeaks();
 
 	//inherited methods (see FastMarching)
-	virtual int propagate();
+	int propagate() override;
 
 protected:
 
@@ -110,7 +110,7 @@ protected:
 		{}
 
 		//! Destructor
-		virtual ~PropagationCell() {}
+		~PropagationCell() override = default;
 
 		//! Local front acceleration
 		float f;
@@ -119,15 +119,14 @@ protected:
 	};
 
 	//inherited methods (see FastMarching)
-	virtual float computeTCoefApprox(Cell* currentCell, Cell* neighbourCell) const;
-	virtual int step();
-	virtual bool instantiateGrid(unsigned size) { return instantiateGridTpl<PropagationCell>(size); }
+	float computeTCoefApprox(Cell* currentCell, Cell* neighbourCell) const override;
+	int step() override;
+	bool instantiateGrid(unsigned size) override { return instantiateGridTpl<PropagationCell>(size); }
 
 	//! Accceleration exageration factor
 	float m_jumpCoef;
 	//! Threshold for propagation stop
 	float m_detectionThreshold;
-
 };
 
 }

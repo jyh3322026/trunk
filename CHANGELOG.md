@@ -1,33 +1,595 @@
-CloudCompare versions history
-=============================
+CloudCompare Version History
+============================
 
-v2.8.beta - XX/XX/2016
+v2.11 (Anoia) - (in development)
+----------------------
+
+- Improvements
+  - Command line tool:
+    - The C2M_DIST command (Cloud-to-Mesh distances) can now be called with 2 meshes as input.
+      In this case the first mesh vertices are used as compared cloud.
+  - Raster import:
+    - new "Apply all" option when CC asks whether invalid pixels of a raster should be ignored or not
+
+- Changes
+  - Command line tool:
+    - The `-FBX_EXPORT_FMT` command is now split. Use `-FBX -EXPORT_FMT`.
+  - Plugins:
+    - The I/O plugin interface has changed, so if you have your own I/O plugins, you will need to update them.
+      - The interface name changed from `ccIOFilterPluginInterface` to `ccIOPluginInterface`.
+      - The `getFilter()` method was removed in favour of `getFilters()`.
+
+v2.10.3 (Zephyrus) - (In progress)
+----------------------
+
+- Enhancements
+  - Speed up the Fit Sphere tool and point picking in the Registration Align (point pairs picking) tool
+
+- Bug fixes
+  - Command line:
+    - the 'EXTRACT_VERTICES' option was actually deleting the extracted vertices right after extracting them, causing a crash when trying to access them later :| (#847)
+  - Fix loading LAS files with paths containing multi-byte characters when using PDAL (#869)
+  - Fix potential crash or use of incorrect data when comparing clouds (#871)
+
+v2.10.2 (Zephyrus) - 24/02/2019
+----------------------
+
+- Bug fixes
+  - Rasterize tool:
+    - interpolating empty cells with the 'resample input cloud' option enabled would make CC crash
+    - change layout so it works better on lower-resolution monitors
+  - Command line:
+    - the 'EXTRACT_VERTICES' option was not accessible
+    - calling the -RASTERIZE option would cause an infinite loop
+    - the Global Shift & Scale information of the input cloud was not transferred to the output cloud of the -RASTERIZE tool
+  - glitch fix: the 3D window was not properly updated after rendering the screen as a file with a zoom > 1
+  - glitch fix: the name of the entity was not displayed at the right place when rendering the screen as a file with a zoom > 1
+  - the Surface and Volume Density features were potentially outputting incorrect values (the wrong source scalar field was used when applying the dimensional scale!)
+  - the chosen octree level could be sub-optimal in some very particular cases
+  - E57 pinhole images:
+    - fix sensor array information (it was displaying total image size for the width of the image)
+    - fix pixel width & height
+
+
+- Translations
+  - updated Russian translation (thanks to Eugene Kalabin)
+  - added Japanese translation (thanks to the translators at CCCP)
+
+
+- macOS Note
+  - I (Andy) had to update ffmpeg, which is used by the animation plugin, for this patch release. Normally I would wait for 2.11, but homebrew changed their policies and started including everything in their build, so I can no longer use it. The good news is that compiling ffmpeg myself and statically linking shaves about 30 MB off the size of CloudCompare.app...
+  - it has been reported that this fixes a potential crash in ffmpeg's libavutil.56.dylib
+
+v2.10.1 (Zephyrus) - 01/16/2019
+----------------------
+
+- Bug fixes:
+
+  - writing E57 files was broken
+  - an exception was being thrown when you close CC after saving an ASCII file (#834)
+
+v2.10 (Zephyrus) - 01/06/2019
+----------------------
+
+- new features:
+
+	* Edit > Polyline > Sample points
+		- to regularly samples points on one or several polylines
+
+	* New set of geometrical features to compute on clouds:
+		- Tools > Other > Compute geometric features
+		- features are all based on locally computed eigen values:
+			* sum of eigen values
+			* omnivariance
+			* eigenentropy
+			* anisotropy
+			* planarity
+			* linearity
+			* PCA1
+			* PCA2
+			* surface variation
+			* sphericity
+			* verticality
+		- most of the features are defined in "Contour detection in unstructured 3D point clouds", Hackel et al, 2016
+
+	* Localization support
+		- Display > Language translation
+		- currently supported languages:
+			* English (default)
+			* Brazilian Portuguese (partial)
+			* French (very partial)
+			* Russian (partial)
+		- volunteers are welcome: https://www.cloudcompare.org/forum/viewtopic.php?t=1444
+
+- enhancements:
+
+	* Roughness, Density and Curvature can now all be computed via the new 'Tools > Other > Compute geometric features' menu
+		(Approx density can't be computed anymore)
+
+	* Global Shift & Scale dialog
+		- new option "Preserve global shift on save" to directly control whether the global coordinates should be preserved
+			at export time or simply forgotten
+
+	* The 'Display > Lock vertical rotation' option has been renamed 'Display > Lock rotation about an axis' (Shortcut: L)
+		- CC will now ask for the rotation axis to be locked (default: Z)
+
+	* The M3C2 plugin can now be called from the command line:
+		- the first time you'll need the configuration file saved with the GUI tool
+			(Use the 'Save parameters to file' button in the bottom-left corner of the M3C2 dialog --> the floppy icon)
+		- then load 2 files (cloud 1 and cloud2)
+		- optionally load a 3rd cloud that will be used as core points
+		- and eventually call the -M3C2 option with the parameter file as argument:
+			CloudCompare -O cloud1 -O cloud2 (-O core_points) -M3C2 parameters_file
+		- new option to use the core points cloud normals (if any)
+
+	* The Canupo plugin is now open-source!
+		- Thanks (once again) to Dimitri Lague for this great contribution
+		- the code is here: https://github.com/CloudCompare/CloudCompare/tree/master/plugins/core/qCanupo
+
+	* The "Classify" option of the Canupo plugin can now be called from the command line:
+		- you'll need a trained classifier (.prm file)
+		- main option: -CANUPO_CLASSIFY classifier.prm
+		- confidence threshold:
+			* -USE_CONFIDENCE {threshold}  (threshold must be between 0 and 1)
+			* (use the 'SET_ACTIVE_SF' after loading a cloud to set the active scalar field if
+				you want it to be used to refine the classification)
+		- syntax:
+			CloudCompare -O cloud1 ... -O cloudN -CANUPO_CLASSIFY (-USE_CONFIDENCE 0.9) classifier.prm
+
+	* Labels can now be imported from ASCII files:
+		- new column role in the ASCII loading dialog: "Labels"
+		- labels can be created from textual or numerical columns
+		- one "2D label" entity is created per point (don't try to load too many of them ;)
+		- labels are displayed in 3D by default (i.e. next to each point), but they can also be displayed in 2D (see the dedicated check-box)
+
+	* FBX units:
+		- default FBX units are 'cm'
+		- if a FBX file with other units is imported, CC will now store this information as meta-data and will set it correctly
+			if the corresponding meshes are exported as FBX again
+
+	* Command line mode:
+		- scalar field convert to RGB:
+			* '-SF_CONVERT_TO_RGB {mixWithExistingColors bool}'
+		- scalar field set color scale:
+			* '-SF_COLOR_SCALE {filename}'
+		- extract all loaded mesh vertices as standalone 'clouds' (the mesh is discarded)
+			* '-EXTRACT_VERTICES'
+		- remove all scan grids
+			* '-REMOVE_SCAN_GRIDS'
+		- new sub-option of 'SAVE_CLOUDS' to set the output filename(s) (e.g. -SAVE_CLOUDS FILE "cloud1.bin cloud2.bin ..."
+		- new options for the 'OCTREE_NORMALS' (thanks to Michael Barnes):
+			* '-ORIENT' to specify a default orientation hint:
+				- PLUS_ZERO
+				- MINUS_ZERO
+				- PLUS_BARYCENTER
+				- MINUS_BARYCENTER
+				- PLUS_X
+				- MINUS_X
+				- PLUS_Y
+				- MINUS_Y
+				- PLUS_Z
+				- MINUS_Z
+				- PREVIOUS
+			* '-MODEL' to specify the local model:
+				- LS
+				- TRI
+				- QUADRIC
+
+	* Unroll tool:
+		- the cylindrical unrolling can be performed inside an arbitrary angular range (between -3600 and +3600 degrees)
+		- this means that the shape can be unrolled on more than 360 degrees, and from an arbitrary starting orientation
+
+	* New options (Display > Display options):
+		- the user can now control whether normals should be enabled on loaded clouds by default or not (default state is now 'off')
+		- the user can now control whether load and save dialogs should be native ones or generic Qt dialogs
+
+	* Normals:
+		- ergonomics of 'Normals > compute' dialog have been (hopefully) enhanced
+		- normals can now be oriented toward a sensor even if there's no grid associated to the point cloud.
+		- the Normal Orientation algorithm based on the Minimum Spanning Tree now uses much less memory (~1/10)
+
+	* PCV:
+		- the PCV plugin can now be applied on several clouds (batch mode)
+
+	* LAS I/O:
+		- CloudCompare can now read and save extra dimensions (for any file version) - see https://github.com/CloudCompare/CloudCompare/pull/666
+
+	* E57:
+		- the E57 plugin now uses [libE57Format] (https://github.com/asmaloney/libE57Format) which is a fork of the old E57RefImpl
+		- if you compile CloudCompare with the E57 plugin, you will need to use this new lib and change some CMake options to point at it - specifically **OPTION_USE_LIBE57FORMAT** and **LIBE57FORMAT_INSTALL_DIR**
+		- the E57 plugin is now available on macOS
+
+	* RDS (Riegl)
+		- the reflectance scalar field read from RDS file should now have correct values (in dB)
+
+	* SHP:
+		- improved support thanks to T. Montaigu (saving and loading Multipatch entities, code refactoring, unit tests, etc.)
+
+	* Cross section tool:
+		- can now be started with a group of entities (no need to select the entities inside anymore)
+		- produces less warnings
+
+	* Plugins (General):
+		- the "About Plugins" dialog was rewritten to provide more information about installed plugins and to include I/O and GL plugins.
+		- [macOS] the "About Plugins..." menu item was moved from the Help menu to the Application menu.
+		- added several fields to the plugin interface: authors, maintainers, and reference links.
+		- I/O plugins now have the option to return a list of filters using a new method *getFilters()* (so one plugin can handle multiple file extensions)
+		- moved support for several less frequently used file formats to a new plugin called qAdditionalIO
+			- Snavely's Bundler output (*.out)
+			- Clouds + calibrated images [meta][ascii] (*.icm)
+			- Point + Normal cloud (*.pn)
+			- Clouds + sensor info. [meta][ascii] (*.pov)
+			- Point + Value cloud (*.pv)
+			- Salome Hydro polylines (*.poly)
+			- SinusX curve (*.sx)
+			- Mensi Soisic cloud (*.soi)
+
+	* Misc:
+		- some loading dialogs 'Apply all' button will only apply to the set of selected files (ASCII, PLY and LAS)
+		- the trace polyline tool will now use the Global Shift & Scale information of the first clicked entity
+		- when calling the 'Edit > Edit Shift & Scale' dialog, the precision of the fields of the shift vector is now 6 digits
+			(so as to let the user manually "geo-reference" a cloud)
+		- the ASCII loading dialog can now load up to 512 columns (i.e. almost as many scalar fields ;). And it shouldn't become huge if
+			there are too many columns or characters in the header line!
+
+- bug fixes:
+
+	* subsampling with a radius dependent on the active scalar field could make CC stall when dealing with negative values
+	* point picking was performed on each click, even when double-clicking. This could actually prevent the double-click from
+		being recognized as such (as the picking could be too slow!)
+	* command line mode: when loading at least two LAS files with the 'GLOBAL_SHIFT AUTO' option, if the LAS files had different AND small LAS Shift
+	* point picking on a mesh (i.e. mainly in the point-pair based registration tool) could select the wrong point on the triangle, or even a wrong triangle
+	* raster I/O: when importing a raster file, the corresponding point cloud was shifted of half a pixel
+	* the RASTERIZE command line could make CC crash at the end of the process
+	* hitting the 'Apply all' button of the ASCII open dialog would not restore the previous load configuration correctly in all cases
+		(the header line may not be extracted the second time, etc.)
+	* align tool: large coordinates of manually input points were rounded off (only when displayed)
+	* when applying an orthographic viewport while the 'stereo' mode is enabled, the stereo mode was broken (now a warning message is displayed and
+		the stereo mode is automatically disabled)
+	* the global shift along vertical dimension (e.g. Z) was not applied when exporting a raster grid to a raster file (geotiff)
+	* the 2.5D Volume calculation tool was ignoring the strategy for filling the empty cells of the 'ceil' cloud (it was always using the 'ground' setting)
+	* [macOS] fixed the squished text in the Matrix and Axis/Angle sections of the transformation history section of the properties
+	* [macOS] fixed squished menus in the properties editor
+	* the application options (i.e. only whether the normals should be displayed or not at loading time) were not saved!
+	* DXF files generated by the qSRA plugin were broken (same bug as the DXF filter in version 2.9)
+	* the OCTREE_NORMALS command was saving a file whatever the state of the AUTO_SAVE option
+	* the Align tools could make CC crash when applying the alignment matrix (if the octree below the aligned entity was visible in the DB tree)
+	* the clouds and contour lines generated by the Rasterize tool were shifted of half a cell
+	* in some cases, merging a mesh with materials with a mesh without could make CC crash
+	* command line mode: the VOLUME command parser would loop indefinitely if other commands were appended after its own options + it was ignoring the AUTO_SAVE state.
+	* some files saved with version 2.6 to 2.9 and containing quadric primitives or projective camera sensors could not be loaded properly since the version 2.10.alpha of May 2018
+	* for a mysterious reason, the FWF_SAVE_CLOUDS command was not accessible anymore...
+	* when computing C2C distances, and using both a 2.5D Triangulation local model and the 'split distances along X, Y and Z' option, the split distances could be wrong in some times
+
+v2.9.1 (Omnia) - 11/03/2017
+----------------------
+
+- enhancements:
+
+	* Primitive factory
+		- sphere center can now be set before its creation (either manually, or via the clipboard if the string is 'x y z')
+
+- Bug fixes:
+
+	* DXF export was broken (styles table was not properly declared)
+	* PLY files with texture indexes were not correctly read
+
+v2.9 (Omnia) - 10/22/2017
 ----------------------
 
 - New features:
 
-	* New plugin: qCSF (Cloth Simulation Filtering)
-		- automatic ground / non-ground classification of aerial LIDAR point clouds
-		- based on the article: "An Easy-to-Use Airborne LIDAR Data Filtering Method Based on Cloth Simulation", Qi Jianbo, Wan Peng, 2015
+	* New plugin: qCompass
+		- structural geology toolbox for the interpretation and analysis of virtual outcrop models (by Sam Thiele)
+		- see http://www.cloudcompare.org/doc/wiki/index.php?title=Compass_(plugin)
 
-	* Support for FWF (Full WaveForm) airborne lidar data
+	* 3D view pivot management:
+		- new option to position the pivot point automatically on the point currently at the screen center (dynamic update)
+			(now the default behavior, can be toggled thanks to the dedicated icon in the 'Viewing tools' toolbar or the 'Shift + P' shortcut)
+		- double clicking on the 3D view will also reposition the pivot point on the point under the cursor
+		- the state of this option is automatically saved and restored when CC starts
+
+	* New tool to import scalar fields from one cloud to another: 'Edit > SFs > Interpolate from another entity'
+		- 3 neighbor extraction methods are supported (nearest neighbor, inside a sphere or with a given number of neighbors)
+		- 3 algorithms are available: average, median and weighted average
+
+	* New sub-menu 'Tools > Batch export'
+		- 'Export cloud info' (formerly in the 'Sand-box' sub-menu)
+			* exports various pieces of information about selected clouds in a CSV file
+			* Name, point count, barycenter
+			+ for each scalar field: name, mean value, std. dev. and sum
+		- 'Export plane info'
+			* exports various pieces of information about selected planes in a CSV file
+			* Name, width, height, center, normal, dip and dip direction
+
+	* New interactor to change the default line width (via the 'hot zone' in the upper-left corner of 3D views)
+
+	* New option: 'Display > Show cursor coordinates'
+		- if activated, the position of the mouse cursor relatively to the 3D view is constantly displayed
+		- the 2D position (in pixels) is always displayed
+		- the 3D position of the point below the cursor is displayed if possible
+
+	* New shortcut: P (pick rotation center)
+
+- enhancements:
+
+	* When a picking operation is active, the ESC key will cancel it.
+
+	* qBroom plugin:
+		- now has a wiki documentation: http://www.cloudcompare.org/doc/wiki/index.php?title=Virtual_broom_(plugin)
+
+	* qAnimation plugin:
+		- new output option 'zoom' (alternative to the existing 'super resolution' option)
+		- the plugin doesn't spam the Console at each frame if the 'super resolution' option is > 1 ;)
+
+	* M3C2 plugin:
+		- "Precision Maps" support added (as described in "3D uncertainty-based topographic change detection with SfM
+			photogrammetry: precision maps for ground control and directly georeferenced surveys" by James et al.)
+		- Allows for the computation of the uncertainty based on precision scalar fields (standard deviation along X, Y and Z)
+			instead of the cloud local roughness
+
+	* 'Unroll' tool:
+		- new cone 'unroll' mode (the true 'unroll' mode - the other one has been renamed 'Straightened cone' ;)
+		- option to export the deviation scalar-field (deviation to the theoretical cylinder / cone)
+		- dialog parameters are now saved in persistent settings
+
+	* Plugins can now be called in command line mode
+		(the 'ccPluginInterface::registerCommands' method must be reimplemented)
+		(someone still needs to do the job for each plugin ;)
+
+	* Trace polyline tool
+		- the tool now works on meshes
+		- Holding CTRL while pressing the right mouse button will pan the view instead of closing the polyline
+		- new 'Continue' button, in case the user has mistakenly closed the polyline and wants to continue
+
+	* Command line mode
+		- the Rasterize tool is now accessible via the command line:
+			* '-RASTERIZE -GRID_STEP {value}'
+			* additional options are:
+				-VERT_DIR {0=X/1=Y/2=Z} - default is Z
+				-EMPTY_FILL {MIN_H/MAX_H/CUSTOM_H/INTERP} - default is 'leave cells empty'
+				-CUSTOM_HEIGHT {value} - to define the custom height filling value if the 'CUSTOM_H' strategy is used (see above)
+				-PROJ {MIN/AVG/MAX} - default is AVG (average)
+				-SF_PROJ {MIN/AVG/MAX} - default is AVG (average)
+				-OUTPUT_CLOUD - to output the result as a cloud (default if no other output format is defined)
+				-OUTPUT_MESH - to output the result as a mesh
+				-OUTPUT_RASTER_Z - to output the result as a geotiff raster (altitudes + all SFs by default, no RGB)
+				-OUTPUT_RASTER_RGB - to output the result as a geotiff raster (RGB)
+				-RESAMPLE - to resample the input cloud instead of generating a regular cloud (or mesh)
+			* if OUTPUT_CLOUD and/or OUTPUT_MESH options are selected, the resulting entities are kept in memory.
+				Moreover if OUTPUT_CLOUD is selected, the resulting raster will replace the original cloud.
+		- 2.5D Volume Calculation tool
+			* '-VOLUME -GRID_STEP {...} etc.' (see the wiki for more details)
+		- Export coord. to SF
+			* '-COORD_TO_SF {X, Y or Z}'
+		- Compute unstructured cloud normals:
+			* '-OCTREE_NORMALS {radius}'
+			* for now the local model is 'Height Function' and no default orientation is specified
+		- Clear normals
+			* '-CLEAR_NORMALS'
+		- New mesh merging option
+			* '-MERGE_MESHES'
+		- Compute mesh volume:
+			* '-MESH_VOLUME'
+			* optional argument: '-TO_FILE {filename}' to output the volume(s) in a file
+		- LAS files:
+			* when loading LAS files without any specification about Global Shift, no shift will be applied, not even the LAS file internal 'shift' (to avoid confusion)
+			* however, it is highly recommended to always specify a Global Shift (AUTO or a specific vector) to avoid losing precision when dealing with big coordinates!
+		- Other improvements:
+			* the progress bar shouldn't appear anymore when loading / saving a file with 'SILENT' mode enabled
+			* the ASCII loading dialog shouldn't appear anymore in 'SILENT' mode (only if CC really can't guess anything)
+			* the default timestamp resolution has been increased (with milliseconds) in order to avoid overwriting files
+				when saving very small file (too quickly!)
+
+	* Rasterize tool
+		- contour lines generation is now based on GDAL (more robust, proper handling of empty cells, etc.)
+		- new option to re-project contour lines computed on a scalar field (i.e. a layer other than the altitudes)
+			on the altitudes layer
+		- the grid step bounds have been widened (between 1E-5 and 1E+5)
+
+	* Edit > SF > Compute Stat. params
+		- the RMS of the active SF is now automatically computed and displayed in the Console
+
+	* PLY I/O filter
+		- now supports quads (quads are loaded as 2 triangles)
+
+	* DXF I/O filter
+		- now based on dxflib 3.17.0
+		- point clouds can now be exported to DXF (the number of points should remain very limited)
+		- see fixed bugs below
+
+	* LAS I/O filter
+		- the 'Spatial Reference System' of LAS files is now stored as meta-data and restored
+			when exporting the cloud as a LAS/LAZ file.
+
+	* [Windows] qLAS_FWF:
+		- the plugin (based on LASlib) can now load most of the standard LAS fields
+		- the plugin can now save files (with or without waveforms)
+		- the plugin can now be called in command line mode:
+			-FWF_O: open a LAS 1.3+ file
+			-FWF_SAVE_CLOUDS: save cloud(s) to LAS 1.3+ file(s) (options are 'ALL_AT_ONCE' and 'COMPRESSED' to save LAZ files instead of LAS)
+
+	* New method: 'Edit > Waveforms > Compress FWF data'
+		- To compress FWF data associated to a cloud (useful after a manual segmentation for instance
+			as the FWF data is shared between clouds and remains complete by default)
+		- Compression is done automatically when saving a cloud with the 'LAS 1.3 / 1.4' filter (QLAS_FWF_IO_PLUGIN)
+			(but it's not done when saving the entity as a BIN file)
+
+	* Oculus support
+		- CC now displays in the current 3D view the mirror image of what is displayed in the headset
+		- using SDK 1.15
+
+	* Point List Picking tool
+		- the list can now be exported as a 'global index, x, y, z' text file
+
+	* Scale / Multiply dialog:
+		- new option to use the same scale for all dimensions
+		- new option to apply the scale to the 'Global shift' (or not)
+
+	* New Menu Entry: 'Edit > Grid > Delete scan grids'
+		- scan grids associated to a cloud can now be deleted (to save space when saving the cloud to a BIN file for instance)
+
+	* qEllipser plugin:
+		- option to export the image as a (potentially scaled) point cloud
+
+	* Normal computation tool:
+		- new algorithm to compute the normals based on scan grids (faster, and more robust)
+		- the 'kernel size' parameter is replaced by 'the minimum angle of triangles' used in the internal triangulation process
+		- Plane and Quadric modes will now automatically increase the radius adaptively to reach a minimum number of points and to avoid creating 'zero' (invalid) normals
+
+	* Edit the scalar value of a single point
+		- create a label on the point (SHIFT + click)
+		- make sure a scalar field is active
+		- right click on the label entry in the DB tree and select 'Edit scalar value'
+
+	* Merge (clouds)
+		- new option to generate a scalar field with the index of the original cloud for each point
+
+	* Other
+		- color scales are now listed in alphabetical order
+		- polylines exported from the 'Interactive Segmentation' tool will now use the same Global Shift as the segmented entity(ies)
+		- when changing the dip and dip direction of plane parallel with XY, the resulting plane shouldn't rotate in an arbitrary way anymore
+		- the filter and single-button plugin toolbars are now on the right side of the window by default (to reset to the default layouts, use "Reset all GUI element positions" at the bottom of the Display menu)
+		- the Plane edition dialog now lest the user specify the normal plane in addition to its dip and dip direction
+		- new 'Clone' icon with a colored background so as to more clearly spot when the icon is enabled (Nyan sheep!)
+		- now using PoissonRecon 9.011
+		- the default maximum point size and maximum line width increased to 16 pixels
+
+- Bug fixes:
+	* STL files are now output by default in BINARY mode in command line mode (no more annoying dialog)
+	* when computing distances, the octree could be modified but the LOD structure was not updated
+		(resulting in potentially heavy display artifacts)
+	* glitch fix: the 'SF > Gradient' tool was mistakenly renaming the input scalar field ('.gradient' appended)
+	* glitch fix: the picking process was ignoring the fact that meshes could be displayed in wireframe mode (they are now ignored in this case)
+	* command line 'CROSS_SECTION' option: the repetition of the cuts (<RepeatDim> option) could be incomplete in some cases (some chunks were missing)
+	* raster loading: rasters loaded as clouds were shifted of half a pixel
+	* the 'Edit > Sensors > Camera > Create' function was broken (input parameters were ignored)
+	* merging clouds with FWF data would duplicate the waveforms of the first one
+	* invalid lines in ASCII (text) files could be considered as a valid point with coordinates (0, 0, 0)
+	* Point-pair based alignment tool:
+		- extracting spheres on a cloud with Global Shift would create the sphere in the global coordinate system instead of the local one (i.e. the sphere was not visible)
+		- deleting a point would remove all the detected spheres
+	* The FARO I/O plugin was associating a wrong transformation to the scan grids, resulting in weird results when computing normals or constructing a mesh based on scan grids
+	* When editing only the dip / dip direction of a plane, the rotation was not made about the plane center
+	* qSRA plugin: profile polyline automatically generated from cylinders or cone were shifted (half of the cylinder/cone height), resulting in a 'shifted' distance map
+		(half of the cloud was 'ignored')
+	* DXF export
+		- the I/O filter was mistakenly exporting the vertices of polylines and meshes as separate clouds
+		- the I/O filter was not exporting the shifted point clouds at the right location
+	* Render to file:
+		- when the 'draw rounded points' option was enabled, pixel transparency could cause a strange effect when exported to PNG images
+	* Octree rendering:
+		- the 'Cube' mode was not functional
+		- the 'Point' mode with normals was not functional
+
+v2.8.1 (Hogfather) - 16/02/2017
+----------------------
+
+- Bug fixes:
+
+	* LAS I/O filter: if the points of a LAS file were not saved in increasing GPS time order,
+		the corresponding 'Time' scalar field could be rejected later at export time
+	* A visible 2D label with the 'show 2D label' option disabled could break the picking process
+	* The sphere fitting algorithm was not always finding the optimal sphere
+	* Rasterize tool: scalar fields were vertically mirrored when exported to a geotiff raster
+	* [macOS] Fix the packaging of the qAnimation plugin so it can find the correct libraries
+	* qAnimation plugin: the export to separate frames was broken
+	* the polyline width was not correctly set in the properties dialog (always set to 'Default')
+	* the clipping box arrows were not displayed correctly when the lights were turned off
+
+v2.8 (Hogfather) - 12/18/2016
+----------------------
+
+- New features:
+
+	* New plugin: qBroom (Virtual Broom) [Windows, macOS]
+		- smart and interactive selection of points on a surface (globally flat, e.g. like a road ;)
+		- selection of the points inside the 'broom', above, below or both
+		- option to invert the selection
+		- automation mode
+
+	* New plugin: qCSF (Cloth Simulation Filtering) [Windows, macOS]
+		- automatic ground / non-ground classification of aerial LIDAR point clouds
+		- based on the article: "An Easy-to-Use Airborne LiDAR Data Filtering Method Based on Cloth Simulation", W. Zhang, J. Qi, P. Wan, H. Wang, D. Xie, X. Wang, G. Yan. Remote Sensing. 2016; 8(6):501.
+
+	* New plugin: qHoughNormals (Normal Estimation in Unstructured Point Clouds) [Windows, macOS, Linux]
+		- based on "Deep Learning for Robust Normal Estimation in Unstructured Point Clouds" by Alexandre Boulch and Renaud Marlet, Symposium of Geometry Processing 2016, Computer Graphics Forum
+
+	* New plugin: qM3C2 (Multiscale Model to Model Cloud Comparison) [Windows, macOS, Linux]
+		- based on "Accurate 3D comparison of complex topography with terrestrial laser scanner: application to the Rangitikei canyon (N-Z)", Lague, D., Brodu, N. and Leroux, J., 2013, ISPRS Journal of Photogrammmetry and Remote Sensing
+
+	* Support for FWF (Full WaveForm) airborne LIDAR data [Windows only]
+		- use the 'LAS 1.3 or 1.4 (\*.las \*.laz)' filter to open LAS files with full waveform data
+		- new 'Edit > Waveform > 2D Waveform viewer' to visualize waveforms associated to each point (as 2D curve)
+		- option to export the waveform as a CSV file
+
+	* New 'Geological' plane creation / edition methods:
+		- Edit > Plane > Create: lets the user create a plane with specific dip / dip direction, center (can be picked on a cloud or a mesh), width and height
+		- Edit > Plane > Edit: edit the above parameters on an existing plane entity
+
+	* New Polyline export format:
+		- 2D height profile (curvilinear abscissa + Z coordinate)
+
+	* New tool: Edit > Mesh > Create surface between two polylines
+		- Creates a surface patch between two polylines
+
+	* New tool: Edit > Mesh > Mesh scan grids
+		- Creates a surface from a cloud with one or several scan grids (one mesh per grid)
+
+	* New tool: Edit > Color > Enhance with intensities
+		- Enhances the RGB colors thanks to the intensity scalar field (RGB-IHS method)
+
+	* Gamepad support (XBox, etc.) [Windows only]
+		- Enable it with the 'File > Gamepad > Enable' menu entry
+		- A: toggle viewer-based perspective mode
+		- B: toggle object-based perspective mode
+		- left stick: move body (viewer-based mode) or move object [left/right and forward/backward]
+		- right stick: rotate head (viewer-based mode) or rotate object
+		- cross: move body (viewer-based mode) or move object [left/right and up/down]
+		- L1/R1: change point size
+		- L2/R2: roll left/right
+		- start: zoom and center on the visible entities
+
+	* New color scales:
+		- two colorscales for dip and dip direction display (thanks to T. Dewez)
+		- matplotlib's veridis colormap (perceptually-uniform)
+
+	* Adds an "Open Recent" item to the File menu to quickly access the last 10 files that you've worked with.
+
+	* New 'display' option to draw round points instead of square ones (when the point size > 1).
+		Warning, the display may be slower then.
+
+	* New formats supported:
+		- Photoscan PSZ
+		- [Windows] Riegl RDBX
 
 - Enhancements:
+
+	* Animation plugin
+		- new 'Export frames' button to generate individual frames instead of an animation
+
+	* Poisson Reconstruction plugin:
+		- based on the latest version of PoissonRecon by Misha (V9.1)
+		- the user can now choose the boundary conditions (free / Dirichlet / Neumann)
+
+	* Cross-section tool
+		- the tool now supports multiple clouds and/or meshes
+
 	* DB Tree (select children by type and/or by name)
 		- regular expressions can now be used to select entities in the DB tree
 
-	* Facets
+	* Facets plugin
 		- meta-data (normals, dip/direction, etc.) is now updated when the facet is rotated / transformed
 		- the 3D representation of the normal vector now depends on the facet size and not on its min. bounding-box size
 
-	* New shortcus 'a la Meshlab':
+	* New shortcuts 'a la Meshlab':
 		- CC now supports the 'CTRL + mouse wheel' shortcut to change the point size
 		- CC now supports the 'ALT + mouse wheel' shortcut to change the zNear value (perspective mode)
 		- CC now supports the 'SHIFT + mouse wheel' shortcut to change the field of view (perspective mode)
 
 	* 2D labels:
 		- most of the 2D labels parts (segment, point legend, etc.) are now displayed in 2D
-			(this way they always appear above the entities and be always visible).
+			(this way they appear above the entities to be visible all the time).
 
 	* SHP files:
 		- when loading 2D points, the Z coordinate can now be exported from an associated DBF field
@@ -37,8 +599,8 @@ v2.8.beta - XX/XX/2016
 
 	* LAS/LAZ files:
 		- load dialog reorganized
-		- infos about the file are now displayed in a 'Info' tab (point count, bounding box)
-		- new 'Tiling' option to tile a (big) LAS/LAZ file in smaller ones (the cloud is not actually loaded in memory)
+		- info about the file are now displayed in a 'Info' tab (point count, bounding box)
+		- new 'Tiling' option to tile a (big) LAS/LAZ file into smaller ones (the cloud is not actually loaded in memory)
 
 	* Global Shift & Scale:
 		- the PoissonRecon plugin now transfers the Global Shift & Scale information from the cloud to the resulting mesh
@@ -47,23 +609,25 @@ v2.8.beta - XX/XX/2016
 
 	* 2.5D Volume Calculation tool:
 		- new option to export the height difference grid as a cloud
-			(warning, the exported points height will actually be equal to the height difference)
+			(warning: the exported points height will actually be equal to the height difference)
 		- default color scale is now symmetrical if the height differences are not only positive or only negative
 
 	* Rasterize tool:
-		- the rasterize tool now use the 'PixelIsArea' convention (i.e. the grid min corner coordinates correspond to the
+		- the 'interpolate' option for empty cells now also interpolates the scalar fields and RGB color layers
+		- the rasterize tool now uses the 'PixelIsArea' convention (i.e. the grid min corner coordinates correspond to the
 			first grid cell center). This allows one to apply the Rasterize tool on a regular grid without any
-			interference / sampling issue.
-		- the volume calculation tool has been updated consequently. Notably, results from the rasterize tool can be used
+			interference / sampling issues.
+		- as a result, the volume calculation tool has been updated. Notably, results from the rasterize tool can be used
 			in the 2.5D Volume calculation tool without any sampling artefact
-		- Exported rasters (geotiff) are using the same convetion. They are also now properly oriented (they could be loaded
+		- exported rasters (geotiff) are using the same convention. They are also now properly oriented (they could be loaded
 			flipped in some GIS tools).
 		- ASCII matrix is now exported from top (highest Y coordinates) to bottom (lowest)
-		- Mixing RGB bands and other layers (heights, scalar fields, etc.) in a geotiff is in fact a bad idea. It results in
+		- mixing RGB bands and other layers (heights, scalar fields, etc.) in a geotiff is in fact a bad idea. It results in
 			64 bits color bands that are not properly handled by most of the other GIS tools. CC will now warn the user about
-			this fact.
-		- Exported clouds and meshes are now properly exported in the same coordinate system as the input cloud
+			this.
+		- exported clouds and meshes are now properly exported in the same coordinate system as the input cloud
 			(it was not the case for clouds projected along X or Y)
+		- a coarse estimation of the grid volume (relative to Z = 0) is now available in the 'volume' tab
 
 	* Raster file import:
 		- New option to import the raster as a textured quad (mesh). Only available if the raster has at least R, G and B bands.
@@ -74,25 +638,65 @@ v2.8.beta - XX/XX/2016
 	* Connected Components Extraction:
 		- safeguard added if too many components are to be created (CC will ask the user to confirm the creation of more than 500 components)
 
-	* CC should now warn the user when he/she tries to save a file with a filename containing special characters while the third party
+	* CC should now warn the user when they try to save a file with a filename containing special characters when the third party
 		library in charge of the export doesn't support them (see the warning Console message)
+
+	* Display options
+		- menu entry changed from 'Display parameters' to 'Display options' for the sake of consistency
+		- new option: 'double sided' (light) to control whether triangles should be lit from the back or not
+
+	* Apply Transformation tool
+		- new 'Reset' button
+		- new 'From dip / dip direction' to initialize the transformation as a rotation matrix passing from (0, 0) to the specified (dip, dip dir.) orientation
+
+	* Normals computation
+		- glitch fix: when computing normals with the 'LS plane' model, only 3 neighbors are requested instead of 12
+		- CC now handles properly the (0, 0, 0) normal resulting from an insufficient number of neighbors
+		- Dip / Dip direction computation takes the (0, 0, 0) normal and outputs NAN values for these normals
+			--> this way it is possible to filter out the points with bad normals with 'Edit > SF > Filter by value' and using the full (valid) range
+
+	* Other
+		- Transformation history is now saved in BIN files
+		- The normal of a plane entity can now be visualized as a 3D arrow (just as the Facet entities)
+		- Dip and dip direction are now displayed in the properties of Facets and Planes
+		- M3C2 sources are now publicly released! (GPL license)
+		- New option to update an existing viewport object (with the current camera parameters)
+		- [macOS] Now looks for the global_shift.txt file beside the .app instead of inside the application bundle
+		- [macOS] Hides the 3D mouse and Gamepad menus since they are not yet supported on macOS
+		- [macOS] Increases the default font sizes for the 3D viewer (these may be set in the Display Options)
+		- I/O plugins (Faro, DP, Riegl, etc) are now loaded even when using CC in command line mode
 
 - Bug fixes:
 	* the custom light was broken (enabled and displayed in the 2D screen coordinates space instead of the 3D world!)
 	* the 2D labels marker size (in 3D) was too dependent on the perspective camera position
 	* the fields named 'intensity', 'grey', 'gray' or 'col***i' in PLY files are now automatically loaded as scalar fields (instead of 'intensity', i.e. grey level RGB)
 	* when using a DBF field as height for polylines (in SHP files), the height value could be read from the wrong field
-	* qSRA (Surface or Revolution Analysis): the profile origin was not always properly take into account. The latitude angles were not always computed relatively to
+	* qSRA (Surface or Revolution Analysis): the profile origin was not always properly taken into account. The latitude angles were not always computed relative to
 		the profile origin and changing the origin via the distance map dialog could be misleading.
-	* when clicking on the 'Apply all' button of the LAS/LAZ loading dialog, the global shift set for the first file could be ignored by the next ones
+	* when clicking on the 'Apply all' button of the LAS/LAZ loading dialog, the global shift set for the first file could be ignored by the subsequent ones
 	* the 3-points label vertex names (A,B,C) were not displayed by default
 	* Rasterize tool:
 		- the 'Hillshade' computation tool was considering the grid upside-down (hence the sun azimuth angle was inverted)
 		- contour lines generated with a projection direction other than Z were not displayed in the right orientation compared
 			to the grid raster (inside the Rasterize tool only)
-	* Command line tool: the CROP2D option applied with an orientation other than Z was not performing the cut at the right position
-	* Connected Components Extraction: the tool couldn't be properly used with an octree level > 10
+	* Command line tool:
+		- the CROP2D option applied with an orientation other than Z was not performing the cut at the right position
+		- the CURV option was no longer accessible
+	* Connected Components Extraction: the tool couldn't be used properly with an octree level > 10
 	* CC failed to save E57 files with multiple clouds with normals
+	* ccViewer was transforming input arguments to upper case, hence preventing files to be opened this way on Linux
+	* Documentation: contrarily to what was written in the wiki, the Level tool does not use the first picked point as origin for the new coordinate system!
+		It only rotates the cloud about this point.
+	* The new plane fitting algorithm (Least Squares fit) was giving strange results in some particular cases. Rolling back to the previous algorithm.
+	* The sandbox tool 'Distance map to best fit 3D quadric' was broken
+	* When computing normals with the Least Squares best fitting plane, CC required at least 12 points in the neighborhood, when only 3 are theoretically
+		sufficient.
+	* The SOR filter was broken (it was potentially using much more points than the number specified by the user, and it was changing over the cloud!)
+	* Fixed a problem when creating a new 3D view with the view not updating until the window was resized or refreshed.
+	* [macOS] Fix plugins on case-sensitive file systems
+	* [macOS] Fix problem with the main window jumping around and resizing when dragging toolbars
+	* [macOS] Fixes the layout of the 2.5D Volume Calculation dialog
+	* Global shift & scale information could be lost when cloning entities or merging them with other non-shifted entities
 
 v2.7.0 - 04/22/2016
 -------------------
@@ -121,7 +725,7 @@ v2.7.0 - 04/22/2016
 		- can be used to set the limits that trigger the 'Global Shift & Scale' mechanism
 		- settings are persistent
 		- settings are used for both the standard application and the command line mode
-		- default triggering value (for the coordinates) have been lowered to 10^4 
+		- default triggering value (for the coordinates) have been lowered to 10^4
 
 	* New 'Tools > Sand-box > Distance Map' tool
 		* allows to compute distance maps for clouds (= distances from regularly sampled positions around the points)
@@ -164,7 +768,7 @@ v2.7.0 - 04/22/2016
 
 - Bug fix:
 	* The HSV to RGB method was broken
-	* The 'Convert normals to HSV colors' mehod doesn't rely on the Dip / Dip direction anymore as the way these values
+	* The 'Convert normals to HSV colors' method doesn't rely on the Dip / Dip direction anymore as the way these values
 		are computed have been changed recently (with a symmetry about the plane Z = 0)
 	* When playing with the 'skip lines' parameter of the ASCII file loading dialog, the roles assignments could be cleared
 		(when a line was reappearing while it had less elements than the other lines)
@@ -206,7 +810,7 @@ v2.6.3 (= pre 2.7.0 for systems that don't support Qt5) - 03/13/2016
 	* Support for the NVidia 3D Vision glasses (thanks to Amfax (UK) - www.amfax.co.uk)
 		- new option of the 'Stereo' mode
 		- the graphic card must support OpenGL quad buffering (i.e. latest GeForce or Quadro cards)
-		- the 3D stereo mode must be enabled in the NVidia Control Pannel
+		- the 3D stereo mode must be enabled in the NVidia Control Panel
 		- the screen frequency must be manually set to the right frequency (i.e. 100 or 120Hz) if not already
 		- (the 3D view is forced to exclusive full-screen mode)
 		- shaders (EDL, etc.) are supported
@@ -287,15 +891,15 @@ v2.6.3 (= pre 2.7.0 for systems that don't support Qt5) - 03/13/2016
 		- new button to hide the clipping-box
 		- new button to restore the previous clipping-box settings (per-entity)
 
-	* Triangulation: 
-		- due to licensing issue with Triangle lib (incompatibility with GPL/LGPL) CGAL is now the prefered library for 2.5D 
-			triangulation CCLib can now be compiled with CGAL support using COMPILE_CC_CORE_LIB_WITH_CGAL. 
+	* Triangulation:
+		- due to licensing issue with Triangle lib (incompatibility with GPL/LGPL) CGAL is now the prefered library for 2.5D
+			triangulation CCLib can now be compiled with CGAL support using COMPILE_CC_CORE_LIB_WITH_CGAL.
 		- please note that as CGAL 2D triangulation module is released under GPL license. A version of CCLib compiled with CGAL
 			support is no longer licensed under LGPL (GPL is "viral"). To keep CCLib original license scheme, you *must*
 			compile it without CGAL.
 		- as a positive side effect, micro benchmarks show that CGAL tends to offer better performances.
 
- 
+
 - Bug fixes:
 	* The 'Edit > Colors > Convert to Scalar Field' method was returning invalid scalar fields
 	* The 'ADD_HEADER' and 'ADD_PTS_COUNT' options of the command line mode were causing an infinite loop
@@ -471,11 +1075,11 @@ v2.6.2 10/08/2015
 			of accuracy (as this field is originally coded on 64 bits but then stored on 32 bits once loaded)
 		- the original value of a single point can be queried anytime by spawning a label on this point
 		- the original value is restored automatically when saving the cloud
-		
+
 - Bug fixes:
 	* The point size couldn't be modified in the 3D view of the 'Rasterize' tool
 	* The 'inverse (1/x)' function of the SF arithmetic tool was not accessible (the integer part was applied instead)
-	* If only one plugin was loaded (with mulitple methods such as qPCL) then the 'Plugins' menu was staying disabled
+	* If only one plugin was loaded (with multiple methods such as qPCL) then the 'Plugins' menu was staying disabled
 	* The scale value displayed in the 3D views (under the scale bar) was wrong when the zoom of the 'Render to file'
 		method was greater than 1
 	* The 'Apply all' option of the 'Global shift & scale' dialog wasn't taken into account when loading LAS/LAZ files
@@ -500,7 +1104,7 @@ v2.6.2 10/08/2015
 	* In command line mode, the Delaunay command was ignoring the 'AUTO_SAVE OFF' option and was creating a looping hierarchy
 		(potentially causing infinite loops later...)
 	* OBJ files: when merging multiple models with textures having the same (local) filename, the images could overwrite each other once saved
-	* Rasterize: saving a raster with the currently displayed scalar field as additioanl layer would make CC crash (+ memory leak fixed)
+	* Rasterize: saving a raster with the currently displayed scalar field as additional layer would make CC crash (+ memory leak fixed)
 	* Point-pair based alignment: the markers picked on the aligned entity could become very big (or very small) when the scale was to be adjusted
 		and the scale of the aligned entity was very different from the reference one.
 	* The 'Apply Transformation' tool can now be applied on primitives
@@ -741,7 +1345,7 @@ v2.6.0 10/24/2014
 		- this plugin is based on the LGPL Cork Library (https://github.com/gilbo/cork)
 		- allows to compute the difference, union or intersection of two CLOSED meshes
 		- current limitations:
-			* doesn't keep the mesh(es) attributes (color, nrormals, etc.)
+			* doesn't keep the mesh(es) attributes (color, normals, etc.)
 			* only available on Windows
 
 - Enhancements:
@@ -789,7 +1393,7 @@ v2.6.0 10/24/2014
 			Use the option '-COMPUTE_PTX_NORMALS' to force their computation.
 	* LAS import:
 		- new handles LAS 1.4 files: the dialog has a new section that allows the user to load the
-			custom fields defined in the LAS file 'extra bytes' section 
+			custom fields defined in the LAS file 'extra bytes' section
 	* VTK import:
 		- VTK I/O filter is now smarter and can read Paraview VTK files with multiple elements per line
 	* PCL import/export:
@@ -830,7 +1434,7 @@ v2.6.0 10/24/2014
 			* '-FBX_EXPORT_FMT' to specify the format when exporting meshes to FBX. Available formats
 				are currently (FBX_binary, FBX_ascii, FBX_encrypted, FBX_6.0_binary, FBX_6.0_ascii, FBX_6.0_encrypted).
 				If not set CC will display a message box to let the user select the output format (even in
-				command line mode ;) 
+				command line mode ;)
 			* '-AUTO_SAVE' + ON/OFF: to set whether output clouds or meshes should be saved after each
 				applied algorithm (currently ON by default)
 			* new option after 'SAVE_CLOUDS' or 'SAVE_MESHES': 'ALL_AT_ONCE' to tell CC to (try to)
@@ -860,7 +1464,7 @@ v2.6.0 10/24/2014
 		- new checkbox to display the global coordinates (instead of shifted ones) for shifted clouds
 	* 2D Labels:
 		- For points with an associated scalar value, the scalar field name is used instead of 'Scalar'
-			(e.g. 'Density = 1.23' instead of 'Scalar = 1.23') 
+			(e.g. 'Density = 1.23' instead of 'Scalar = 1.23')
 
 - Bug fixes:
 	* the spinboxes of the bounding-box editing dialog were oversized
@@ -937,7 +1541,7 @@ v2.5.5 07/06/2014
 				and or/rescaled automatically)
 			* this new method can be called on several clouds at once
 		- when a transformation (applied with 'Edit > Apply transformation') causes the cloud coordinates
-			to go overbounds, the same dialog appears in order for the user to optionaly update the global
+			to go out of bounds, the same dialog appears in order for the user to optionally update the global
 			shift/scale information instead.
 	* Bundler (.out) import:
 		- Big coordinates (for keypoints) are now properly handled (with the Global Shift & Scale mechanism)
@@ -947,7 +1551,7 @@ v2.5.5 07/06/2014
 		- SQRT, POW2, POW3, EXP, LOG, LOG10, COS(radians), SIN(radians), TAN(radians), ACOS, ASIN, ATAN
 	* Point clouds are now pre-loaded in the graphic card memory if possible (via VBOs)
 		- allows for much faster display (up to 15 times!)
-		- tihs feature can be disabled in the "Display Options" dialog ("Other display options" tab)
+		- this feature can be disabled in the "Display Options" dialog ("Other display options" tab)
 	* Histogram display enhanced with the QCustomPlot library (http://www.qcustomplot.com/)
 	* Scalar-field properties editing dialog enhanced:
 		- sliders are replaced by interactors displayed over a representation of the SF histogram
@@ -971,7 +1575,7 @@ v2.5.5 07/06/2014
 	* The 'Interactive Transformation' tool is now much more accurate
 		- only double-precision matrices are used
 		- before that, especially when lots of rotations were applied to an entity, the resulting transformation matrix
-			could have had accumulated too many numerical errors resulting in a slightly shrinked cloud
+			could have had accumulated too many numerical errors resulting in a slightly shrunk cloud
 	* (Mac OS X) Fonts on "retina" displays are no longer fuzzy
 	* 3D mouse support: CloudCompare now relies on the official 3dConnexion SDK
 		- wireless devices should now be handled correctly
@@ -1026,7 +1630,7 @@ v2.5.4 04/19/2014
 		- for each point, the best fit plane is computed on all the neighbors except the point itself
 			(this gives a less biased measure). The roughness value is then computed as the distance
 			between the point and this plane.
-	* New 'sand box' method: "Export cloud(s) info"
+	* New 'sand box' method: "Export cloud info"
 		- exports various pieces of information for all selected clouds in a CSV file (cloud name, size,
 			mean, std.dev. and sum of all scalar fields, etc.)
 	* 'Camera link' feature enhanced:
@@ -1067,7 +1671,7 @@ v2.5.4 04/19/2014
 	* Several memory leaks have been fixed (2D1/2 mesh triangulation, etc.)
 	* Cloning a mesh which was a child of its vertices would cause the duplication of the mesh structure
 		in the resulting entity
-		
+
 
 v2.5.3 02/21/2014
 -----------------
@@ -1152,10 +1756,10 @@ v2.5.3 02/21/2014
 	* The translation obtained by ICP registration with adaptive scale was wrong! (scale was not applied)
 	* The 'repetitive slice extraction' option of the 'Cross section' tool was behaving strangely (some slices
 		were sometimes fused together)
-	* Pixel distances were squared twice in the Bilateral filter (shader) 
+	* Pixel distances were squared twice in the Bilateral filter (shader)
 	* The 'Point pair-based registration' dialog was not automatically reset
 	* Wrong error code returned by PLY I/O Filter when failing to create the output file
-	* Meshes color couldn't be changed anymore (with 'Edit > Set color')	
+	* Meshes color couldn't be changed anymore (with 'Edit > Set color')
 	* GL filters rendering was downgraded when switching from perspective to ortho. view
 
 v2.5.2 12/19/2013
@@ -1167,7 +1771,7 @@ v2.5.2 12/19/2013
 	- when selecting the 'min' or 'max height' projections, the user can now choose
 		to 'resample' the original cloud in order to produce a new cloud (instead
 		of generating a regularly sampled cloud using the grid cell's centers)
-	- the tool can now export the resulting grid as a true multiband raster (geotiff)
+	- the tool can now export the resulting grid as a true multi-band raster (geotiff)
 	- menu entry renamed: "Tools > Projection > Rasterize (Height grid generation)"
 - It is now possible to compile CloudCompare with 64 bits floating point values
 	(i.e 64 bits 'doubles' instead of 32 bits 'floats') for coordinates and/or scalars.
@@ -1201,7 +1805,7 @@ v2.5.2 12/19/2013
 - Other enhancements:
 	- 'Clipping-box' tool:
 		* the clipping box position and extension can now be edited
-			(see the 'advanced' button in the 'Box thicnkess' frame)
+			(see the 'advanced' button in the 'Box thickness' frame)
 		* when extracting contours, CC will now ask the user if he wishes/accepts
 			to split the initial contour in several parts so as to really respect
 			the 'max edge length' parameter (this gives a much nicer result).
@@ -1214,9 +1818,9 @@ v2.5.2 12/19/2013
 	- the 'Edit > Transformation' tool now offers 3 different ways to input a transformation:
 		* classical 4x4 transformation matrix
 		* rotation axis, rotation angle and translation vector
-		* euler angles and translation vector
+		* Euler angles and translation vector
 	- if you paste a transformation matrix copied from the console, the 'Edit > Transformation' tool
-		will now automatically remove the timetsamp (between square brackets)
+		will now automatically remove the timestamp (between square brackets)
 	- when using 'Local models' when computing cloud-to-cloud distances, CC will now take the
 		smallest distance between each point and either the local model or the nearest neighbor
 		(in order to avoid clearly erroneous distances due to badly shaped local models).
@@ -1225,7 +1829,7 @@ v2.5.2 12/19/2013
 		* a progress dialog is now displayed during loading/saving
 		* multiple loading sessions can be done concurrently (use drag & drop on a 3D view
 			- note: only interesting when loading files from different drives)
-		* additional check addded to detect corrupted meshes
+		* additional check added to detect corrupted meshes
 	- Global rescaling applying at loading time is now properly handled
 		* works just like global shift
 		* appears in the entity properties as well
@@ -1477,7 +2081,7 @@ v2.4 03/10/2013
 
 - Points size can now be independently set for each cloud
 	* see the 'Point size' combo-box in the cloud's properties
-- The 'Align with point pairs' tool can now be used with only one cloud selected	
+- The 'Align with point pairs' tool can now be used with only one cloud selected
 	(in which case reference points must be manually added with the 'pencil' icon)
 - Point picking mechanism enhanced:
 	- point marker is now a (selectable) 3D sphere
@@ -1505,14 +2109,14 @@ v2.4 03/10/2013
 	* display the name of the entity in the 3D view (in the middle of its bounding-box by default)
 	* can be (recursively) toggled with 'Edit > Toggle > 3D name' (shortcut: D)
 	* with the dedicated checkbox in the properties dialog of each entity
-	* with a right click on the entity entry in the DB tree	
+	* with a right click on the entity entry in the DB tree
 - "Toggle materials/textures" entry added to the DB tree context menu (and in the 'Edit > Toggle' sub-menu)
 - New display options (display dialog):
 	* point marker size (see above)
 	* histogram background color
 	* label color
 - New option for computing normals (CC's way, not qPCL's)
-	* +/-barycenter: normals are oriented by pointing outwards or towards the barycenter 
+	* +/-barycenter: normals are oriented by pointing outwards or towards the barycenter
 - Limits for auto-decimation are now:
 	* 10M. points for a cloud
 	* 2.5M. faces for a mesh
@@ -1541,7 +2145,7 @@ v2.4 01/21/2013
 	* interpolates mesh original colors (if any)
 	* only works with single meshes for the moment (not with mesh groups)
 	(+ 'Edit > Mesh > Measure surface' now also outputs the mean triangle surface)
-	
+
 - 'Set color' and 'Colorize' can now be applied to groups
 
 v2.4 01/13/2013
@@ -1559,7 +2163,7 @@ v2.4 01/13/2013
 	* primitives don't loose their attributes (colors, SF, etc.) when cloned
 		(they still loose them if display precision is changed however...)
 	* CC will only display one global progress bar when loading E57 files with many scans (>10)
-	
+
 - Bug fixes:
 	* a space character was missing when exporting a cloud with normals in ASCII format!
 	* texture files associated to PLY files should be vertically inverted (at least when the files come from PhotoScan?)
@@ -1592,7 +2196,7 @@ v2.4 12/16/2012
 - LAS import filter improved:
 	* 'time' and 'return number' fields are now supported (i.e. imported as scalar fields)
 	* color coding (8 bits or 16 bits) is automatically detected (see associated bug below)
-	* importer is more clever (fields with a unique value are automatically ignored - in case you really need them, they can be created 
+	* importer is more clever (fields with a unique value are automatically ignored - in case you really need them, they can be created
 		afterwards with the "Add constant SF" method - see above)
 - ASCII export filter:
 	* adaptive precision when writing point coordinates (typically if the cloud has been shifted at loading time due to too large coordinates)
@@ -1673,7 +2277,7 @@ v2.4 07/28/2012
 - First (skipped) line of ASCII files can now be used to read out 'headers' for columns
 	* a new checkbox is available at the bottom of the ASCII import wizard.
 	* the header line must have as much blocks as columns in the file (so be sure not to use space characters in names if the file delimiter is also the space character!)
-	* for the moment, only the scalar fields names are used by the ASCII importer 
+	* for the moment, only the scalar fields names are used by the ASCII importer
 
 - Bugs fixed:
 	* 2D Viewport objects can now be dragged and dropped, and can be loaded properly from BIN files
@@ -1692,7 +2296,7 @@ v2.4 07/18/2012
 - No more system console on Windows
 
 - Bugs fixed:
-	* under certain circumstances, when two clouds with different scalar fields were fused, 
+	* under certain circumstances, when two clouds with different scalar fields were fused,
 		random values would be set to the points that hadn't any before (instead of NaN).
 	* a bug with the internal timer was preventing CC from properly updating mesh bounding-boxes
 		(after a transformation typically) or the messages in 3D views from disappearing
@@ -1725,7 +2329,7 @@ v2.4 06/27/2012
 v2.4 06/24/2012
 ---------------
 
-- CloudCompare 64 bits version available (Windows & Linux) 
+- CloudCompare 64 bits version available (Windows & Linux)
 - Introducing BIN "V2" format (highly enhanced):
 	* almost any type of entity and their display option can be saved (all selected elements with their siblings)
 	* this format can freely evolve while keeping backward compatibility (integrated version management)

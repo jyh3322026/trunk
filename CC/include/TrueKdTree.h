@@ -20,11 +20,11 @@
 #define TRUE_KD_TREE_HEADER
 
 //Local
-#include "ReferenceCloud.h"
 #include "DistanceComputationTools.h"
+#include "ReferenceCloud.h"
 
 //system
-#include <stdint.h> //for uint fixed-sized types
+#include <cstdint>
 
 namespace CCLib
 {
@@ -45,11 +45,11 @@ public:
 	static const uint8_t LEAF_TYPE = 1;
 
 	//! Tree base node
-	struct BaseNode
+	class BaseNode
 	{
 	public:
-		explicit BaseNode(uint8_t nodeType) : parent(0), type(nodeType) {}
-		virtual ~BaseNode() {}
+		explicit BaseNode(uint8_t nodeType) : parent(nullptr), type(nodeType) {}
+		virtual ~BaseNode() = default;
 
 		bool isNode() const { return type == NODE_TYPE; }
 		bool isLeaf() const { return type == LEAF_TYPE; }
@@ -66,7 +66,7 @@ public:
 	};
 
 	//! Tree node
-	struct Node : public BaseNode
+	class Node : public BaseNode
 	{
 	public:
 
@@ -81,20 +81,20 @@ public:
 		Node()
 			: BaseNode(NODE_TYPE)
 			, splitValue(0)
-			, leftChild(0)
-			, rightChild(0)
+			, leftChild(nullptr)
+			, rightChild(nullptr)
 			, splitDim(X_DIM)
 		{}
 
-		virtual ~Node()
+		~Node() override
 		{
-			if (leftChild) delete leftChild;
-			if (rightChild) delete rightChild;
+			delete leftChild;
+			delete rightChild;
 		}
 	};
 
 	//! Tree leaf
-	struct Leaf : public BaseNode
+	class Leaf : public BaseNode
 	{
 	public:
 
@@ -118,15 +118,14 @@ public:
 			memcpy(planeEq, planeEquation, sizeof(PointCoordinateType) * 4);
 		}
 
-		virtual ~Leaf()
+		~Leaf() override
 		{
-			if (points)
-				delete points;
+			delete points;
 		}
 	};
 
 	//! A vector of leaves
-	typedef std::vector<Leaf*> LeafVector;
+	using LeafVector = std::vector<Leaf *>;
 
 	//! Default constructor
 	explicit TrueKdTree(GenericIndexedCloudPersist* cloud);
@@ -148,7 +147,7 @@ public:
 				DistanceComputationTools::ERROR_MEASURES errorMeasure = DistanceComputationTools::RMS,
 				unsigned minPointCountPerCell = 3,
 				unsigned maxPointCountPerCell = 0,
-				GenericProgressCallback* progressCb = 0);
+				GenericProgressCallback* progressCb = nullptr);
 
 	//! Clears structure
 	void clear();

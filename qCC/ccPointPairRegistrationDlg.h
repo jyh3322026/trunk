@@ -19,7 +19,12 @@
 #define POINT_PAIR_REGISTRATION_DIALOG_HEADER
 
 //Local
-#include <ccOverlayDialog.h>
+#include "ccMainAppInterface.h"
+#include "ccOverlayDialog.h"
+#include "ccPickingListener.h"
+
+//CCLib
+#include <PointProjectionTools.h>
 
 //qCC_db
 #include <ccPointCloud.h>
@@ -32,26 +37,27 @@ class ccGenericPointCloud;
 class ccGenericGLDisplay;
 class ccGLWindow;
 class cc2DLabel;
+class ccPickingHub;
 
 //Dialog for the point-pair registration algorithm (Horn)
-class ccPointPairRegistrationDlg : public ccOverlayDialog, Ui::pointPairRegistrationDlg
+class ccPointPairRegistrationDlg : public ccOverlayDialog, public ccPickingListener, Ui::pointPairRegistrationDlg
 {
 	Q_OBJECT
 
 public:
 
 	//! Default constructor
-	explicit ccPointPairRegistrationDlg(QWidget* parent = 0);
+	explicit ccPointPairRegistrationDlg(ccPickingHub* pickingHub, ccMainAppInterface* app, QWidget* parent = nullptr);
 
 	//inherited from ccOverlayDialog
-	virtual bool linkWith(ccGLWindow* win);
-	virtual bool start();
-	virtual void stop(bool state);
+	bool linkWith(ccGLWindow* win) override;
+	bool start() override;
+	void stop(bool state) override;
 
 	//! Inits dialog
 	bool init(	ccGLWindow* win,
 				ccHObject* aligned,
-				ccHObject* reference = 0);
+				ccHObject* reference = nullptr);
 
 	//! Clears dialog
 	void clear();
@@ -60,14 +66,17 @@ public:
 	void pause(bool state);
 
 	//! Adds a point to the 'align' set
-	bool addAlignedPoint(CCVector3d& P, ccHObject* entity = 0, bool shifted = true);
+	bool addAlignedPoint(CCVector3d& P, ccHObject* entity = nullptr, bool shifted = true);
 	//! Adds a point to the 'reference' set
-	bool addReferencePoint(CCVector3d& P, ccHObject* entity = 0, bool shifted = true);
+	bool addReferencePoint(CCVector3d& P, ccHObject* entity = nullptr, bool shifted = true);
 
 	//! Removes a point from the 'align' set
 	void removeAlignedPoint(int index, bool autoRemoveDualPoint = true);
 	//! Removes a point from the 'reference' set
 	void removeRefPoint(int index, bool autoRemoveDualPoint = true);
+
+	//! Inherited from ccPickingListener
+	void onItemPicked(const PickedItem& pi) override;
 
 protected slots:
 
@@ -88,8 +97,6 @@ protected slots:
 
 	//! Slot called when a "delete" button is pushed
 	void onDelButtonPushed();
-
-	void processPickedItem(ccHObject*, unsigned, int, int, const CCVector3&);
 
 	//! Updates the registration info and buttons states
 	void updateAlignInfo();
@@ -158,6 +165,11 @@ protected:
 	//! Whether the dialog is paused or not
 	bool m_paused;
 
+	//! Picking hub
+	ccPickingHub* m_pickingHub;
+
+	//! Main application interface
+	ccMainAppInterface* m_app;
 };
 
 #endif //POINT_PAIR_REGISTRATION_DIALOG_HEADER

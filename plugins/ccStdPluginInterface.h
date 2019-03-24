@@ -19,14 +19,14 @@
 #define CC_STD_PLUGIN_INTERFACE_HEADER
 
 //Qt
-#include <QWidget>
 #include <QActionGroup>
+#include <QWidget>
 
 //qCC_db
 #include <ccHObject.h>
 
 //qCC
-#include "ccPluginInterface.h"
+#include "ccDefaultPluginInterface.h"
 #include "ccMainAppInterface.h"
 
 //UI Modification flags
@@ -40,30 +40,45 @@
 	and the associated ccMainAppInterface member should give it
 	access to everything it needs in the main application.
 **/
-class ccStdPluginInterface : public ccPluginInterface
-{
+class ccStdPluginInterface : public ccDefaultPluginInterface
+{	
 public:
 
 	//! Default constructor
-	ccStdPluginInterface() : ccPluginInterface(), m_app(0) {}
+	ccStdPluginInterface( const QString &resourcePath = QString() ) :
+		ccDefaultPluginInterface( resourcePath )
+	  , m_app(nullptr)
+	{
+	}
+	
 	//! Destructor
-	virtual ~ccStdPluginInterface() {}
+	~ccStdPluginInterface() override = default;
 
 	//inherited from ccPluginInterface
-	virtual CC_PLUGIN_TYPE getType() const override { return CC_STD_PLUGIN; }
+	CC_PLUGIN_TYPE getType() const override { return CC_STD_PLUGIN; }
 
 	//! Sets application entry point
 	/** Called just after plugin creation by qCC
 	**/
-	virtual void setMainAppInterface(ccMainAppInterface* app);
+	virtual void setMainAppInterface(ccMainAppInterface* app)
+	{
+		m_app = app;
+		
+		if (m_app)
+		{
+			//we use the same 'unique ID' generator in plugins as in the main
+			//application (otherwise we'll have issues with 'unique IDs'!)
+			ccObject::SetUniqueIDGenerator(m_app->getUniqueIDGenerator());
+		}
+	}
 
-	//! A callback poiner to the main app interface for being used by plugins
+	//! A callback pointer to the main app interface for use by plugins
 	/**  Any plugin (and its tools) may need to access methods of this interface
 	**/
 	virtual ccMainAppInterface * getMainAppInterface() { return m_app; }
 
-	//! Returns action(s)
-	virtual void getActions(QActionGroup& group) = 0;
+	//! Get a list of actions for this plugin
+	virtual QList<QAction *> getActions() = 0;
 
 	//! This method is called by the main application whenever the entity selection changes
 	/** Does nothing by default. Should be re-implemented by the plugin if necessary.
@@ -72,7 +87,7 @@ public:
 	virtual void onNewSelection(const ccHObject::Container& selectedEntities) { /*ignored by default*/ }
 
 	//! Shortcut to ccMainAppInterface::dispToConsole
-	inline virtual void dispToConsole(QString message, ccMainAppInterface::ConsoleMessageLevel level = ccMainAppInterface::STD_CONSOLE_MESSAGE)
+	inline virtual void dispToConsole(const QString& message, ccMainAppInterface::ConsoleMessageLevel level = ccMainAppInterface::STD_CONSOLE_MESSAGE)
 	{
 		if (m_app)
 		{
@@ -85,6 +100,8 @@ protected:
 	//! Main application interface
 	ccMainAppInterface* m_app;
 };
+
+Q_DECLARE_METATYPE(const ccStdPluginInterface *);
 
 Q_DECLARE_INTERFACE(ccStdPluginInterface,"edf.rd.CloudCompare.ccStdPluginInterface/1.4")
 

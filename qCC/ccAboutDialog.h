@@ -21,17 +21,19 @@
 #include <QDialog>
 
 namespace Ui {
-    class AboutDialog;
+	class AboutDialog;
 }
 
 class ccAboutDialog : public QDialog
 {
-   public:
-      ccAboutDialog( QWidget *parent = nullptr );
-      ~ccAboutDialog();
+	Q_OBJECT
 
-    private:
-      Ui::AboutDialog   *mUI;
+public:
+	ccAboutDialog(QWidget *parent = nullptr);
+	~ccAboutDialog();
+
+private:
+	Ui::AboutDialog   *mUI;
 };
 
 #endif // CCABOUTDIALOG_H

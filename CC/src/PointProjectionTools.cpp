@@ -16,41 +16,39 @@
 //#                                                                        #
 //##########################################################################
 
-#include "PointProjectionTools.h"
+#include <PointProjectionTools.h>
 
 //local
-#include "SimpleCloud.h"
-#include "Delaunay2dMesh.h"
-#include "GenericIndexedMesh.h"
-#include "GenericProgressCallback.h"
-#include "Neighbourhood.h"
-#include "SimpleMesh.h"
-#include "DistanceComputationTools.h"
+#include <Delaunay2dMesh.h>
+#include <DistanceComputationTools.h>
+#include <GenericProgressCallback.h>
+#include <Neighbourhood.h>
+#include <ParallelSort.h>
+#include <PointCloud.h>
+#include <SimpleMesh.h>
 
 //system
-#include <assert.h>
-#include <string.h>
 #include <set>
 
 using namespace CCLib;
 
-SimpleCloud* PointProjectionTools::developCloudOnCylinder(GenericCloud* cloud,
+PointCloud* PointProjectionTools::developCloudOnCylinder(	GenericCloud* cloud,
 															PointCoordinateType radius,
 															unsigned char dim,
 															CCVector3* center,
 															GenericProgressCallback* progressCb)
 {
 	if (!cloud)
-		return 0;
+		return nullptr;
 
 	unsigned char dim1 = (dim > 0 ? dim-1 : 2);
 	unsigned char dim2 = (dim < 2 ? dim+1 : 0);
 
 	unsigned count = cloud->size();
 
-	SimpleCloud* newList = new SimpleCloud();
-	if (!newList->reserve(count)) //not enough memory
-		return 0;
+	PointCloud* newCloud = new PointCloud();
+	if (!newCloud->reserve(count)) //not enough memory
+		return nullptr;
 
 	//we compute cloud bounding box center if no center is specified
 	CCVector3 C;
@@ -76,15 +74,15 @@ SimpleCloud* PointProjectionTools::developCloudOnCylinder(GenericCloud* cloud,
 		progressCb->start();
 	}
 
-	const CCVector3* Q = 0;
-	cloud->placeIteratorAtBegining();
+	const CCVector3* Q = nullptr;
+	cloud->placeIteratorAtBeginning();
 	while ((Q = cloud->getNextPoint()))
 	{
 		CCVector3 P = *Q-*center;
 		PointCoordinateType u = sqrt(P.u[dim1] * P.u[dim1] + P.u[dim2] * P.u[dim2]);
 		PointCoordinateType lon = atan2(P.u[dim1],P.u[dim2]);
 
-		newList->addPoint(CCVector3(lon*radius,P.u[dim],u-radius));
+		newCloud->addPoint(CCVector3(lon*radius,P.u[dim],u-radius));
 
 		if (progressCb && !nprogress.oneStep())
 		{
@@ -98,30 +96,30 @@ SimpleCloud* PointProjectionTools::developCloudOnCylinder(GenericCloud* cloud,
 		progressCb->stop();
 	}
 
-	return newList;
+	return newCloud;
 }
 
 //deroule la liste sur un cone dont le centre est "center" et d'angle alpha en degres
-SimpleCloud* PointProjectionTools::developCloudOnCone(GenericCloud* cloud, unsigned char dim, PointCoordinateType baseRadius, float alpha, const CCVector3& center, GenericProgressCallback* progressCb)
+PointCloud* PointProjectionTools::developCloudOnCone(GenericCloud* cloud, unsigned char dim, PointCoordinateType baseRadius, float alpha, const CCVector3& center, GenericProgressCallback* progressCb)
 {
 	if (!cloud)
-		return 0;
+		return nullptr;
 
 	unsigned count = cloud->size();
 
-	SimpleCloud* outCloud = new SimpleCloud();
+	PointCloud* outCloud = new PointCloud();
 	if (!outCloud->reserve(count)) //not enough memory
-		return 0;
+		return nullptr;
 
 	unsigned char dim1 = (dim>0 ? dim-1 : 2);
 	unsigned char dim2 = (dim<2 ? dim+1 : 0);
 
-	float tan_alpha = tan(alpha*static_cast<float>(CC_DEG_TO_RAD));
+	float tan_alpha = tanf(alpha*static_cast<float>(CC_DEG_TO_RAD));
 	//float cos_alpha = cos(alpha*CC_DEG_TO_RAD);
 	//float sin_alpha = sin(alpha*CC_DEG_TO_RAD);
 	float q = 1.0f/(1.0f+tan_alpha*tan_alpha);
 
-	cloud->placeIteratorAtBegining();
+	cloud->placeIteratorAtBeginning();
 
 	NormalizedProgress nprogress(progressCb, count);
 	if (progressCb)
@@ -181,15 +179,15 @@ SimpleCloud* PointProjectionTools::developCloudOnCone(GenericCloud* cloud, unsig
 	return outCloud;
 }
 
-SimpleCloud* PointProjectionTools::applyTransformation(GenericCloud* cloud, Transformation& trans, GenericProgressCallback* progressCb)
+PointCloud* PointProjectionTools::applyTransformation(GenericCloud* cloud, Transformation& trans, GenericProgressCallback* progressCb)
 {
 	assert(cloud);
 
 	unsigned count = cloud->size();
 
-	SimpleCloud* transformedCloud = new SimpleCloud();
+	PointCloud* transformedCloud = new PointCloud();
 	if (!transformedCloud->reserve(count))
-		return 0; //not enough memory
+		return nullptr; //not enough memory
 
 	NormalizedProgress nprogress(progressCb, count);
 	if (progressCb)
@@ -205,7 +203,7 @@ SimpleCloud* PointProjectionTools::applyTransformation(GenericCloud* cloud, Tran
 		progressCb->start();
 	}
 
-	cloud->placeIteratorAtBegining();
+	cloud->placeIteratorAtBeginning();
 	const CCVector3* P;
 
 	if (trans.R.isValid())
@@ -257,7 +255,7 @@ GenericIndexedMesh* PointProjectionTools::computeTriangulation(	GenericIndexedCl
 	{
 		if (errorStr)
 			strcpy(errorStr, "Invalid input cloud");
-		return 0;
+		return nullptr;
 	}
 
 
@@ -269,7 +267,7 @@ GenericIndexedMesh* PointProjectionTools::computeTriangulation(	GenericIndexedCl
 			{
 				if (errorStr)
 					strcpy(errorStr, "Invalid projection dimension");
-				return 0;
+				return nullptr;
 			}
 			const unsigned char Z = static_cast<unsigned char>(dim);
 			const unsigned char X = Z == 2 ? 0 : Z+1;
@@ -288,7 +286,7 @@ GenericIndexedMesh* PointProjectionTools::computeTriangulation(	GenericIndexedCl
 				break;
 			}
 
-			cloud->placeIteratorAtBegining();
+			cloud->placeIteratorAtBeginning();
 			for (unsigned i=0; i<count; ++i)
 			{
 				const CCVector3* P = cloud->getPoint(i);
@@ -303,7 +301,7 @@ GenericIndexedMesh* PointProjectionTools::computeTriangulation(	GenericIndexedCl
 				if (errorStr)
 					strcpy(errorStr, triLibErrorStr);
 				delete dm;
-				return 0;
+				return nullptr;
 			}
 			dm->linkMeshWith(cloud,false);
 
@@ -317,27 +315,27 @@ GenericIndexedMesh* PointProjectionTools::computeTriangulation(	GenericIndexedCl
 					if (errorStr)
 						strcpy(errorStr, "No triangle left after pruning");
 					delete dm;
-					return 0;
+					return nullptr;
 				}
 			}
 
 			return static_cast<GenericIndexedMesh*>(dm);
 		}
-		break;
+
 	case DELAUNAY_2D_BEST_LS_PLANE:
 		{
 			Neighbourhood Yk(cloud);
 			GenericIndexedMesh* mesh = Yk.triangulateOnPlane(false,maxEdgeLength,errorStr);
 			return mesh;
 		}
-		break;
+
 	default:
 		//shouldn't happen
 		assert(false);
 		break;
 	}
 
-	return 0;
+	return nullptr;
 }
 
 // Lexicographic sorting operator
@@ -349,14 +347,14 @@ inline bool LexicographicSort(const CCVector2& a, const CCVector2& b)
 bool PointProjectionTools::extractConvexHull2D(	std::vector<IndexedCCVector2>& points,
 												std::list<IndexedCCVector2*>& hullPoints)
 {
-	size_t n = points.size();
+	std::size_t n = points.size();
 
 	// Sort points lexicographically
-	std::sort(points.begin(), points.end(), LexicographicSort);
+	ParallelSort(points.begin(), points.end(), LexicographicSort);
 
 	// Build lower hull
 	{
-		for (size_t i=0; i<n; i++)
+		for (std::size_t i=0; i<n; i++)
 		{
 			while (hullPoints.size() >= 2)
 			{
@@ -386,7 +384,7 @@ bool PointProjectionTools::extractConvexHull2D(	std::vector<IndexedCCVector2>& p
 
 	// Build upper hull
 	{
-		size_t t = hullPoints.size()+1;
+		std::size_t t = hullPoints.size()+1;
 		for (int i=static_cast<int>(n)-2; i>=0; i--)
 		{
 			while (hullPoints.size() >= t)
@@ -454,7 +452,7 @@ bool PointProjectionTools::segmentIntersect(const CCVector2& A, const CCVector2&
 	}
 
 	PointCoordinateType cross_AB_CD = AB.cross(CD);
-	if (fabs(cross_AB_CD) != 0) //AB and CD are not parallel
+	if (std::abs(cross_AB_CD) != 0) //AB and CD are not parallel
 	{
 		//where do they intersect?
 		//PointCoordinateType v = cross_AB_AC/cross_AB_CD;
@@ -492,47 +490,49 @@ enum HullPointFlags {	POINT_NOT_USED	= 0,
 						POINT_FROZEN	= 3,
 };
 
-typedef CCLib::PointProjectionTools::IndexedCCVector2 Vertex2D;
-typedef std::list<Vertex2D*>::iterator VertexIterator;
-typedef std::list<Vertex2D*>::const_iterator ConstVertexIterator;
+using Vertex2D = CCLib::PointProjectionTools::IndexedCCVector2;
+using VertexIterator = std::list<Vertex2D *>::iterator;
+using ConstVertexIterator = std::list<Vertex2D *>::const_iterator;
 
-struct Edge
+namespace 
 {
-	Edge() : nearestPointIndex(0), nearestPointSquareDist(-1.0f) {}
-	
-	Edge(const VertexIterator& A, unsigned _nearestPointIndex, float _nearestPointSquareDist)
-		: itA(A)
-		, nearestPointIndex(_nearestPointIndex)
-		, nearestPointSquareDist(_nearestPointSquareDist)
-	{}
-
-	//operator
-	inline bool operator< (const Edge& e) const { return nearestPointSquareDist < e.nearestPointSquareDist; }
-
-	VertexIterator itA;
-	unsigned nearestPointIndex;
-	float nearestPointSquareDist;
-};
-
+	struct Edge
+	{
+		Edge() : nearestPointIndex(0), nearestPointSquareDist(-1.0f) {}
+		
+		Edge(const VertexIterator& A, unsigned _nearestPointIndex, float _nearestPointSquareDist)
+			: itA(A)
+			, nearestPointIndex(_nearestPointIndex)
+			, nearestPointSquareDist(_nearestPointSquareDist)
+		{}
+		
+		//operator
+		inline bool operator< (const Edge& e) const { return nearestPointSquareDist < e.nearestPointSquareDist; }
+		
+		VertexIterator itA;
+		unsigned nearestPointIndex;
+		float nearestPointSquareDist;
+	};
+}
 
 //! Finds the nearest (available) point to an edge
 /** \return The nearest point distance (or -1 if no point was found!)
 **/
-PointCoordinateType FindNearestCandidate(	unsigned& minIndex,
-											const VertexIterator& itA,
-											const VertexIterator& itB,
-											const std::vector<Vertex2D>& points,
-											const std::vector<HullPointFlags>& pointFlags,
-											PointCoordinateType minSquareEdgeLength,
-											PointCoordinateType maxSquareEdgeLength,
-											bool allowLongerChunks = false)
+static PointCoordinateType FindNearestCandidate(	unsigned& minIndex,
+													const VertexIterator& itA,
+													const VertexIterator& itB,
+													const std::vector<Vertex2D>& points,
+													const std::vector<HullPointFlags>& pointFlags,
+													PointCoordinateType minSquareEdgeLength,
+													PointCoordinateType maxSquareEdgeLength,
+													bool allowLongerChunks = false)
 {
 	//look for the nearest point in the input set
 	PointCoordinateType minDist2 = -1;
-	CCVector2 AB = **itB-**itA;
+	CCVector2 AB = **itB - **itA;
 	PointCoordinateType squareLengthAB = AB.norm2();
 	unsigned pointCount = static_cast<unsigned>(points.size());
-	for (unsigned i=0; i<pointCount; ++i)
+	for (unsigned i = 0; i < pointCount; ++i)
 	{
 		const Vertex2D& P = points[i];
 		if (pointFlags[P.index] != POINT_NOT_USED)
@@ -543,7 +543,7 @@ PointCoordinateType FindNearestCandidate(	unsigned& minIndex,
 			continue;
 
 		//we only consider 'inner' points
-		CCVector2 AP = P-**itA;
+		CCVector2 AP = P - **itA;
 		if (AB.x * AP.y - AB.y * AP.x < 0)
 		{
 			continue;
@@ -560,7 +560,7 @@ PointCoordinateType FindNearestCandidate(	unsigned& minIndex,
 				//(i.e. at least one of the created edges is smaller than the original one
 				//and we don't create too small edges!)
 				PointCoordinateType squareLengthAP = AP.norm2();
-				PointCoordinateType squareLengthBP = (P-**itB).norm2();
+				PointCoordinateType squareLengthBP = (P - **itB).norm2();
 				if (	squareLengthAP >= minSquareEdgeLength
 					&&	squareLengthBP >= minSquareEdgeLength
 					&&	(allowLongerChunks || (squareLengthAP < squareLengthAB || squareLengthBP < squareLengthAB))
@@ -580,7 +580,7 @@ bool PointProjectionTools::extractConcaveHull2D(std::vector<IndexedCCVector2>& p
 												PointCoordinateType maxSquareEdgeLength/*=0*/)
 {
 	//first compute the Convex hull
-	if (!extractConvexHull2D(points,hullPoints))
+	if (!extractConvexHull2D(points, hullPoints))
 		return false;
 
 	//do we really need to compute the concave hull?
@@ -592,9 +592,9 @@ bool PointProjectionTools::extractConcaveHull2D(std::vector<IndexedCCVector2>& p
 	std::vector<HullPointFlags> pointFlags;
 	try
 	{
-		pointFlags.resize(pointCount,POINT_NOT_USED);
+		pointFlags.resize(pointCount, POINT_NOT_USED);
 	}
-	catch(...)
+	catch (...)
 	{
 		//not enough memory
 		return false;
@@ -604,15 +604,15 @@ bool PointProjectionTools::extractConcaveHull2D(std::vector<IndexedCCVector2>& p
 	PointCoordinateType minSquareEdgeLength = 0;
 	{
 		CCVector2 minP,maxP;
-		for (size_t i=0; i<pointCount; ++i)
+		for (std::size_t i = 0; i < pointCount; ++i)
 		{
 			const IndexedCCVector2& P = points[i];
 			if (i)
 			{
-				minP.x = std::min(P.x,minP.x);
-				minP.y = std::min(P.y,minP.y);
-				maxP.x = std::max(P.x,maxP.x);
-				maxP.y = std::max(P.y,maxP.y);
+				minP.x = std::min(P.x, minP.x);
+				minP.y = std::min(P.y, minP.y);
+				maxP.x = std::max(P.x, maxP.x);
+				maxP.y = std::max(P.y, maxP.y);
 			}
 			else
 			{
@@ -620,7 +620,7 @@ bool PointProjectionTools::extractConcaveHull2D(std::vector<IndexedCCVector2>& p
 			}
 		}
 		minSquareEdgeLength = (maxP-minP).norm2() / static_cast<PointCoordinateType>(1.0e7); //10^-7 of the max bounding rectangle side
-		minSquareEdgeLength = std::min(minSquareEdgeLength, maxSquareEdgeLength/10);
+		minSquareEdgeLength = std::min(minSquareEdgeLength, maxSquareEdgeLength / 10);
 
 		//we remove very small edges
 		for (std::list<IndexedCCVector2*>::iterator itA = hullPoints.begin(); itA != hullPoints.end(); ++itA)
@@ -654,7 +654,7 @@ bool PointProjectionTools::extractConcaveHull2D(std::vector<IndexedCCVector2>& p
 			++step;
 
 			////reset point flags
-			//for (size_t i=0; i<pointCount; ++i)
+			//for (std::size_t i=0; i<pointCount; ++i)
 			//{
 			//	if (pointFlags[i] != POINT_FROZEN)
 			//		pointFlags[i] = POINT_NOT_USED;
@@ -685,7 +685,7 @@ bool PointProjectionTools::extractConcaveHull2D(std::vector<IndexedCCVector2>& p
 
 						if (minSquareDist >= 0)
 						{
-							Edge e(itA,nearestPointIndex,minSquareDist);
+							Edge e(itA, nearestPointIndex, minSquareDist);
 							edges.insert(e);
 						}
 					}
@@ -782,7 +782,7 @@ bool PointProjectionTools::extractConcaveHull2D(std::vector<IndexedCCVector2>& p
 						}
 
 						//update the removed edges info and put them back in the main list
-						for (size_t i=0; i<removed.size(); ++i)
+						for (std::size_t i=0; i<removed.size(); ++i)
 						{
 							VertexIterator itC = removed[i];
 							VertexIterator itD = itC; ++itD;
@@ -856,4 +856,35 @@ bool PointProjectionTools::extractConcaveHull2D(std::vector<IndexedCCVector2>& p
 	}
 
 	return true;
+}
+
+void PointProjectionTools::Transformation::apply(GenericIndexedCloudPersist& cloud) const
+{
+	//always apply the scale before everything (applying before or after rotation does not changes anything)
+	if (std::abs(s - 1.0) > ZERO_TOLERANCE)
+	{
+		for (unsigned i = 0; i< cloud.size(); ++i)
+		{
+			CCVector3* P = const_cast<CCVector3*>(cloud.getPoint(i));
+			*P *= s;
+		}
+	}
+
+	if (R.isValid())
+	{
+		for (unsigned i = 0; i< cloud.size(); ++i)
+		{
+			CCVector3* P = const_cast<CCVector3*>(cloud.getPoint(i));
+			(*P) = R * (*P);
+		}
+	}
+
+	if (T.norm() > ZERO_TOLERANCE) //T applied only if it makes sense
+	{
+		for (unsigned i = 0; i< cloud.size(); ++i)
+		{
+			CCVector3* P = const_cast<CCVector3*>(cloud.getPoint(i));
+			(*P) += T;
+		}
+	}
 }

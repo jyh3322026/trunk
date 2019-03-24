@@ -44,8 +44,10 @@ struct dbTreeSelectionInfo
 	size_t normalsCount;
 	size_t octreeCount;
 	size_t cloudCount;
+	size_t gridCound;
 	size_t groupCount;
 	size_t polylineCount;
+	size_t planeCount;
 	size_t meshCount;
 	size_t imageCount;
 	size_t sensorCount;
@@ -55,13 +57,15 @@ struct dbTreeSelectionInfo
 
 	void reset()
 	{
-		memset(this,0,sizeof(dbTreeSelectionInfo));
+		memset(this, 0, sizeof(dbTreeSelectionInfo));
 	}
 };
 
 //! Custom QTreeView widget (for advanced selection behavior)
 class ccCustomQTreeView : public QTreeView
 {
+	Q_OBJECT
+	
 public:
 
 	//! Default constructor
@@ -70,7 +74,7 @@ public:
 protected:
 
 	//inherited from QTreeView
-	virtual QItemSelectionModel::SelectionFlags selectionCommand(const QModelIndex& index, const QEvent* event=0) const;
+	QItemSelectionModel::SelectionFlags selectionCommand(const QModelIndex& index, const QEvent* event=nullptr) const override;
 };
 
 //! GUI database tree root
@@ -85,10 +89,10 @@ public:
 		\param propertiesTreeWidget widget for selected entity's properties tree display
 		\param parent widget QObject parent
 	**/
-	ccDBRoot(ccCustomQTreeView* dbTreeWidget, QTreeView* propertiesTreeWidget, QObject* parent = 0);
+	ccDBRoot(ccCustomQTreeView* dbTreeWidget, QTreeView* propertiesTreeWidget, QObject* parent = nullptr);
 
 	//! Destructor
-	virtual ~ccDBRoot();
+	~ccDBRoot() override;
 
 	//! Returns associated root object
 	ccHObject* getRootEntity();
@@ -122,7 +126,7 @@ public:
 	//! Returns selected entities in DB tree (optionally with a given type and additional information)
 	size_t getSelectedEntities(	ccHObject::Container& selectedEntities,
 								CC_CLASS_ENUM filter = CC_TYPES::OBJECT,
-								dbTreeSelectionInfo* info = NULL);
+								dbTreeSelectionInfo* info = nullptr);
 
 	//! Expands tree at a given node
 	void expandElement(ccHObject* object, bool state);
@@ -137,20 +141,19 @@ public:
 	void unloadAll();
 
 	//inherited from QAbstractItemModel
-	virtual QVariant data(const QModelIndex &index, int role) const;
-	virtual QModelIndex index(int row, int column, const QModelIndex &parentIndex = QModelIndex()) const;
-	virtual QModelIndex index(ccHObject* object);
-	virtual QModelIndex parent(const QModelIndex &index) const;
-	virtual int rowCount(const QModelIndex &parent = QModelIndex()) const;
-	virtual int columnCount(const QModelIndex &parent = QModelIndex()) const;
-	virtual Qt::ItemFlags flags(const QModelIndex &index) const;
-	virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole);
-	virtual Qt::DropActions supportedDropActions() const;
-	virtual bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent);
-	virtual QMap<int,QVariant> itemData(const QModelIndex& index) const;
-	virtual Qt::DropActions supportedDragActions() const { return Qt::MoveAction; }
+	QVariant data(const QModelIndex &index, int role) const override;
+	QModelIndex index(int row, int column, const QModelIndex &parentIndex = QModelIndex()) const override;
+	QModelIndex index(ccHObject* object);
+	QModelIndex parent(const QModelIndex &index) const override;
+	int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+	int columnCount(const QModelIndex &parent = QModelIndex()) const override;
+	Qt::ItemFlags flags(const QModelIndex &index) const override;
+	bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
+	Qt::DropActions supportedDropActions() const override;
+	bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent) override;
+	QMap<int,QVariant> itemData(const QModelIndex& index) const override;
+	Qt::DropActions supportedDragActions() const override { return Qt::MoveAction; }
 
-public slots:
 	void changeSelection(const QItemSelection & selected, const QItemSelection & deselected);
 	void reflectObjectPropChange(ccHObject* obj);
 	void redrawCCObject(ccHObject* object);
@@ -177,8 +180,7 @@ public slots:
 	**/
 	void selectEntities(const ccHObject::Container& entities, bool incremental = false);
 
-protected:
-
+private:
 	//! Entity property that can be toggled
 	enum TOGGLE_PROPERTY {	TG_ENABLE,
 							TG_VISIBLE,
@@ -191,7 +193,6 @@ protected:
 	//! Toggles a given property (enable state, visibility, normal, color, SF, etc.) on selected entities
 	void toggleSelectedEntitiesProperty(TOGGLE_PROPERTY prop);
 
-protected slots:
 	void showContextMenu(const QPoint&);
 
 	void expandBranch();
@@ -214,9 +215,12 @@ protected slots:
 	void alignCameraWithEntityDirect() { alignCameraWithEntity(false); }
 	void alignCameraWithEntityIndirect() { alignCameraWithEntity(true); }
 	void enableBubbleViewMode();
+	void editLabelScalarValue();
 
 signals:
 	void selectionChanged();
+	void dbIsEmpty();
+	void dbIsNotEmptyAnymore();
 
 protected:
 
@@ -295,10 +299,11 @@ protected:
 	QAction* m_alignCameraWithEntityReverse;
 	//! Context menu action: enable bubble-view (on a sensor)
 	QAction* m_enableBubbleViewMode;
+	//! Context menu action: change current scalar value (via a 2D label)
+	QAction* m_editLabelScalarValue;
 
 	//! Last context menu pos
 	QPoint m_contextMenuPos;
-
 };
 
 #endif

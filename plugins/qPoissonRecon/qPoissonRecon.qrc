@@ -1,5 +1,0 @@
-<RCC>
-    <qresource prefix="/CC/plugin/qPoissonRecon">
-        <file>qPoissonRecon.png</file>
-    </qresource>
-</RCC>

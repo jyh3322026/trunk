@@ -519,7 +519,8 @@ int ccComparisonDlg::determineBestOctreeLevel(double maxSearchDist)
 	}
 
 	//we skip the lowest subdivision levels (useless + incompatible with below formulas ;)
-	int theBestOctreeLevel = 2;
+	static const int s_minOctreeLevel = 6;
+	int theBestOctreeLevel = s_minOctreeLevel;
 
 	//we don't test the very first and very last level
 	ccProgressDialog progressCb(false, this);
@@ -533,7 +534,7 @@ int ccComparisonDlg::determineBestOctreeLevel(double maxSearchDist)
 	PointCoordinateType maxDistance = static_cast<PointCoordinateType>(maxDistanceDefined ? maxSearchDistSpinBox->value() : 0);
 
 	//for each level
-	for (int level=2; level<MAX_OCTREE_LEVEL; ++level)
+	for (int level = s_minOctreeLevel; level < MAX_OCTREE_LEVEL; ++level)
 	{
 		const unsigned char bitDec = CCLib::DgmOctree::GET_BIT_SHIFT(level);
 		unsigned numberOfPointsInCell = 0;
@@ -722,7 +723,7 @@ bool ccComparisonDlg::computeDistances()
 			for (unsigned j = 0; j < 3; ++j)
 			{
 				ccScalarField* sfDim = new ccScalarField();
-				if (sfDim->resize(count))
+				if (sfDim->resizeSafe(count))
 				{
 					sfDim->link();
 					c2cParams.splitDistances[j] = sfDim;
@@ -743,7 +744,7 @@ bool ccComparisonDlg::computeDistances()
 					if (c2cParams.splitDistances[j])
 					{
 						c2cParams.splitDistances[j]->release();
-						c2cParams.splitDistances[j] = 0;
+						c2cParams.splitDistances[j] = nullptr;
 					}
 				}
 			}
@@ -759,7 +760,7 @@ bool ccComparisonDlg::computeDistances()
 			{
 				size_t validDB = 0;
 				//we also make sure that the sensors have valid depth buffer!
-				for (unsigned i=0; i<pc->getChildrenNumber(); ++i)
+				for (unsigned i = 0; i < pc->getChildrenNumber(); ++i)
 				{
 					ccHObject* child = pc->getChild(i);
 					if (child && child->isA(CC_TYPES::GBL_SENSOR))
@@ -937,10 +938,11 @@ bool ccComparisonDlg::computeDistances()
 
 	for (unsigned j = 0; j < 3; ++j)
 	{
-		CCLib::ScalarField* sf = c2cParams.splitDistances[j];
+		CCLib::ScalarField* &sf = c2cParams.splitDistances[j];
 		if (sf)
 		{
 			sf->release();
+			sf = nullptr;
 		}
 	}
 			

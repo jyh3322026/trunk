@@ -63,8 +63,7 @@ public:
 	~Garbage()
 	{
 		//dispose of left over
-		typedef typename std::unordered_set<C*>::iterator iterator;
-		for (iterator it = m_items.begin(); it != m_items.end(); ++it)
+		for (auto it = m_items.begin(); it != m_items.end(); ++it)
 			delete *it;
 		m_items.clear();
 	}
@@ -98,7 +97,7 @@ public:
 		m_items.erase(item);
 	}
 
-	//! Manually deltes an item already the trash
+	//! Manually deltes an item already in the trash
 	inline void destroy(CCLib::ScalarField* item)
 	{
 		m_items.erase(item);
@@ -111,9 +110,9 @@ public:
 	~Garbage()
 	{
 		//dispose of left over
-		for (std::unordered_set<CCLib::ScalarField*>::iterator it = m_items.begin(); it != m_items.end(); ++it)
+		for (auto item : m_items)
 		{
-			(*it)->release();
+			item->release();
 		}
 		m_items.clear();
 	}

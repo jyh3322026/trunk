@@ -16,19 +16,21 @@
 //##########################################################################
 
 #include "ImageFileFilter.h"
+#include "FileIO.h"
 
 //qCC_db
+#include <ccHObjectCaster.h>
 #include <ccImage.h>
 
 //Qt
-#include <QImageReader>
-#include <QImageWriter>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QImage>
-#include <QFileDialog>
+#include <QImageReader>
+#include <QImageWriter>
 
 //System
-#include <assert.h>
+#include <cassert>
 
 ImageFileFilter::ImageFileFilter()
 	: FileIOFilter()
@@ -40,7 +42,7 @@ ImageFileFilter::ImageFileFilter()
 		//we convert this list into a proper "filters" string
 		for (int i = 0; i < formats.size(); ++i)
 		{
-			m_outputFilters.append(QString("%1 image (*.%2)").arg(QString(formats[i].data()).toUpper()).arg(formats[i].data()));
+			m_outputFilters.append(QString("%1 image (*.%2)").arg(QString(formats[i].data()).toUpper(),formats[i].data()));
 		}
 	}
 
@@ -61,7 +63,7 @@ ImageFileFilter::ImageFileFilter()
 	}
 }
 
-QString ImageFileFilter::GetSaveFilename(QString dialogTitle, QString baseName, QString imageSavePath, QWidget* parentWidget/*=0*/)
+QString ImageFileFilter::GetSaveFilename(const QString& dialogTitle, const QString& baseName, const QString& imageSavePath, QWidget* parentWidget/*=0*/)
 {
 	//add images output file filters
 	QString filters;
@@ -79,7 +81,7 @@ QString ImageFileFilter::GetSaveFilename(QString dialogTitle, QString baseName, 
 	for (int i = 0; i < formats.size(); ++i)
 	{
 		QString ext = QString(formats[i].data()).toUpper();
-		QString filter = QString("%1 image (*.%2)").arg(ext).arg(formats[i].data());
+		QString filter = QString("%1 image (*.%2)").arg(ext,formats[i].data());
 		filters.append(filter + QString("\n"));
 
 		//find PNG by default
@@ -91,14 +93,14 @@ QString ImageFileFilter::GetSaveFilename(QString dialogTitle, QString baseName, 
 
 	QString outputFilename = QFileDialog::getSaveFileName(	parentWidget,
 															dialogTitle,
-															imageSavePath + QString("/%1.%2").arg(baseName).arg(pngFilter.isEmpty() ? QString(formats[0].data()) : QString("png")),
+															imageSavePath + QString("/%1.%2").arg(baseName, pngFilter.isEmpty() ? QString(formats[0].data()) : QString("png")),
 															filters,
 															pngFilter.isEmpty() ? static_cast<QString*>(0) : &pngFilter);
 
 	return outputFilename;
 }
 
-QString ImageFileFilter::GetLoadFilename(QString dialogTitle, QString imageLoadPath, QWidget* parentWidget/*=0*/)
+QString ImageFileFilter::GetLoadFilename(const QString& dialogTitle, const QString& imageLoadPath, QWidget* parentWidget/*=0*/)
 {
 	//we grab the list of supported image file formats (for reading)
 	QList<QByteArray> formats = QImageReader::supportedImageFormats();
@@ -121,7 +123,7 @@ QStringList ImageFileFilter::getFileFilters(bool onImport) const
 	return onImport ? QStringList(m_inputFilter) : m_outputFilters;
 }
 
-bool ImageFileFilter::canLoadExtension(QString upperCaseExt) const
+bool ImageFileFilter::canLoadExtension(const QString& upperCaseExt) const
 {
 	//we grab the list of supported image file formats (for reading)
 	QList<QByteArray> formats = QImageReader::supportedImageFormats();
@@ -144,7 +146,7 @@ bool ImageFileFilter::canSave(CC_CLASS_ENUM type, bool& multiple, bool& exclusiv
 	return false;
 }
 
-CC_FILE_ERROR ImageFileFilter::saveToFile(ccHObject* entity, QString filename, SaveParameters& parameters)
+CC_FILE_ERROR ImageFileFilter::saveToFile(ccHObject* entity, const QString& filename, const SaveParameters& parameters)
 {
 	if (!entity)
 		return CC_FERR_BAD_ARGUMENT;
@@ -158,8 +160,12 @@ CC_FILE_ERROR ImageFileFilter::saveToFile(ccHObject* entity, QString filename, S
 		ccLog::Warning(QString("[IMAGE] Image '%1' is empty!").arg(image->getName()));
 		return CC_FERR_NO_SAVE;
 	}
-
-	if (!image->data().save(filename))
+	
+	QImageWriter writer(filename);
+	
+	writer.setText("Author", FileIO::writerInfo());
+	
+	if (!writer.write(image->data()))
 	{
 		ccLog::Warning(QString("[IMAGE] Failed to save image in '%1").arg(filename));
 		return CC_FERR_CONSOLE_ERROR;
@@ -168,7 +174,7 @@ CC_FILE_ERROR ImageFileFilter::saveToFile(ccHObject* entity, QString filename, S
 	return CC_FERR_NO_ERROR;
 }
 
-CC_FILE_ERROR ImageFileFilter::loadFile(QString filename, ccHObject& container, LoadParameters& parameters)
+CC_FILE_ERROR ImageFileFilter::loadFile(const QString& filename, ccHObject& container, LoadParameters& parameters)
 {
 	QImage qImage;
 	if (!qImage.load(filename))

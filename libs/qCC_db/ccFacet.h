@@ -19,15 +19,22 @@
 #define CC_FACET_HEADER
 
 //Local
-#include "ccMesh.h"
-#include "ccPolyline.h"
-#include "ccPointCloud.h"
+#include "ccHObject.h"
+#include "ccPlanarEntityInterface.h"
 
+namespace CCLib
+{
+	class GenericIndexedCloudPersist;
+}
+
+class ccMesh;
+class ccPolyline;
+class ccPointCloud;
 
 //! Facet
 /** Composite object: point cloud + 2D1/2 contour polyline + 2D1/2 surface mesh
 **/
-class QCC_DB_LIB_API ccFacet : public ccHObject
+class QCC_DB_LIB_API ccFacet : public ccHObject, public ccPlanarEntityInterface
 {
 public:
 
@@ -36,10 +43,10 @@ public:
 		\param name name
 	**/
 	ccFacet(PointCoordinateType maxEdgeLength = 0,
-			QString name = QString("Facet"));
+			const QString& name = QString("Facet"));
 
 	//! Destructor
-	virtual ~ccFacet();
+	~ccFacet() override = default;
 
 	//! Creates a facet from a set of points
 	/** The facet boundary can either be the convex hull (maxEdgeLength = 0)
@@ -53,16 +60,19 @@ public:
 	static ccFacet* Create(	CCLib::GenericIndexedCloudPersist* cloud,
 							PointCoordinateType maxEdgeLength = 0,
 							bool transferOwnership = false,
-							const PointCoordinateType* planeEquation = 0);
+							const PointCoordinateType* planeEquation = nullptr);
 
 	//! Returns class ID
-	virtual CC_CLASS_ENUM getClassID() const override { return CC_TYPES::FACET; }
-	virtual bool isSerializable() const override { return true; }
+	CC_CLASS_ENUM getClassID() const override { return CC_TYPES::FACET; }
+	bool isSerializable() const override { return true; }
 
 	//! Sets the facet unique color
 	/** \param rgb RGB color
 	**/
 	void setColor(const ccColor::Rgb& rgb);
+
+	//inherited from ccPlanarEntityInterface
+	inline CCVector3 getNormal() const override { return CCVector3(m_planeEquation); }
 
 	//! Returns associated RMS
 	inline double getRMS() const { return m_rms; }
@@ -70,21 +80,30 @@ public:
 	inline double getSurface() const { return m_surface; }
 	//! Returns plane equation
 	inline const PointCoordinateType* getPlaneEquation() const { return m_planeEquation; }
-	//! Returns normal
-	inline CCVector3 getNormal() const { return CCVector3(m_planeEquation); }
-	//! Inverts normal
+	//! Inverts the facet normal
 	void invertNormal();
-	//! Returns center
+	//! Returns the facet center
 	inline const CCVector3& getCenter() const { return m_center; }
 
 	//! Returns polygon mesh (if any)
 	inline ccMesh* getPolygon() { return m_polygonMesh; }
+	//! Returns polygon mesh (if any)
+	inline const ccMesh* getPolygon() const { return m_polygonMesh; }
+	
 	//! Returns contour polyline (if any)
 	inline ccPolyline* getContour() { return m_contourPolyline; }
+	//! Returns contour polyline (if any)
+	inline const ccPolyline* getContour() const { return m_contourPolyline; }
+	
 	//! Returns contour vertices (if any)
 	inline ccPointCloud* getContourVertices() { return m_contourVertices; }
+	//! Returns contour vertices (if any)
+	inline const ccPointCloud* getContourVertices() const { return m_contourVertices; }
+	
 	//! Returns origin points (if any)
 	inline ccPointCloud* getOriginPoints() { return m_originPoints; }
+	//! Returns origin points (if any)
+	inline const ccPointCloud* getOriginPoints() const { return m_originPoints; }
 
 	//! Sets polygon mesh
 	inline void setPolygon(ccMesh* mesh) { m_polygonMesh = mesh; }
@@ -95,22 +114,17 @@ public:
 	//! Sets origin points
 	inline void setOriginPoints(ccPointCloud* cloud) { m_originPoints = cloud; }
 
-	//! Show normal vector
-	inline void showNormalVector(bool state) { m_showNormalVector = state; }
-	//! Whether normal vector is shown or not
-	inline bool normalVectorIsShown() const { return m_showNormalVector; }
-
 	//! Clones this facet
 	ccFacet* clone() const;
 
 protected:
 
 	//inherited from ccDrawable
-	virtual void drawMeOnly(CC_DRAW_CONTEXT& context) override;
+	void drawMeOnly(CC_DRAW_CONTEXT& context) override;
 
 	//! Creates internal representation (polygon, polyline, etc.)
 	bool createInternalRepresentation(	CCLib::GenericIndexedCloudPersist* points,
-										const PointCoordinateType* planeEquation = 0);
+										const PointCoordinateType* planeEquation = nullptr);
 
 	//! Facet
 	ccMesh* m_polygonMesh;
@@ -136,15 +150,12 @@ protected:
 	//! Max length
 	PointCoordinateType m_maxEdgeLength;
 
-	//! Whether the facet normal vector should be displayed or not
-	bool m_showNormalVector;
-
 	//inherited from ccHObject
-	virtual bool toFile_MeOnly(QFile& out) const override;
-	virtual bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
+	bool toFile_MeOnly(QFile& out) const override;
+	bool fromFile_MeOnly(QFile& in, short dataVersion, int flags) override;
 
 	// ccHObject interface
-	virtual void applyGLTransformation(const ccGLMatrix &trans) override;
+	void applyGLTransformation(const ccGLMatrix &trans) override;
 };
 
 #endif //CC_FACET_PRIMITIVE_HEADER

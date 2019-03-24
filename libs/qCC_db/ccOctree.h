@@ -19,18 +19,15 @@
 #define CC_OCTREE_HEADER
 
 //Local
-#include "ccHObject.h"
 #include "ccGenericGLDisplay.h"
+#include "ccHObject.h"
 
 //CCLib
 #include <DgmOctree.h>
 #include <ReferenceCloud.h>
 
 //Qt
-#include <QSharedPointer>
-
-//system
-#include <vector>
+#include <QObject>
 
 class ccGenericPointCloud;
 class ccOctreeFrustumIntersector;
@@ -39,8 +36,10 @@ class ccCameraSensor;
 //! Octree structure
 /** Extends the CCLib::DgmOctree class.
 **/
-class QCC_DB_LIB_API ccOctree : public CCLib::DgmOctree
+class QCC_DB_LIB_API ccOctree : public QObject, public CCLib::DgmOctree
 {
+	Q_OBJECT
+
 public: //GENERAL METHODS
 
 	//! Shared pointer
@@ -118,6 +117,11 @@ public: //HELPERS
 	//! Computes the average normal of a set of points
 	static CCVector3 ComputeAverageNorm(CCLib::ReferenceCloud* subset,
 										ccGenericPointCloud* sourceCloud);
+
+signals:
+
+	//! Signal sent when the octree organization is modified (cleared, etc.)
+	void updated();
 
 protected: ////RENDERING
 

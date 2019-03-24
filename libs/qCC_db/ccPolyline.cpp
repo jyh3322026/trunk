@@ -21,9 +21,8 @@
 #include "ccPolyline.h"
 
 //Local
-#include "ccPointCloud.h"
 #include "ccCone.h"
-
+#include "ccPointCloud.h"
 
 ccPolyline::ccPolyline(GenericIndexedCloudPersist* associatedCloud)
 	: Polyline(associatedCloud)
@@ -37,7 +36,7 @@ ccPolyline::ccPolyline(GenericIndexedCloudPersist* associatedCloud)
 	showVertices(false);
 	setVertexMarkerWidth(3);
 	setWidth(0);
-	showArrow(false,0,0);
+	showArrow(false, 0, 0);
 
 	ccGenericPointCloud* cloud = dynamic_cast<ccGenericPointCloud*>(associatedCloud);
 	if (cloud)
@@ -48,10 +47,10 @@ ccPolyline::ccPolyline(GenericIndexedCloudPersist* associatedCloud)
 }
 
 ccPolyline::ccPolyline(const ccPolyline& poly)
-	: Polyline(0)
+	: Polyline(nullptr)
 	, ccShiftedObject(poly)
 {
-	ccPointCloud* clone = 0;
+	ccPointCloud* clone = nullptr;
 	initWith(clone, poly);
 }
 
@@ -157,11 +156,11 @@ void ccPolyline::applyGLTransformation(const ccGLMatrix& trans)
 
 	//invalidate the bounding-box
 	//(and we hope the vertices will be updated as well!)
-	m_validBB = false;
+	invalidateBoundingBox();
 }
 
 //unit arrow
-static QSharedPointer<ccCone> c_unitArrow(0);
+static QSharedPointer<ccCone> c_unitArrow(nullptr);
 
 void ccPolyline::drawMeOnly(CC_DRAW_CONTEXT& context)
 {
@@ -197,98 +196,95 @@ void ccPolyline::drawMeOnly(CC_DRAW_CONTEXT& context)
 		glFunc->glPushName(getUniqueIDForDisplay());
 
 	if (isColorOverriden())
-		ccGL::Color3v(glFunc, m_tempColor.rgb);
+		ccGL::Color3v(glFunc, getTempColor().rgb);
 	else if (colorsShown())
 		ccGL::Color3v(glFunc, m_rgbColor.rgb);
 
 	//display polyline
-	if (vertCount > 1)
+	if (m_width != 0)
 	{
-		if (m_width != 0)
-		{
-			glFunc->glPushAttrib(GL_LINE_BIT);
-			glFunc->glLineWidth(static_cast<GLfloat>(m_width));
-		}
+		glFunc->glPushAttrib(GL_LINE_BIT);
+		glFunc->glLineWidth(static_cast<GLfloat>(m_width));
+	}
 
-		//DGM: we do the 'GL_LINE_LOOP' manually as I have a strange bug
-		//on one on my graphic card with this mode!
-		//glBegin(m_isClosed ? GL_LINE_LOOP : GL_LINE_STRIP);
-		glFunc->glBegin(GL_LINE_STRIP);
-		for (unsigned i = 0; i < vertCount; ++i)
-		{
-			ccGL::Vertex3v(glFunc, getPoint(i)->u);
-		}
-		if (m_isClosed)
-		{
-			ccGL::Vertex3v(glFunc, getPoint(0)->u);
-		}
-		glFunc->glEnd();
+	//DGM: we do the 'GL_LINE_LOOP' manually as I have a strange bug
+	//on one on my graphic card with this mode!
+	//glBegin(m_isClosed ? GL_LINE_LOOP : GL_LINE_STRIP);
+	glFunc->glBegin(GL_LINE_STRIP);
+	for (unsigned i = 0; i < vertCount; ++i)
+	{
+		ccGL::Vertex3v(glFunc, getPoint(i)->u);
+	}
+	if (m_isClosed)
+	{
+		ccGL::Vertex3v(glFunc, getPoint(0)->u);
+	}
+	glFunc->glEnd();
 
-		//display arrow
-		if (m_showArrow && m_arrowIndex < vertCount && (m_arrowIndex > 0 || m_isClosed))
-		{
-			const CCVector3* P0 = getPoint(m_arrowIndex == 0 ? vertCount - 1 : m_arrowIndex - 1);
-			const CCVector3* P1 = getPoint(m_arrowIndex);
-			//direction of the last polyline chunk
-			CCVector3 u = *P1 - *P0;
-			u.normalize();
+	//display arrow
+	if (m_showArrow && m_arrowIndex < vertCount && (m_arrowIndex > 0 || m_isClosed))
+	{
+		const CCVector3* P0 = getPoint(m_arrowIndex == 0 ? vertCount - 1 : m_arrowIndex - 1);
+		const CCVector3* P1 = getPoint(m_arrowIndex);
+		//direction of the last polyline chunk
+		CCVector3 u = *P1 - *P0;
+		u.normalize();
 
-			if (m_mode2D)
+		if (m_mode2D)
+		{
+			u *= -m_arrowLength;
+			static const PointCoordinateType s_defaultArrowAngle = static_cast<PointCoordinateType>(15.0 * CC_DEG_TO_RAD);
+			static const PointCoordinateType cost = cos(s_defaultArrowAngle);
+			static const PointCoordinateType sint = sin(s_defaultArrowAngle);
+			CCVector3 A(cost * u.x - sint * u.y, sint * u.x + cost * u.y, 0);
+			CCVector3 B(cost * u.x + sint * u.y, -sint * u.x + cost * u.y, 0);
+			glFunc->glBegin(GL_POLYGON);
+			ccGL::Vertex3v(glFunc, (A + *P1).u);
+			ccGL::Vertex3v(glFunc, (B + *P1).u);
+			ccGL::Vertex3v(glFunc, (*P1).u);
+			glFunc->glEnd();
+		}
+		else
+		{
+			if (!c_unitArrow)
 			{
-				u *= -m_arrowLength;
-				static const PointCoordinateType s_defaultArrowAngle = static_cast<PointCoordinateType>(15.0 * CC_DEG_TO_RAD);
-				static const PointCoordinateType cost = cos(s_defaultArrowAngle);
-				static const PointCoordinateType sint = sin(s_defaultArrowAngle);
-				CCVector3 A(cost * u.x - sint * u.y, sint * u.x + cost * u.y, 0);
-				CCVector3 B(cost * u.x + sint * u.y, -sint * u.x + cost * u.y, 0);
-				glFunc->glBegin(GL_POLYGON);
-				ccGL::Vertex3v(glFunc, (A + *P1).u);
-				ccGL::Vertex3v(glFunc, (B + *P1).u);
-				ccGL::Vertex3v(glFunc, (*P1).u);
-				glFunc->glEnd();
+				c_unitArrow = QSharedPointer<ccCone>(new ccCone(0.5, 0.0, 1.0));
+				c_unitArrow->showColors(true);
+				c_unitArrow->showNormals(false);
+				c_unitArrow->setVisible(true);
+				c_unitArrow->setEnabled(true);
 			}
+			if (colorsShown())
+				c_unitArrow->setTempColor(m_rgbColor);
 			else
-			{
-				if (!c_unitArrow)
-				{
-					c_unitArrow = QSharedPointer<ccCone>(new ccCone(0.5, 0.0, 1.0));
-					c_unitArrow->showColors(true);
-					c_unitArrow->showNormals(false);
-					c_unitArrow->setVisible(true);
-					c_unitArrow->setEnabled(true);
-				}
-				if (colorsShown())
-					c_unitArrow->setTempColor(m_rgbColor);
-				else
-					c_unitArrow->setTempColor(context.pointsDefaultCol);
-				//build-up unit arrow own 'context'
-				CC_DRAW_CONTEXT markerContext = context;
-				markerContext.drawingFlags &= (~CC_DRAW_ENTITY_NAMES); //we must remove the 'push name flag' so that the sphere doesn't push its own!
-				markerContext.display = 0;
+				c_unitArrow->setTempColor(context.pointsDefaultCol);
+			//build-up unit arrow own 'context'
+			CC_DRAW_CONTEXT markerContext = context;
+			markerContext.drawingFlags &= (~CC_DRAW_ENTITY_NAMES); //we must remove the 'push name flag' so that the sphere doesn't push its own!
+			markerContext.display = nullptr;
 
-				glFunc->glMatrixMode(GL_MODELVIEW);
-				glFunc->glPushMatrix();
-				ccGL::Translate(glFunc, P1->x, P1->y, P1->z);
-				ccGLMatrix rotMat = ccGLMatrix::FromToRotation(u, CCVector3(0, 0, PC_ONE));
-				glFunc->glMultMatrixf(rotMat.inverse().data());
-				glFunc->glScalef(m_arrowLength, m_arrowLength, m_arrowLength);
-				ccGL::Translate(glFunc, 0.0, 0.0, -0.5);
-				c_unitArrow->draw(markerContext);
-				glFunc->glPopMatrix();
-			}
+			glFunc->glMatrixMode(GL_MODELVIEW);
+			glFunc->glPushMatrix();
+			ccGL::Translate(glFunc, P1->x, P1->y, P1->z);
+			ccGLMatrix rotMat = ccGLMatrix::FromToRotation(u, CCVector3(0, 0, PC_ONE));
+			glFunc->glMultMatrixf(rotMat.inverse().data());
+			glFunc->glScalef(m_arrowLength, m_arrowLength, m_arrowLength);
+			ccGL::Translate(glFunc, 0.0, 0.0, -0.5);
+			c_unitArrow->draw(markerContext);
+			glFunc->glPopMatrix();
 		}
+	}
 
-		if (m_width != 0)
-		{
-			glFunc->glPopAttrib();
-		}
+	if (m_width != 0)
+	{
+		glFunc->glPopAttrib();
 	}
 
 	//display vertices
 	if (m_showVertices)
 	{
 		glFunc->glPushAttrib(GL_POINT_BIT);
-		glFunc->glPointSize((GLfloat)m_vertMarkWidth);
+		glFunc->glPointSize(static_cast<GLfloat>(m_vertMarkWidth));
 
 		glFunc->glBegin(GL_POINTS);
 		for (unsigned i = 0; i < vertCount; ++i)
@@ -554,4 +550,141 @@ unsigned ccPolyline::getUniqueIDForDisplay() const
 		return m_parent->getParent()->getUniqueID();
 	else
 		return getUniqueID();
+}
+
+unsigned ccPolyline::segmentCount() const
+{
+	unsigned count = size();
+	if (count && !isClosed())
+	{
+		--count;
+	}
+	return count;
+}
+
+void ccPolyline::setGlobalShift(const CCVector3d& shift)
+{
+	ccShiftedObject::setGlobalShift(shift);
+
+	ccPointCloud* pc = dynamic_cast<ccPointCloud*>(m_theAssociatedCloud);
+	if (pc && pc->getParent() == this)
+	{
+		//auto transfer the global shift info to the vertices
+		pc->setGlobalShift(shift);
+	}
+}
+
+void ccPolyline::setGlobalScale(double scale)
+{
+	ccShiftedObject::setGlobalScale(scale);
+
+	ccPointCloud* pc = dynamic_cast<ccPointCloud*>(m_theAssociatedCloud);
+	if (pc && pc->getParent() == this)
+	{
+		//auto transfer the global scale info to the vertices
+		pc->setGlobalScale(scale);
+	}
+}
+
+ccPointCloud* ccPolyline::samplePoints(	bool densityBased,
+										double samplingParameter,
+										bool withRGB)
+{
+	if (samplingParameter <= 0 || size() < 2)
+	{
+		assert(false);
+		return nullptr;
+	}
+
+	//we must compute the total length of the polyline
+	double L = this->computeLength();
+
+	unsigned pointCount = 0;
+	if (densityBased)
+	{
+		pointCount = static_cast<unsigned>(ceil(L * samplingParameter));
+	}
+	else
+	{
+		pointCount = static_cast<unsigned>(samplingParameter);
+	}
+
+	if (pointCount == 0)
+	{
+		assert(false);
+		return nullptr;
+	}
+
+	//convert to real point cloud
+	ccPointCloud* cloud = new ccPointCloud(getName() + "." + QObject::tr("sampled"));
+	if (!cloud->reserve(pointCount))
+	{
+		ccLog::Warning("[ccPolyline::samplePoints] Not enough memory");
+		delete cloud;
+		return nullptr;
+	}
+
+	double samplingStep = L / pointCount;
+	double s = 0.0; //current sampled point curvilinear position
+	unsigned indexA = 0; //index of the segment start vertex
+	double sA = 0.0; //curvilinear pos of the segment start vertex
+
+	for (unsigned i = 0; i < pointCount; )
+	{
+		unsigned indexB = ((indexA + 1) % size());
+		const CCVector3& A = *getPoint(indexA);
+		const CCVector3& B = *getPoint(indexB);
+		CCVector3 AB = B - A;
+		double lAB = AB.normd();
+
+		double relativePos = s - sA;
+		if (relativePos >= lAB)
+		{
+			//specific case: last point
+			if (i + 1 == pointCount)
+			{
+				assert(relativePos < lAB * 1.01); //it should only be a rounding issue in the worst case
+				relativePos = lAB;
+			}
+			else //skip this segment
+			{
+				++indexA;
+				sA += lAB;
+				continue;
+			}
+		}
+
+		//now for the interpolation work
+		double alpha = relativePos / lAB;
+		alpha = std::max(alpha, 0.0); //just in case
+		alpha = std::min(alpha, 1.0);
+
+		CCVector3 P = A + alpha * AB;
+		cloud->addPoint(P);
+
+		//proceed to the next point
+		++i;
+		s += samplingStep;
+	}
+
+	if (withRGB)
+	{
+		if (isColorOverriden())
+		{
+			//we use the default 'temporary' color
+			cloud->setRGBColor(getTempColor());
+		}
+		else if (colorsShown())
+		{
+			//we use the default color
+			cloud->setRGBColor(m_rgbColor);
+		}
+	}
+
+	//import parameters from the source
+	cloud->setGlobalShift(getGlobalShift());
+	cloud->setGlobalScale(getGlobalScale());
+	cloud->setGLTransformationHistory(getGLTransformationHistory());
+
+	return cloud;
 }

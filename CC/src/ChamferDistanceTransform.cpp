@@ -18,19 +18,15 @@
 
 #include "ChamferDistanceTransform.h"
 
-//local
-#include "GenericProgressCallback.h"
-
 //system
 #include <algorithm>
-#include <string.h>
-#include <assert.h>
-#include <stdio.h> //for sprintf
+#include <cassert>
+#include <cstring>
 
 using namespace CCLib;
 
 //! Forward mask shifts and weights (Chamfer 3-4-5)
-const char ForwardNeighbours345[14*4] = {
+const signed char ForwardNeighbours345[14*4] = {
 	-1,-1,-1, 5,
 	 0,-1,-1, 4,
 	 1,-1,-1, 5,
@@ -48,7 +44,7 @@ const char ForwardNeighbours345[14*4] = {
 };
 
 //! Backward mask shifts and weights (Chamfer 3-4-5)
-const char BackwardNeighbours345[14*4] = {
+const signed char BackwardNeighbours345[14*4] = {
 	 0, 0, 0, 0,
 	 1, 0, 0, 3,
 	-1, 1, 0, 4,
@@ -66,7 +62,7 @@ const char BackwardNeighbours345[14*4] = {
 };
 
 //! Forward mask shifts and weights (Chamfer 1-1-1)
-const char ForwardNeighbours111[14*4] = {
+const signed char ForwardNeighbours111[14*4] = {
 	-1,-1,-1, 1,
 	 0,-1,-1, 1,
 	 1,-1,-1, 1,
@@ -84,7 +80,7 @@ const char ForwardNeighbours111[14*4] = {
 };
 
 //! Backward masks shifts and weights (Chamfer 1-1-1)
-const char BackwardNeighbours111[14*4] = {
+const signed char BackwardNeighbours111[14*4] = {
 	 0, 0, 0, 0,
 	 1, 0, 0, 1,
 	-1, 1, 0, 1,
@@ -105,12 +101,12 @@ const char BackwardNeighbours111[14*4] = {
 //																					unsigned jStart,
 //																					unsigned kStart,
 //																					bool forward,
-//																					const char neighbours[14][4],
+//																					const signed char neighbours[14][4],
 //																					NormalizedProgress* normProgress/*=0*/)
 //{
 //	assert(!m_grid.empty());
 //
-//	GridElement* _grid = &(m_grid[pos2index(iStart,jStart,kStart)]);
+//	GridElement* _grid = &(m_grid[pos2index(iStart, jStart, kStart)]);
 //
 //	//accelerating structure
 //	int neighborShift[14];
@@ -173,8 +169,8 @@ int ChamferDistanceTransform::propagateDistance(CC_CHAMFER_DISTANCE_TYPE type, G
         return -1;
 	}
 
-	const char* fwNeighbours = 0;
-	const char* bwNeighbours = 0;
+	const signed char* fwNeighbours = nullptr;
+	const signed char* bwNeighbours = nullptr;
 	switch (type)
 	{
 	case CHAMFER_111:
@@ -213,14 +209,14 @@ int ChamferDistanceTransform::propagateDistance(CC_CHAMFER_DISTANCE_TYPE type, G
 
 	//1st pass: forward scan
 	{
-		GridElement* _grid = &(m_grid[pos2index(0,0,0)]);
+		GridElement* _grid = &(m_grid[pos2index(0, 0, 0)]);
 
 		//accelerating structure
 		int neighborShift[14];
 		{
 			for (unsigned char v=0; v<14; ++v)
 			{
-				const char* fwNeighbour = fwNeighbours + 4*v;
+				const signed char* fwNeighbour = fwNeighbours + 4*v;
 				neighborShift[v] =	static_cast<int>(fwNeighbour[0]) +
 									static_cast<int>(fwNeighbour[1]) * static_cast<int>(m_rowSize) +
 									static_cast<int>(fwNeighbour[2]) * static_cast<int>(m_sliceSize);
@@ -237,7 +233,7 @@ int ChamferDistanceTransform::propagateDistance(CC_CHAMFER_DISTANCE_TYPE type, G
 
 					for (unsigned char v=1; v<14; ++v)
 					{
-						const char* fwNeighbour = fwNeighbours + 4*v;
+						const signed char* fwNeighbour = fwNeighbours + 4*v;
 						GridElement neighborVal = _grid[neighborShift[v]] + static_cast<GridElement>(fwNeighbour[3]);
 						minVal = std::min(minVal, neighborVal);
 					}
@@ -264,26 +260,26 @@ int ChamferDistanceTransform::propagateDistance(CC_CHAMFER_DISTANCE_TYPE type, G
 		{
 			for (unsigned char v=0; v<14; ++v)
 			{
-				const char* bwNeighbour = bwNeighbours + 4*v;
+				const signed char* bwNeighbour = bwNeighbours + 4*v;
 				neighborShift[v] =	static_cast<int>(bwNeighbour[0]) +
 									static_cast<int>(bwNeighbour[1]) * static_cast<int>(m_rowSize) +
 									static_cast<int>(bwNeighbour[2]) * static_cast<int>(m_sliceSize);
 			}
 		}
 
-		GridElement* _grid = &(m_grid[pos2index(static_cast<int>(m_innerSize.x)-1, static_cast<int>(m_innerSize.y)-1, static_cast<int>(m_innerSize.z)-1)]);
+		GridElement* _grid = &(m_grid[pos2index(static_cast<int>(m_innerSize.x) - 1, static_cast<int>(m_innerSize.y) - 1, static_cast<int>(m_innerSize.z) - 1)]);
 
-		for (unsigned k=0; k<m_innerSize.z; ++k)
+		for (unsigned k = 0; k < m_innerSize.z; ++k)
 		{
-			for (unsigned j=0; j<m_innerSize.y; ++j)
+			for (unsigned j = 0; j < m_innerSize.y; ++j)
 			{
-				for (unsigned i=0; i<m_innerSize.x; ++i)
+				for (unsigned i = 0; i < m_innerSize.x; ++i)
 				{
 					GridElement minVal = _grid[neighborShift[0]] + static_cast<GridElement>(bwNeighbours[3]);
 
-					for (unsigned char v=1; v<14; ++v)
+					for (unsigned char v = 1; v < 14; ++v)
 					{
-						const char* bwNeighbour = bwNeighbours + 4*v;
+						const signed char* bwNeighbour = bwNeighbours + 4 * v;
 						GridElement neighborVal = _grid[neighborShift[v]] + static_cast<GridElement>(bwNeighbour[3]);
 						minVal = std::min(minVal, neighborVal);
 					}
@@ -304,7 +300,7 @@ int ChamferDistanceTransform::propagateDistance(CC_CHAMFER_DISTANCE_TYPE type, G
 				}
 			}
 
-			_grid -= 2*m_rowSize; //next slice
+			_grid -= 2 * m_rowSize; //next slice
 		}
 	}
 

@@ -20,8 +20,8 @@
 #define GENERIC_PROGRESS_CALLBACK_HEADER
 
 //Local
-#include "CCCoreLib.h"
 #include "CCConst.h"
+#include "CCCoreLib.h"
 
 class AtomicCounter;
 
@@ -34,7 +34,7 @@ class CC_CORE_LIB_API GenericProgressCallback
 public:
 
 	//! Default destructor
-	virtual ~GenericProgressCallback() {}
+	virtual ~GenericProgressCallback() = default;
 
 	//! Notifies the algorithm progress
 	/** The notification is sent by the running algorithm (on the library side).

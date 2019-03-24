@@ -22,6 +22,7 @@
 //Local
 #include "CCConst.h"
 #include "CCToolbox.h"
+#include "PointCloud.h"
 #include "SquareMatrix.h"
 
 //System
@@ -37,10 +38,6 @@ namespace CCLib
 
 class GenericIndexedMesh;
 class GenericProgressCallback;
-class GenericIndexedCloud;
-class GenericIndexedCloudPersist;
-class GenericCloud;
-class SimpleCloud;
 
 //! Several point cloud re-projection algorithms ("developpee", translation, rotation, etc.)
 class CC_CORE_LIB_API PointProjectionTools : public CCToolbox
@@ -62,8 +59,14 @@ public:
 		//! Default constructor
 		Transformation() : s(PC_ONE) {}
 
-		//! Applies transformation to a point
+		//! Applies the transformation to a point
 		inline CCVector3 apply(const CCVector3& P) const { return s * (R * P) + T; }
+
+		//! Applies the transformation to a cloud
+		/** \warning THIS METHOD IS NOT COMPATIBLE WITH PARALLEL STRATEGIES
+			\warning The caller should invalidate the bounding-box manually afterwards
+		**/
+		CC_CORE_LIB_API void apply(GenericIndexedCloudPersist& cloud) const;
 	};
 
 	//! Develops a cylinder-shaped point cloud around its main axis
@@ -76,11 +79,11 @@ public:
 		\param progressCb the client application can get some notification of the process progress through this callback mechanism (see GenericProgressCallback)
 		\return the "developed" cloud
 	**/
-	static SimpleCloud* developCloudOnCylinder(	GenericCloud* cloud,
+	static PointCloud* developCloudOnCylinder(	GenericCloud* cloud,
 												PointCoordinateType radius,
 												unsigned char dim = 2,
-												CCVector3* center = 0,
-												GenericProgressCallback* progressCb = 0);
+												CCVector3* center = nullptr,
+												GenericProgressCallback* progressCb = nullptr);
 
 	//! Develops a cone-shaped point cloud around its main axis
 	/** Generates a "developpee" of a cone-shaped point cloud.
@@ -93,12 +96,12 @@ public:
 		\param progressCb the client application can get some notification of the process progress through this callback mechanism (see GenericProgressCallback)
 		\return the "developed" cloud
 	**/
-	static SimpleCloud* developCloudOnCone(	GenericCloud* cloud,
+	static PointCloud* developCloudOnCone(	GenericCloud* cloud,
 											unsigned char dim,
 											PointCoordinateType baseRadius,
 											float alpha,
 											const CCVector3& center,
-											GenericProgressCallback* progressCb = 0);
+											GenericProgressCallback* progressCb = nullptr);
 
 	//! Applys a geometrical transformation to a point cloud
 	/** \param cloud the point cloud to be "transformed"
@@ -106,16 +109,16 @@ public:
 		\param progressCb the client application can get some notification of the process progress through this callback mechanism (see GenericProgressCallback)
 		\return the "transformed" cloud
 	**/
-	static SimpleCloud* applyTransformation(GenericCloud* cloud,
+	static PointCloud* applyTransformation(	GenericCloud* cloud,
 											Transformation& trans,
-											GenericProgressCallback* progressCb = 0);
+											GenericProgressCallback* progressCb = nullptr);
 
 	//! Applys a geometrical transformation to a single point
 	/** \param P the point
 		\param trans the geometrical transformation
 		\return the "transformed" point
 	**/
-	static CCVector3 applyTransformation(const CCVector3& P, Transformation& trans);
+	//static CCVector3 applyTransformation(const CCVector3& P, Transformation& trans);
 
 	//! Computes a 2.5D Delaunay triangulation
 	/** The triangulation can be either computed on the points projected
@@ -134,7 +137,7 @@ public:
 													CC_TRIANGULATION_TYPES type = DELAUNAY_2D_AXIS_ALIGNED,
 													PointCoordinateType maxEdgeLength = 0,
 													unsigned char dim = 2,
-													char* errorStr = 0);
+													char* errorStr = nullptr);
 
 	//! Indexed 2D vector
 	/** Used for convex and concave hull computation
@@ -151,8 +154,6 @@ public:
 		IndexedCCVector2(PointCoordinateType x, PointCoordinateType y, unsigned i) : CCVector2(x,y), index(i) {}
 		//! Copy constructor
 		IndexedCCVector2(const CCVector2& v) : CCVector2(v), index(0) {}
-		//! Copy constructor
-		IndexedCCVector2(const IndexedCCVector2& v) : CCVector2(v), index(v.index) {}
 
 		//! Point index
 		unsigned index;
